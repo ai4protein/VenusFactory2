@@ -85,7 +85,7 @@ class ToolJobs:
         public=self.queue.public(identity,owner)
         public.update(self.records.register('mcp',identity,owner,row['kind'],row['metadata']['tool'],row['created']))
         public.update(tool=row['metadata']['tool'],category=row['metadata']['category'])
-        public.update({key:row['metadata'][key] for key in ('arguments_sha256','parent_job') if key in row['metadata']})
+        public.update({key:row['metadata'][key] for key in ('arguments_sha256','parent_job','session_id') if key in row['metadata']})
         result=self.queue.files(identity)/'mcp-result.json'
         progress=self.queue.files(identity)/'mcp-progress.json'
         if progress.is_file():public['progress']=json.loads(progress.read_text())

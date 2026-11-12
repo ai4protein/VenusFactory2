@@ -214,9 +214,8 @@ class AutonomousResearch:
         if role=='SC' and context.get('scientific_acceptance',{}).get('models'):
             instruction += ' Exact response schema: '+json.dumps(sc_acceptance.model_schema(),ensure_ascii=False)
         if role=='CB':
-            instruction += (' For each step, choose verification: artifact for documents; execution for computed analysis; '
-                'data for checked data splits; model for fitted and measured models; revision for a measured descendant; '
-                'review for independent approval; delivery for the final package. Host records must support completion. ')
+            from .research_verification_contract import VERIFICATION_DESCRIPTION
+            instruction += ' For each step, choose verification: ' + VERIFICATION_DESCRIPTION + ' Host records must support completion. '
             instruction += (' Include deliverable in the plan JSON: model, tool or analysis. '
                 'Choose model for predictive-model development from wet-lab data or a paper extension, '
                 'even when the short user topic does not use the word model. Choose tool for a reusable '
@@ -439,7 +438,7 @@ class AutonomousResearch:
                     request['audit_required']=True
                     from .research_handoff import native_phase
                     with native_phase(policy) as handoff:
-                        await run(request,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff)
+                        await run(request,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
                 from .execution_followup import execution_followup, execution_usage
                 followup = execution_followup(
                     request, native, events, checkpoint=service.checkpoint,
@@ -480,7 +479,7 @@ class AutonomousResearch:
                     else:
                         from .research_handoff import native_phase
                         with native_phase(policy) as handoff:
-                            await run(followup,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff)
+                            await run(followup,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
                 awaiting=next((e for e in events if e.get('kind')=='interaction'),None)
                 if awaiting:
                     from .interactions import Interaction

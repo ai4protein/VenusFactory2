@@ -77,6 +77,10 @@ class ResearchWorkspace:
         write_json(self.control/'receipts.json',self.receipts)
         return result
 
+    def record_queued_analysis(self, **kwargs):
+        from .research_analysis_evidence import capture
+        return capture(self, **kwargs)
+
     async def list_research_files(self) -> dict:
         """List files in the current research workspace."""
         from backend.web_v2.research_files import list_files

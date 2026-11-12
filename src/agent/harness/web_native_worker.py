@@ -61,7 +61,7 @@ def web_tool_name(name, harness):
     return name[:limit] + "_" + suffix
 
 
-async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
+async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, analysis_recorder=None):
     send = event_sink or emit
     from aiohttp import web
 
@@ -124,6 +124,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
     checkpoint_saved = False
     checkpoint_calls = 0
     is_research = 'submit_research_checkpoint' in mapping
+    if analysis_recorder is not None and not is_research:
+        raise ValueError("Analysis receipts require a Scientist workspace")
     if checkpoint_handoff is not None and (not is_research or not request.get("audit_required")):
         raise ValueError("Checkpoint handoff requires an audited Scientist tool surface")
     lookup_limit = min(48, 2 * profile.budget.tool_calls) if is_research else 0
@@ -143,6 +145,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
     workspace_call = asyncio.Lock()
     discovery_lock = asyncio.Lock()
     active_requests = set()
+    reference_hashes = {}
     closing = False
 
     def host_paths(value):
@@ -218,6 +221,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
         observation = None
         queued_tool = False
         accepted_call = False
+        analysis_artifact = None
         try:
             if method == "initialize":
                 result = {
@@ -300,6 +304,15 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
                         assert_tool_allowed(canonical_name)
                     args = (arguments if canonical_name in INTERACTION_NAMES else
                             prepare_tool_arguments(canonical_name, tool, arguments, workspace))
+                    if canonical_name in {"read_session_file", "write_session_file", "edit_session_file"}:
+                        from utils.scoped_files import parts
+                        reference = "/".join(parts(args["path"]))
+                        if reference in reference_hashes:
+                            from .research_analysis_evidence import file_digest
+                            if canonical_name != "read_session_file":
+                                raise ValueError("Research context references are read-only")
+                            if file_digest(workspace, reference) != reference_hashes[reference]:
+                                raise ValueError("Research context reference changed; its content is unavailable")
                     from mcp_tools.scheduler.catalog import classify, native_tools
                     registered = native_tools()
                     if canonical_name in registered and classify(canonical_name, tool.metadata)["execution"] == "queued":
@@ -309,15 +322,27 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
                             send({"kind": "research_tool_status", "status": job["status"], "tool": name, "call_id": call_id,
                                   "job_id": job["id"], "job_number": job["job_number"], "position": job["position"],
                                   "progress": public_value(job.get("progress"), workspace)})
-                        value = await invoke(canonical_name, args, owner=os.getenv('VENUS_QUEUE_OWNER') or "chat:" + str(request.get("session_id") or token),
-                                             parent_job=os.getenv('VENUS_QUEUE_JOB_ID'),
-                                             session_id=request.get("session_id"), on_status=queue_status)
+                        terminal = []
+                        owner = os.getenv('VENUS_QUEUE_OWNER') or "chat:" + str(request.get("session_id") or token)
+                        parent_job = os.getenv('VENUS_QUEUE_JOB_ID')
+                        value = await invoke(canonical_name, args, owner=owner, parent_job=parent_job,
+                                             session_id=request.get("session_id"), on_status=queue_status,
+                                             **({"on_terminal": terminal.append} if analysis_recorder else {}))
+                        if analysis_recorder is not None:
+                            analysis_artifact = analysis_recorder(
+                                job=terminal[-1] if terminal else None, name=canonical_name,
+                                arguments=args, value=value, owner=owner, parent_job=parent_job,
+                                session_id=request.get("session_id"))
+
                     else:
                         from backend.web_v2.usage_store import Observation
                         observation = Observation('tool', canonical_name)
                         from backend.web_v2.compute_access import inline_prediction
                         inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), canonical_name, classify(canonical_name, tool.metadata)['category'])
                         value = await tool.ainvoke(args, config={"configurable": {"session_id": request.get("session_id")}})
+                    if canonical_name == "read_session_file" and reference in reference_hashes:
+                        if not isinstance(value, dict) or value.get("file_sha256") != reference_hashes[reference]:
+                            raise ValueError("Research context reference changed while reading; its content is unavailable")
                     if canonical_name == 'submit_research_checkpoint' and not _tool_output_indicates_failure(value)[0]:
                         if checkpoint_handoff is not None:
                             checkpoint_handoff.save(arguments, public_value(value, workspace))
@@ -346,6 +371,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
                     ],
                     "isError": failed,
                 }
+                if analysis_artifact is not None:
+                    result["content"].append({"type": "text", "text": json.dumps({"analysis_evidence": analysis_artifact})})
                 result = with_budget_feedback(result)
             else:
                 raise ValueError("Unknown MCP method")
@@ -383,6 +410,35 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
                 {"jsonrpc": "2.0", "id": body.get("id"), "error": {"code": -32603, "message": message}}
             )
 
+    prompt_request = request
+    if is_research:
+        import hashlib
+
+        from utils.scoped_files import write_bytes
+
+        from .host import write_json
+        from .research_context_projection import project_research_context
+        try:
+            context_value = json.loads(request["text"])
+        except (ValueError, TypeError):
+            context_value = None
+        if isinstance(context_value, dict) and "objective" in context_value:
+            projection = project_research_context(
+                public_value(context_value, workspace), reference_prefix="context/research-" + call_scope)
+            if projection.reference_payloads:
+                # Persist all referenced bytes before exposing any shortened prompt.
+                for path, content in projection.reference_payloads.items():
+                    data = content.encode("utf-8")
+                    write_bytes(workspace, path, data)
+                    reference_hashes[path] = hashlib.sha256(data).hexdigest()
+                projected_text = json.dumps(projection.context, ensure_ascii=False)
+                prompt_request = {**request, "text": projected_text}
+                write_json(control / "context-projection.json", {
+                    "original_sha256": hashlib.sha256(request["text"].encode()).hexdigest(),
+                    "projected_sha256": hashlib.sha256(projected_text.encode()).hexdigest(),
+                    "reference_files": reference_hashes,
+                })
+
     app = web.Application(client_max_size=16_000_000)
     app.router.add_post("/rpc", rpc)
     server = web.AppRunner(app)
@@ -412,7 +468,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
         [{key: row[key] for key in ('id', 'name', 'description')}
          for row in disclosure.overview()['categories']], ensure_ascii=False)
     task = Task(
-        workspace, capability, output, public_value(native_prompt(request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat",
+        workspace, capability, output, public_value(native_prompt(prompt_request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat",
         interaction="research_execution" if is_research else None,
     )
     adapter, _ = builtin_registry().resolve(runtime_profile, request["runtimes"])

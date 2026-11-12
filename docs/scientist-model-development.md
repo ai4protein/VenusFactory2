@@ -51,6 +51,23 @@ its own fresh context and does not receive SC's endorsement. Successful deliveri
 include the SC assessment and technical test report. Closed historical protocols
 remain unchanged; resumed topics use the new acceptance policy.
 
+## Computation evidence and working context
+
+Completed MCP computations can provide execution evidence without fitting a model.
+The worker binds the task, arguments, result and declared input/output file hashes;
+the research host saves a scoped result under `analysis/`. A checkpoint must cite
+that result, and acceptance rechecks all bound files. Failed or pending jobs,
+modified outputs and model-written claims do not produce execution evidence.
+Reading a sequence or calculating its properties does not establish a validated
+training split, a fitted model, or scientific usefulness. Those remain separate
+checks and SC decisions.
+
+Native execution keeps the objective, scientific criteria, plan requirements,
+current feedback and prepared-data contract in context. Longer historical records
+and duplicate plans may move into bounded, hash-checked reference files read on
+demand. PI, SC and host validation retain the canonical context. References do not
+increase tool budgets or replace experimental receipts.
+
 ## Algorithm freedom
 
 The implementation role can write its own representations, objectives, estimators,

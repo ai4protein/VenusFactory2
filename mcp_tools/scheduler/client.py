@@ -24,14 +24,14 @@ async def rpc(name, arguments):
         return data
 
 
-async def invoke(name, arguments, *, owner, session_id=None, parent_job=None, on_status=None):
+async def invoke(name, arguments, *, owner, session_id=None, parent_job=None, on_status=None, on_terminal=None):
     args={'name':name,'arguments':arguments,'owner':owner,'session_id':session_id}
     if parent_job: args['parent_job']=parent_job
     job=await rpc('submit_tool',args)
-    return await wait(job, owner, on_status)
+    return await wait(job, owner, on_status, on_terminal=on_terminal)
 
 
-async def wait(job, owner, on_status=None):
+async def wait(job, owner, on_status=None, *, on_terminal=None):
     previous=None
     try:
         while True:
@@ -39,6 +39,8 @@ async def wait(job, owner, on_status=None):
             if state!=previous and on_status:on_status({k:v for k,v in job.items() if k!='result'})
             previous=state
             if job['status'] in TERMINAL:
+                if on_terminal:
+                    on_terminal(job)
                 result=job.get('result',{})
                 # Preserve tool-level failure details for harness repair/iteration.
                 # Infrastructure failures have no tool value and still raise.

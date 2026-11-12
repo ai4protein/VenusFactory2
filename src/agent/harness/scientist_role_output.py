@@ -52,8 +52,10 @@ def specification(role, protocol, *, model_acceptance=False, study_acceptance=Fa
         return None
     if role == "CB":
         schema["required"].remove("deliverable")
-        from .research_plan_evidence import VERIFICATION_KINDS
-        schema["properties"]["steps"]["items"]["properties"]["verification"] = {"enum": list(VERIFICATION_KINDS)}
+        from .research_verification_contract import VERIFICATION_DESCRIPTION, VERIFICATION_KINDS
+        schema["properties"]["steps"]["items"]["properties"]["verification"] = {
+            "enum": list(VERIFICATION_KINDS), "description": VERIFICATION_DESCRIPTION,
+        }
         schema["properties"]["steps"]["items"]["properties"]["approach"] = {
             **text, "description": (
                 "Concrete implementation method. For model training or revision, name the feature representation, "

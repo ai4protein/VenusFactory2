@@ -21,6 +21,7 @@ def mcp_result(value):
 async def execute(spec):
     from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
     assert_tool_call_allowed(spec['name'], spec['arguments'])
+    capture_spec = dict(spec, arguments=dict(spec['arguments']))
     if spec.get('workspace'):
         from agent.harness.session_boundary import bind_arguments
         from agent.harness.session_sandbox import check_workspace
@@ -42,12 +43,20 @@ async def execute(spec):
                                 cache_dir=arguments.get('cache_dir'))
         return {'value':value,'is_error':False}
     if spec['route']=='native':
-        from mcp_tools.scheduler.catalog import native_tools
+        from mcp_tools.scheduler.analysis_evidence import AnalysisCapture
+        from mcp_tools.scheduler.catalog import classify, native_tools
         tool=native_tools()[spec['name']]
+        capture = (AnalysisCapture(capture_spec, workspace, classify(spec['name'], getattr(tool, 'metadata', None))['category'])
+                   if spec.get('workspace') else None)
         value=await tool.ainvoke(spec['arguments'],config={'configurable':{'session_id':spec.get('session_id')}})
         from agent.chat_agent_utils import _tool_output_indicates_failure
         failed,_=_tool_output_indicates_failure(value)
-        return {'value':value,'is_error':failed}
+        result = {'value':value,'is_error':failed}
+        if capture is not None:
+            evidence = capture.finish(result)
+            if evidence is not None:
+                result['analysis_evidence'] = evidence
+        return result
     # Same MCP implementation as the HTTP catalog, but no recursive queue wrapper.
     os.environ['VENUS_MCP_QUEUE_WORKER']='1'
     from fastmcp import Client

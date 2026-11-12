@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from .contracts import file_hash
+from .research_verification_contract import VERIFICATION_KINDS as VERIFICATION_KINDS
 from .research_workspace import safe_file
 
-VERIFICATION_KINDS = ("artifact", "execution", "data", "model", "revision", "review", "delivery")
 _TOOL_REQUIREMENTS = {
     "validate_research_evaluation": "data",
     "prepare_research_dataset": "data",
@@ -52,9 +52,11 @@ def checkpoint_steps(plan, checkpoint, *, workspace, receipts, experiments, prog
         and artifacts.get(row["result"].get("evaluation_file")) == row["result"].get("source_sha256")
         for row in receipts
     )
+    from .research_analysis_evidence import checkpointed
+    analysis_jobs = checkpointed(receipts, workspace, artifacts)
     facts = {
         "artifact": bool(artifacts),
-        "execution": executed or bool(measured),
+        "execution": executed or bool(measured) or bool(analysis_jobs),
         "data": partitioned or bool(measured),
         "model": bool(measured),
         "revision": any(row.get("parent") and row.get("variant") in {"candidate", "ablation"} for row in measured),
@@ -63,7 +65,7 @@ def checkpoint_steps(plan, checkpoint, *, workspace, receipts, experiments, prog
     }
     guidance = {
         "artifact": "Checkpoint the actual result files.",
-        "execution": "Run the checkpointed script successfully; merely writing a function does not execute it.",
+        "execution": "Run the checkpointed script successfully, or checkpoint the host analysis result from a completed queued computation. Writing a function or a report alone does not execute it.",
         "data": "Validate the split with validate_research_evaluation and checkpoint the validated evaluation file.",
         "model": "Use train_research_model or evaluate_research_model to record a measured generation; checkpoint its unchanged runtime files or experiments/<id>.json.",
         "revision": "Measure a revised generation against its baseline and checkpoint that generation.",
@@ -78,6 +80,7 @@ def checkpoint_steps(plan, checkpoint, *, workspace, receipts, experiments, prog
         missing = [kind for kind in kinds if not facts.get(kind, False)]
         result.append({
             "id": step["id"], "passed": not missing, "requirements": kinds,
+            "analysis_job_ids": analysis_jobs if "execution" in kinds else [],
             "experiment_ids": [row["id"] for row in measured] if any(k in kinds for k in ("model", "revision")) else [],
             "issues": [guidance.get(kind, "Unsupported verification requirement.") for kind in missing],
         })

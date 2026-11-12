@@ -1,0 +1,130 @@
+"""Capture authenticated queued computations and bind their checkpoint artifacts.
+
+These records attest execution, not scientific usefulness, data splits or model
+quality. Scientific acceptance and independent model Review remain separate.
+"""
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import re
+from pathlib import Path
+
+from mcp_tools.scheduler.receipt_binding import value_digest
+from utils.scoped_files import open_file, write_bytes
+
+SHA = re.compile(r"[a-f0-9]{64}")
+JOB = re.compile(r"[a-f0-9]{32}")
+FIELDS = {"version", "tool", "category", "workspace_sha256", "arguments_sha256",
+          "result_sha256", "input_files", "output_files"}
+MAX_BYTES = 100 * 1024**2
+
+
+def workspace_digest(workspace):
+    return hashlib.sha256(str(Path(workspace).resolve()).encode()).hexdigest()
+
+
+def file_digest(workspace, name):
+    size, digest = 0, hashlib.sha256()
+    with open_file(workspace, name, max_bytes=MAX_BYTES) as stream:
+        while chunk := stream.read(1024**2):
+            size += len(chunk)
+            if size > MAX_BYTES:
+                raise ValueError("Analysis artifact is too large")
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def unchanged_files(workspace, files):
+    if not isinstance(files, dict) or len(files) > 100:
+        raise ValueError("Invalid analysis file binding")
+    for name, expected in files.items():
+        if not isinstance(name, str) or not isinstance(expected, str) or not SHA.fullmatch(expected):
+            raise ValueError("Invalid analysis file digest")
+        if file_digest(workspace, name) != expected:
+            raise ValueError("Analysis input or output changed")
+
+
+def validate_evidence(evidence, workspace):
+    from mcp_tools.scheduler.analysis_evidence import ANALYSIS_CATEGORIES
+
+    if (not isinstance(evidence, dict) or set(evidence) != FIELDS
+            or type(evidence["version"]) is not int or evidence["version"] != 1
+            or evidence["category"] not in ANALYSIS_CATEGORIES
+            or not isinstance(evidence["tool"], str) or not evidence["tool"]
+            or evidence["workspace_sha256"] != workspace_digest(workspace)):
+        raise ValueError("Invalid queued analysis evidence")
+    for key in ("arguments_sha256", "result_sha256"):
+        if not isinstance(evidence[key], str) or not SHA.fullmatch(evidence[key]):
+            raise ValueError("Invalid queued analysis digest")
+    unchanged_files(workspace, evidence["input_files"])
+    unchanged_files(workspace, evidence["output_files"])
+
+
+def capture(service, *, job, name, arguments, value, owner, parent_job, session_id):
+    """Called only by the host after its authenticated scheduler invocation."""
+    if job is None or not isinstance(job, dict):
+        return None
+    result = job.get("result")
+    if not isinstance(result, dict):
+        return None
+    evidence = result.get("analysis_evidence")
+    if evidence is None:
+        return None
+    if (not owner or not parent_job or not session_id
+            or not isinstance(job.get("id"), str) or not JOB.fullmatch(job["id"])
+            or job.get("tool") != name or job.get("status") != "completed"
+            or job.get("parent_job") != parent_job or job.get("session_id") != session_id
+            or job.get("arguments_sha256") != value_digest(arguments)
+            or result.get("is_error") is not False or "value" not in result
+            or value_digest(result["value"]) != value_digest(value)):
+        raise ValueError("Queued analysis task binding mismatch")
+    validate_evidence(evidence, service.workspace)
+    if (evidence["tool"] != name or evidence["category"] != job.get("category")
+            or evidence["arguments_sha256"] != value_digest(arguments)
+            or evidence["result_sha256"] != value_digest(value)):
+        raise ValueError("Queued analysis result binding mismatch")
+    from .session_boundary import public_value
+    document = public_value({"tool": name, "job_number": job.get("job_number"),
+        "category": evidence["category"], "arguments": arguments,
+        "input_files": evidence["input_files"], "output_files": evidence["output_files"],
+        "result": value}, service.workspace)
+    raw = (json.dumps(document, ensure_ascii=False, allow_nan=False, indent=2) + "\n").encode()
+    if len(raw) > 16 * 1024**2:
+        raise ValueError("Analysis result exceeds the artifact limit")
+    artifact = {"path": "analysis/" + job["id"] + ".json", "sha256": hashlib.sha256(raw).hexdigest()}
+    write_bytes(service.workspace, artifact["path"], raw)
+    saved = {"version": 1, "task_id": job["id"], "parent_job": parent_job,
+             "session_id": session_id, "owner_sha256": hashlib.sha256(owner.encode()).hexdigest(),
+             "evidence": copy.deepcopy(evidence), "artifact": artifact}
+    service.record("queued_analysis", {"tool": name, "arguments_sha256": value_digest(arguments)}, saved)
+    return {**artifact, "tool": name, "job_number": job.get("job_number"),
+            "instruction": "Inspect this result and cite its path in the research checkpoint."}
+
+
+def checkpointed(receipts, workspace, artifacts):
+    """Recheck protected records and all cited bytes; never trust workspace JSON."""
+    accepted = []
+    for row in receipts:
+        if row.get("tool") != "queued_analysis":
+            continue
+        try:
+            saved = row["result"]
+            if (set(saved) != {"version", "task_id", "parent_job", "session_id", "owner_sha256", "evidence", "artifact"}
+                    or type(saved["version"]) is not int or saved["version"] != 1
+                    or not JOB.fullmatch(saved["task_id"]) or not saved["parent_job"] or not saved["session_id"]
+                    or not SHA.fullmatch(saved["owner_sha256"])):
+                continue
+            artifact = saved["artifact"]
+            if set(artifact) != {"path", "sha256"} or artifact["path"] != "analysis/" + saved["task_id"] + ".json":
+                continue
+            if artifacts.get(artifact["path"]) != artifact["sha256"]:
+                continue
+            if file_digest(workspace, artifact["path"]) != artifact["sha256"]:
+                continue
+            validate_evidence(saved["evidence"], workspace)
+            accepted.append(saved["task_id"])
+        except (ValueError, OSError, KeyError, TypeError):
+            continue
+    return accepted
