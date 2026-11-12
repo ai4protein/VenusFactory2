@@ -175,6 +175,9 @@ def training_progress(development, before, previous=None):
 
     def fingerprint(row):
         error = row.get("error", "").replace(row["source_file"], "<algorithm>")
+        # The source reporter adds a line number after the path. Comments and
+        # blank lines move it without changing the measured algorithm/failure.
+        error = re.sub(r"(?m)^At <algorithm>:[0-9]+:", "At <algorithm>:<n>:", error)
         error = re.sub(r"line [0-9]+", "line <n>", error)
         return digest({
             "algorithm": row.get("algorithm_ast_sha256") or row["algorithm_sha256"],

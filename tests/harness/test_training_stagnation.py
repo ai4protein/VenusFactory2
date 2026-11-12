@@ -30,12 +30,15 @@ async def fail(service, name="broken.py", code=BROKEN, seed=0):
 
 
 @pytest.mark.asyncio
-async def test_same_failed_algorithm_across_cycles_is_not_repaired_by_renaming(tmp_path):
+@pytest.mark.parametrize("comment_position", ["after", "before"])
+async def test_same_failed_algorithm_across_cycles_is_not_repaired_by_renaming(tmp_path, comment_position):
     service = await service_at(tmp_path)
     report = None
     for index in range(3):
         before = training_snapshot(service.development)
-        await fail(service, f"revision_{index}.py", BROKEN + f"\n# revision {index}\n")
+        code = ("# revision\n\n" * index + BROKEN if comment_position == "before"
+                else BROKEN + f"\n# revision {index}\n")
+        await fail(service, f"revision_{index}.py", code)
         report = training_progress(service.development, before, report)
         assert report["same_failure_cycles"] == index + 1
         assert report["intervention_required"] is (index == 2)
