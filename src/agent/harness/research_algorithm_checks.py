@@ -60,7 +60,7 @@ def _entrypoint_message(name, node, tree):
                   "the learner and its fitted transformations. Read rows from training['train'].")
     else:
         repair = ("Recover the learner and fitted transformations from the single model argument. "
-                  "inputs is one query dict. Return a dict such as {'value': scalar}; do not refit on query targets.")
+                  "inputs is one query dict. Return a dict with the declared prediction key (scalar or multilabel probabilities); do not refit on query targets.")
     return f"Implement module-level {signature}. " + detail + repair, location
 
 

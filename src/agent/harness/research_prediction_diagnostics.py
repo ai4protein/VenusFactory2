@@ -8,6 +8,9 @@ ABS_TOL = 1e-12
 
 def prediction_diagnostics(task, predictions, training_targets, *, split):
     """Describe behavior without query labels, per-row outputs or an admission verdict."""
+    if task == "multilabel":
+        from .research_multilabel import diagnostics
+        return diagnostics(predictions, training_targets, split=split)
     if task not in {"regression", "classification"} or split not in {"validation", "test"}:
         raise ValueError("Declare the task and evaluated split")
     if not predictions or not training_targets:

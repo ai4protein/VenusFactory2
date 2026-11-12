@@ -63,7 +63,7 @@ jobs:
           tests/harness/test_messages_bridge.py tests/harness/test_responses_gateway.py
           tests/harness/test_codex_adapter.py tests/harness/test_web_live_text.py
           tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
-          tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py
+          tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py tests/harness/test_multilabel_evaluation.py tests/harness/test_multilabel_training.py
           tests/test_research_review_recovery.py tests/test_research_measurements.py
           tests/harness/test_research_algorithm_checks.py tests/harness/test_focused_repair.py tests/harness/test_outbound_strings.py
 

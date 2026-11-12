@@ -91,12 +91,24 @@ class InterfaceTests(unittest.TestCase):
                 self.assertEqual(contract['kind'], 'model')
                 self.assertIs(invariant.get('finite_prediction'), True)
                 value = actual[interface['prediction_key']]
-                self.assertIn(type(value), (int, float))
-                self.assertTrue(math.isfinite(value))
-                if 'min' in invariant:
-                    self.assertGreaterEqual(value, invariant['min'])
-                if 'max' in invariant:
-                    self.assertLessEqual(value, invariant['max'])
+                if 'probability_labels' in invariant:
+                    self.assertIsInstance(value, dict)
+                    self.assertEqual(set(value), set(invariant['probability_labels']))
+                    values = list(value.values())
+                    for probability in values:
+                        self.assertIn(type(probability), (int, float))
+                        self.assertTrue(math.isfinite(probability))
+                        self.assertGreaterEqual(probability, 0)
+                        self.assertLessEqual(probability, 1)
+                else:
+                    values = [value]
+                for item in values:
+                    self.assertIn(type(item), (int, float))
+                    self.assertTrue(math.isfinite(item))
+                    if 'min' in invariant:
+                        self.assertGreaterEqual(item, invariant['min'])
+                    if 'max' in invariant:
+                        self.assertLessEqual(item, invariant['max'])
                 self.assertTrue(equal(actual, run(case['inputs'])), 'Predictions changed on replay')
 
     def test_examples_and_boundaries(self):
@@ -132,6 +144,30 @@ def episode_comparison_table(development, evaluation):
         for method, value in methods.items():
             text += (f"| {split} | {generation} | {method} | {episode['task_count']} | "
                      f"{episode['metric']} | {value['macro_score']:.6g} | {value['pooled_score']:.6g} |\n")
+    return text
+
+
+def multilabel_comparison_table(development, evaluation):
+    rows = [("Validation", str(index), generation['validation'].get('multilabel'))
+            for index, generation in enumerate((development or {}).get('generations', []))]
+    rows.append(("Final test", "Selected", (evaluation or {}).get('multilabel')))
+    rows = [(split, generation, value) for split, generation, value in rows if value]
+    if not rows:
+        return ''
+    text = '\n## Multilabel probabilities\n\nUnobserved labels are excluded from scoring. '
+    text += 'Brier is the mean squared probability error; macro scores give each observed label equal weight. '
+    text += 'AP is undefined for a label without both classes. F1 uses a fixed threshold of 0.5.\n\n'
+    text += '| Split | Generation | Label | Observed | Positive | Brier | Training reference Brier | AP | F1 |\n'
+    text += '|---|---|---|---|---|---|---|---|---|\n'
+    def number(value):
+        return 'n/a' if value is None else f'{value:.6g}'
+    for split, generation, metrics in rows:
+        for label, value in metrics['per_label'].items():
+            label_text = label.replace('|', '&#124;').replace('\n', ' ').replace('\r', ' ')
+            reference = metrics['reference']['per_label'][label]
+            text += (f"| {split} | {generation} | {label_text} | {value['observed']} | {value['positive']} | "
+                     f"{number(value['brier'])} | {number(reference['brier'])} | "
+                     f"{number(value['average_precision'])} | {number(value['f1'])} |\n")
     return text
 
 
@@ -202,6 +238,7 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
     if evaluation:
         report_text += '\n## Final test\n\n```json\n' + json.dumps(evaluation, indent=2, ensure_ascii=False) + '\n```\n'
     report_text += episode_comparison_table(development, evaluation)
+    report_text += multilabel_comparison_table(development, evaluation)
     report_text += '\n## Independent Review\n\n' + receipt['independent']['summary'] + '\n\n## Limitations\n\n' + report['evidence_limit'] + '\n'
     contract = {'schema': SCHEMA, 'id': identity, 'family_id': family, 'kind': kind,
                 'name': manifest['name'], 'author': spec['author'], 'version': spec['version'], 'scope': spec['scope'],

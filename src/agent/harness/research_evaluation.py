@@ -9,6 +9,7 @@ import json
 import math
 
 from .contracts import digest
+from .research_multilabel import label_names, validate_target, training_prevalence, masked_scores
 
 ROW_LIMITS = {"train": (5, 20000), "validation": (2, 512), "test": (3, 512)}
 EPISODE_SCHEMA = "venusfactory.support-query.v1"
@@ -94,8 +95,8 @@ def _episode_records(data):
 
 def validate_data(data, strategy):
     _require(isinstance(data, dict), "Evaluation data must be a JSON object")
-    _require(data.get("task") in {"regression", "classification"},
-             "Declare regression or classification")
+    _require(data.get("task") in {"regression", "classification", "multilabel"},
+             "Declare regression, classification or multilabel")
     _require(all(isinstance(data.get(k), str) and data[k].strip()
                  for k in ["provenance", "grouping"]),
              "Declare data provenance and grouping")
@@ -114,6 +115,7 @@ def validate_data(data, strategy):
         for _ in _bounded_encoding(data):
             pass
     records = _episode_records(data) if "support" in data else splits
+    labels = label_names(data.get("labels")) if data["task"] == "multilabel" else None
     needs_tasks = strategy == "meta_learning" or "support" in data
     seen_ids = set()
     seen_groups = set()
@@ -131,9 +133,12 @@ def validate_data(data, strategy):
                      and isinstance(row.get("inputs"), dict),
                      "Each row needs id, group and inputs")
             target = row.get("target")
-            _require(type(target) in (int, float, str)
-                     and (isinstance(target, str) or math.isfinite(target)),
-                     "Provide finite targets")
+            if labels is not None:
+                validate_target(target, labels)
+            else:
+                _require(type(target) in (int, float, str)
+                         and (isinstance(target, str) or math.isfinite(target)),
+                         "Provide finite targets")
             if data["task"] == "regression":
                 _require(type(target) in (int, float), "Regression requires numeric targets")
             _require(row["id"] not in ids, "Duplicate sample ID")
@@ -154,6 +159,8 @@ def validate_data(data, strategy):
         _require(len(task_sets[0]) >= 2 and all(task_sets[1:])
                  and not any(task_sets[i] & task_sets[j] for i in range(3) for j in range(i)),
                  "Meta-learning requires multiple training tasks and disjoint validation/test tasks")
+    if labels is not None:
+        training_prevalence([row["target"] for row in splits["train"]])
     rows = data.get("unlabeled", [])
     _require(isinstance(rows, list) and len(rows) <= 20000,
              "Provide at most 20,000 unlabeled observations as a list")
@@ -180,7 +187,8 @@ def validate_data(data, strategy):
 def training_view(data, strategy):
     """The only observation view supplied to host-managed fitting."""
     return {"task": data["task"], "strategy": strategy, "train": data["splits"]["train"],
-            "unlabeled": data.get("unlabeled", [])}
+            "unlabeled": data.get("unlabeled", []),
+            **({"labels": data["labels"]} if data["task"] == "multilabel" else {})}
 
 
 def training_evidence_summary(value, data, strategy):
@@ -198,6 +206,9 @@ def training_evidence_summary(value, data, strategy):
 def scores(task, predictions, targets, train, *, query_rows=None):
     _require(len(predictions) == len(targets) and bool(targets),
              "Prediction count differs from query count")
+    if task == "multilabel":
+        return masked_scores(predictions, targets, train, query_rows=query_rows)
+    _require(task in {"regression", "classification"}, "Unsupported evaluation task")
     if task == "regression":
         _require(all(type(p) in (int, float) and math.isfinite(p) for p in predictions),
                  "Predictions must be finite numbers")

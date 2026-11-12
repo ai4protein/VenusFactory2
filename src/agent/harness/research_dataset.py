@@ -13,9 +13,10 @@ from .research_development import immutable_copy, inspect_evaluation, require
 from .research_episodes import prepare_episodes
 from .research_evaluation import evaluation_bytes, validate_data
 from .research_input_profile import training_input_profile
+from .research_multilabel import parse_target
 
 
-def model_interface(task, columns, *, episodic=False):
+def model_interface(task, columns, *, episodic=False, labels=None):
     """Describe the callable shape without observations or fitted-method choices."""
     fields = {name: "<original CSV string>" for name in columns[:4]}
     result = {
@@ -43,8 +44,16 @@ def model_interface(task, columns, *, episodic=False):
             "output_key": "Use prediction_key from train_research_model; its default is value.",
         },
     }
+    if task == "multilabel":
+        from .research_multilabel import label_names
+        labels = label_names(labels)
+        result["labels"] = labels
+        result["shape_example"]["training_row"]["target"] = {label: "<0 or 1; null means unobserved>" for label in labels}
+        result["fit"]["labels"] = "training['labels'] fixes output names. Exclude null targets from each label's loss; labels need not be mutually exclusive."
+        result["predict"]["returns"] = {"value": {label: "<finite probability 0..1>" for label in labels}}
+        result["predict"]["probabilities"] = "Return all declared labels. Independent probabilities need not sum to one."
     if episodic:
-        support = [{"id": "<support observation ID>", "inputs": dict(fields), "target": "<support measurement>"}]
+        support = [{"id": "<support observation ID>", "inputs": dict(fields), "target": result["shape_example"]["training_row"]["target"] if task == "multilabel" else "<support measurement>"}]
         result["shape_example"]["training_row"]["task_id"] = "<training task ID>"
         result["shape_example"]["training_row"]["inputs"] = {**fields, "support": support}
         result["shape_example"]["prediction_inputs"] = {**fields, "support": support}
@@ -89,7 +98,7 @@ def prepared_details(data):
     """One metadata view for the initial result and checkpoint restoration."""
     preparation = data["preparation"]
     result = {
-        "model_interface": model_interface(data["task"], preparation["input_columns"], episodic="support" in data),
+        "model_interface": model_interface(data["task"], preparation["input_columns"], episodic="support" in data, labels=data.get("labels")),
         "training_profile": training_input_profile(data["splits"]["train"], preparation["input_columns"]),
     }
     if preparation.get("split_column"):
@@ -129,7 +138,7 @@ def prepare_dataset(workspace, *, data_file, target_column, input_columns, group
                     provenance, grouping, id_column="", task="regression", seed=0,
                     validation_fraction=0.15, test_fraction=0.15, output_file="", data_store=None,
                     task_column="", support_size=0, unlabeled_file="", unlabeled_id_column="", split_column=""):
-    require(task in {"regression","classification"}, "Declare regression or classification")
+    require(task in {"regression","classification","multilabel"}, "Declare regression, classification or multilabel")
     require(type(seed) is int and 0 <= seed < 2**32, "Use an unsigned 32-bit split seed")
     if not split_column:
         require(all(type(x) in (int,float) and math.isfinite(x) and 0 < x < 1
@@ -165,6 +174,8 @@ def prepare_dataset(workspace, *, data_file, target_column, input_columns, group
                     f"Use train, validation or test in the partition column at row {index}")
             require(group_partitions.setdefault(group, partition) == partition,
                     "A biological group cannot cross provided partitions")
+        if task == "multilabel":
+            target = parse_target(target)
         if task=="regression":
             try: target=float(target)
             except ValueError as exc:raise ValueError(f"Non-numeric measured target at row {index}") from exc
@@ -192,6 +203,8 @@ def prepare_dataset(workspace, *, data_file, target_column, input_columns, group
                          "id_column":id_column,"group_column":group_column,"seed":seed,
                          "validation_fraction":validation_fraction,"test_fraction":test_fraction,
                          "method":"sha256_ordered_whole_groups","source_rows":len(rows)}}
+    if task == "multilabel":
+        data["labels"] = sorted(rows[0]["target"])
     if split_column:
         data["preparation"].update(split_column=split_column, method="provided_whole_groups")
         data["preparation"].pop("validation_fraction")

@@ -241,7 +241,26 @@ raw source files remain unchanged. The author's homology partition is preserved,
 not independently recalculated. Full folds and bounded pilot subsets must be
 reported separately; no silent truncation to Scientist's row limits is permitted.
 
-Task admission still requires native multilabel training and probability metrics,
-observed-label masks in development and independent Review, training-only controls,
-and validation-only threshold calibration. One source's labels, folds and protein
-rows do not multiply its study or model counts.
+Native Scientist now accepts `task=multilabel`: select a CSV/TSV target column
+whose cells contain JSON objects, for example `{"Cytoplasm":1,"Nucleus":0,"Plastid":null}`.
+Every row keeps the same 2..64 label names. Each label requires observed training
+data; null values are omitted from its loss and evaluation. `fit` receives
+`training["labels"]`; `predict` returns all label probabilities inside `value`
+(or the chosen prediction key). Independent labels need not sum to one.
+
+Development and independent Review share masked macro Brier as the selection
+metric and a training-only per-label prevalence reference. Reports include micro
+Brier, noninterpolated average precision, fixed-0.5 F1 and per-label observation
+counts. AP is undefined without both classes and excluded from macro AP in that
+case. No threshold is selected from test labels. Support/query tasks additionally
+report equal-task scores and support prevalence; a label absent from support uses
+the training prevalence, with the fallback count disclosed. The downloaded
+package preserves these reports and replays independent probability invariants.
+
+The localization pilot still needs a declared cohort/full-fold protocol, relevant
+trained controls, data reuse review and biological performance evaluation. Software
+protocol tests do not count as localization models. One source's labels, folds and
+protein rows do not multiply its study or model counts.
+
+Metric definitions: [Brier score](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.brier_score_loss.html)
+and [average precision](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.average_precision_score.html).

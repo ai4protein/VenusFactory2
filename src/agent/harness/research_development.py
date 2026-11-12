@@ -21,7 +21,7 @@ from utils.scoped_files import read_bytes, copy_file, write_bytes
 
 STRATEGIES = {
     'supervised': {'use':'Supervised baselines and new custom architectures; linear/kernel/tree/neural methods are all valid.',
-        'comparison':'Training-mean/majority reference and a credible task-specific baseline.'},
+        'comparison':'Training-mean/majority/per-label-prevalence reference and a credible task-specific baseline.'},
     'few_shot': {'use':'Few labeled observations per target; regularized adaptation, kernels, prototypes or learned priors.',
         'comparison':'Same support examples and query split; several support sizes/seeds; uncertainty and failures.'},
     'semi_supervised': {'use':'Labeled plus genuine unlabeled observations from a documented compatible distribution.',
@@ -60,6 +60,7 @@ def guide():
             'Freeze a selected generation; propose with review_spec.development_experiment_id',
             'Independent Review checks interfaces, held-out test and retraining; a private model package and test report follow approval'],
         'dataset_preparation': {'tool':'prepare_research_dataset',
+            'multilabel':'Set task=multilabel; the target column contains JSON label objects with 0/1/null values. fit receives training["labels"]. predict returns independent probabilities under the prediction_key. Missing labels are masked, not negatives.',
             'episodes':'Set task_column and support_size=1..64. Whole tasks and connected biological groups stay in one split. Each query input includes a fixed support list of {id, inputs, target}; only training tasks enter fitting.',
             'unlabeled':'Set unlabeled_file for a separate CSV/TSV with the same input columns and no measured-target column. Optional unlabeled_id_column preserves IDs. The host rejects overlaps and exposes selected fields only.'},
         'training_api':{'tool':'train_research_model',
