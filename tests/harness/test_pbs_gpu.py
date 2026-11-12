@@ -285,3 +285,19 @@ def test_broad_read_or_write_is_still_rejected(allocation, permission):
     with pytest.raises(SandboxUnavailable, match="explicit CUDA-device permissions"):
         pbs_gpu.capture(LIMITS)
     assert not opened
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("available", [False, True])
+async def test_strategy_guide_discloses_only_verified_training_devices(tmp_path, monkeypatch, available):
+    def capture(limits):
+        if not available:
+            raise SandboxUnavailable("unavailable")
+        return pbs_gpu.Allocation(JOB, UUID, "/dev/nvidia3", 16 * GIB)
+
+    monkeypatch.setattr(pbs_gpu, "capture", capture)
+    service = ResearchWorkspace(tmp_path / "work", tmp_path / "control", {"steps": []})
+    compute = (await service.get_research_strategy_guide())["compute"]
+    assert compute["training_devices"] == (["cpu", "cuda"] if available else ["cpu"])
+    assert compute["prediction_device"] == "cpu"
+    assert UUID not in json.dumps(compute) and JOB not in json.dumps(compute)

@@ -114,6 +114,23 @@ def capture(limits):
     return allocation
 
 
+def compute_options():
+    """Disclose usable devices on request, without exposing allocation details."""
+    from .sandbox_resources import Limits
+
+    result = {"training_devices": ["cpu"], "prediction_device": "cpu"}
+    try:
+        capture(Limits.load())
+    except (SandboxUnavailable, OSError, ValueError):
+        return result
+    return {
+        **result,
+        "training_devices": ["cpu", "cuda"],
+        "gpu_backend": "pbs",
+        "gpu_instruction": "Use device=cuda for fitting; return CPU-portable fitted state. Review refits on GPU.",
+    }
+
+
 def process_rss(pid):
     """Resident memory of the sandbox supervisor and its private process tree."""
     pending, seen, total = [pid], set(), 0

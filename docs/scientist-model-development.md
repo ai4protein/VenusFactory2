@@ -464,6 +464,7 @@ retains its existing profile, data, request budget and checkpoints. Configure it
 provider credentials privately using the normal deployment setup. A paused goal
 requires an explicit resume through the goal interface.
 
+`get_research_strategy_guide` reports currently verified training devices.
 `train_research_model(device="cuda")` fits authored Python in bubblewrap using
 only the GPU assigned by PBS. This opt-in path requires
 `VENUS_RESEARCH_GPU_BACKEND=pbs`, local mode, an unambiguous GPU UUID, and verified
@@ -487,3 +488,8 @@ Review must repeat that fitting step inside a verified GPU allocation and then
 replay its predictions on CPU. A successful fit alone cannot publish a model.
 The initial backend is for an allocated local research worker; it does not submit
 a new PBS job for each tool call or enable GPU-authored training in the web UI.
+
+SC uses an interim progress review before a measured model is submitted. It
+separates completed validation from later failed fits and unfinished submission
+or delivery. Submitted candidates still receive the full independent usefulness
+assessment before technical Review; interim feedback cannot approve a model.

@@ -186,3 +186,56 @@ async def test_bad_study_citation_gets_bounded_repair_without_changing_evidence(
     assert len(calls) == 2 and "format_repair" in calls[1]
     assert calls[1]["development_measurements"] == context["development_measurements"]
     assert result["evidence_ids"] == [measured["id"]] and path.read_bytes() == frozen
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("submitted", [False, True])
+async def test_actual_sc_request_distinguishes_progress_from_final_acceptance(tmp_path, monkeypatch, submitted):
+    from types import SimpleNamespace
+
+    from agent.harness import Budget, ModelBinding, Profile
+    from agent.harness import autonomous_research as ar
+    from agent.harness import scientific_acceptance as acceptance
+
+    class CapturedRequest(Exception):
+        pass
+
+    captured = []
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, **kwargs):
+            captured.append(kwargs["json"])
+            raise CapturedRequest()
+
+    monkeypatch.setattr(ar.httpx, "AsyncClient", lambda **kwargs: Client())
+    profile = Profile(
+        "science_expert",
+        "expert-deepseek-harness",
+        ModelBinding("dmx", "glm-4-flash", "https://www.dmxapi.cn/v1", protocol="responses"),
+        Budget(),
+    )
+    relay = SimpleNamespace(policy=object(), base_url="http://fixture", token="fixture")
+    context = {
+        "scientific_acceptance": {
+            "study_evidence_required": True,
+            "models": [{"candidate_id": "candidate"}] if submitted else [],
+        }
+    }
+    runner = ar.AutonomousResearch(SimpleNamespace(root=tmp_path), "fixture", {}, tools=[])
+    with pytest.raises(CapturedRequest):
+        await runner.consult("SC", context, profile, relay, tmp_path)
+    instructions = captured[0]["instructions"]
+    expected = acceptance.PROMPT if submitted else acceptance.STUDY_PROMPT
+    assert expected in instructions
+    if submitted:
+        assert acceptance.STUDY_PROMPT not in instructions
+        assert "Exact response schema" in instructions
+    else:
+        assert "interim progress review" in instructions
+        assert "Do not grant model acceptance" in instructions

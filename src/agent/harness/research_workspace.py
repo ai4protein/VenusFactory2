@@ -214,8 +214,9 @@ class ResearchWorkspace:
 
     async def get_research_strategy_guide(self) -> dict:
         """Get model-development strategies, evidence requirements and measured prior generations. Supports custom algorithms, few-shot, semi-supervised and meta-learning; PLM training is optional."""
+        from .pbs_gpu import compute_options
         from .research_development import guide
-        return {**guide(),'development':self.development.summary(),
+        return {**guide(),'development':self.development.summary(),'compute':compute_options(),
                 'reference_baselines':{'tool':'get_research_baseline','tasks':['regression','multilabel'],
                     'scope':'Fixed sequence controls for the declared task; inspect scope before choosing.'}}
 
