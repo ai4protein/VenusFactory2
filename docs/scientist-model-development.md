@@ -25,6 +25,13 @@ exact-prediction matches and receipt identities. A missing submission is distinc
 from missing evaluation. Study-level objections return to PI even when no model
 assessment was possible; they do not discard earlier experiments or bypass the
 separate model-admission checks.
+For study feedback before submission, SC must cite experiment IDs from that
+history. Unknown, missing or duplicate citations trigger the same bounded output
+repair as a malformed review. Measured progress precedes the current failure
+summary; repeated failed-tool envelopes and general Agent discovery instructions
+are omitted, while successful observations and failure summaries remain. Citation
+checks bind the opinion to a study; they do not by themselves prove its scientific
+interpretation correct.
 
 A negative verdict or missing evidence prevents technical Review and registration,
 persists an actionable request for PI, and continues the research loop. Accepted

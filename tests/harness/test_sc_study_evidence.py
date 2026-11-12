@@ -109,3 +109,80 @@ async def test_prior_actual_fit_reaches_sc_without_current_receipts_or_proposal(
     assert "holdout-v" not in json.dumps(result) and "holdout-t" not in json.dumps(result)
     assert all(path.read_bytes() == raw for path, raw in frozen.items())
     assert not result["scientific_acceptance"]["models"]
+
+
+@pytest.mark.parametrize("protocol", ["chat_completions", "responses"])
+def test_study_review_citations_are_typed_and_bound_to_real_measurements(tmp_path, protocol):
+    from agent.harness.scientist_role_output import RoleOutputError, specification, validate_output
+    development = Development(tmp_path)
+    row, _ = add_measurement(development)
+    context = sc.evidence_context({}, [], development)
+    assert context["scientific_acceptance"]["study_evidence_required"]
+    review = {"decision": "needs_revision", "summary": "A measured reference exists; develop a justified revision.",
+              "issues": ["No measured revision or submitted model yet."], "evidence_ids": [row["id"]]}
+    spec = specification("SC", protocol, study_acceptance=True)
+    assert json.loads(validate_output(json.dumps(review), spec)) == review
+    assert sc.parse_study_review(json.dumps(review), context) == review
+    missing = {key:value for key,value in review.items() if key != "evidence_ids"}
+    with pytest.raises(RoleOutputError):
+        sc.parse_study_review(json.dumps(missing), context)
+    for ids in (["f"*32], [row["id"], row["id"]], []):
+        bad = {**review, "evidence_ids": ids}
+        with pytest.raises(ValueError):
+            sc.parse_study_review(json.dumps(bad), context)
+        assessment = sc.assess(bad, context)
+        assert not assessment["passed"] and "SC study feedback must cite" in " ".join(assessment["issues"])
+    assert "evidence_ids" not in specification("SC", protocol)["schema"]["properties"]
+    # A valid interim review is still not approval of any unsubmitted model.
+    valid = {**review, "decision": "ready_for_host_validation", "issues": []}
+    result = sc.assess(valid, context)
+    assert result["passed"] and result["approved_models"] == {}
+
+
+def test_model_review_reduces_duplicate_errors_but_retains_success_evidence(tmp_path):
+    import copy
+    development = Development(tmp_path)
+    add_measurement(development)
+    failure = {"tool_call_id": "failed", "is_error": True, "output": "failure "*1000}
+    success = {"tool_call_id": "measured_cost", "is_error": False, "output": {"wall_seconds": 3.2}}
+    context = {"objective": "Build a predictor", "plan": {"deliverable": "model"},
+               "available_tools": {"count": 132, "categories": [{"id":"training"}], "discovery":"long general Agent instructions"},
+               "execution": {"tool_results": [failure,success], "failures": [{"tool":"fit","error":"Missing dependency"}]}}
+    before = copy.deepcopy(context)
+    result = sc.evidence_context(context, [], development)
+    assert context == before
+    assert result["execution"]["tool_results"] == [success]
+    assert result["execution"]["failures"] == context["execution"]["failures"]
+    assert result["execution"]["failed_tool_observations_omitted"] == 1
+    assert "discovery" not in result["available_tools"]
+    assert result["available_tools"]["categories"] == [{"id":"training"}]
+    assert list(result)[:2] == ["objective", "measured_progress"]
+    assert result["measured_progress"]["evaluated_experiment_ids"] == [f"{1:032x}"]
+    assert result["measured_progress"]["submitted_model_ids"] == []
+    analysis = sc.evidence_context({"plan":{"deliverable":"analysis"},"execution":context["execution"]}, [], None)
+    assert analysis["execution"]["tool_results"] == [failure,success]
+
+
+@pytest.mark.asyncio
+async def test_bad_study_citation_gets_bounded_repair_without_changing_evidence(tmp_path):
+    from types import SimpleNamespace
+
+    from test_autonomous_research import profile
+
+    from agent.harness.autonomous_research import AutonomousResearch
+    development = Development(tmp_path / "development")
+    measured, path = add_measurement(development)
+    frozen = path.read_bytes()
+    context = sc.evidence_context({}, [], development)
+    calls = []
+    async def consult(role, current):
+        calls.append(current)
+        return json.dumps({"decision":"needs_revision","summary":"Measure a justified revision of the reference.",
+                           "issues":["The revised experiment remains incomplete."],
+                           "evidence_ids":["f"*32 if len(calls)==1 else measured["id"]]})
+    runner = AutonomousResearch(SimpleNamespace(root=tmp_path), "unused", {}, consult=consult)
+    result = await runner.structured("SC", context, profile(), SimpleNamespace(calls=0), tmp_path/"review",
+                                    lambda raw: sc.parse_study_review(raw, context))
+    assert len(calls) == 2 and "format_repair" in calls[1]
+    assert calls[1]["development_measurements"] == context["development_measurements"]
+    assert result["evidence_ids"] == [measured["id"]] and path.read_bytes() == frozen

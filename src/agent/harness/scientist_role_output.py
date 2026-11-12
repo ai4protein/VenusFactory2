@@ -12,7 +12,7 @@ def object_schema(properties):
             "required": list(properties), "additionalProperties": False}
 
 
-def specification(role, protocol, *, model_acceptance=False):
+def specification(role, protocol, *, model_acceptance=False, study_acceptance=False):
     text = {"type": "string", "minLength": 1, "maxLength": 2000}
     strings = {"type": "array", "items": {"type": "string"}}
     if role == "PI":
@@ -36,6 +36,12 @@ def specification(role, protocol, *, model_acceptance=False):
         if model_acceptance:
             from .scientific_acceptance import model_schema
             schema = model_schema()
+        elif study_acceptance:
+            schema["properties"]["evidence_ids"] = {
+                "type": "array", "minItems": 1, "maxItems": 12, "uniqueItems": True,
+                "items": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+                "description": "Host experiment IDs supporting this study review. Cite measurements from development_measurements; these are not accepted model IDs."}
+            schema["required"].append("evidence_ids")
     else:
         return None
     if role == "CB":

@@ -206,7 +206,7 @@ class AutonomousResearch:
     async def consult(self, role, context, profile, relay, folder):
         if self.consult_override:return await self.consult_override(role,context)
         from .scientist_role_output import specification, request_fields, output_content
-        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models'))) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
+        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False)) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
         output_spec = spec
         instruction=SCIENTIST_PURPOSE+ROLES[role]+' Respond in the language of the research objective.'
         if role=='SC' and context.get('scientific_acceptance',{}).get('models'):
@@ -500,7 +500,12 @@ class AutonomousResearch:
                 progress.pop('reviewed_episode',None)
                 progress['research_completed']=False
                 sc_context=sc_acceptance.evidence_context(context,service.proposals,development)
-                validator=sc_acceptance.parse_model_review if sc_context['scientific_acceptance']['models'] else critic_decision
+                validator = critic_decision
+                if sc_context['scientific_acceptance']['models']:
+                    validator = sc_acceptance.parse_model_review
+                elif sc_context['scientific_acceptance'].get('study_evidence_required'):
+                    def validator(raw):
+                        return sc_acceptance.parse_study_review(raw, sc_context)
                 review=await self.structured('SC',sc_context,profile,relay,folder,validator)
                 write_json(folder/'review.json',review)
                 acceptance=sc_acceptance.record(folder,review,sc_context,goal_root=self.store.root)
