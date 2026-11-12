@@ -111,16 +111,20 @@ class QueueMiddleware(Middleware):
         return ToolResult(content=result.get('message') or 'Tool task '+final['status'],is_error=True)
 
 
-def application(mcp):
-    service_identity = identity()
-    public=mcp.http_app(path='/mcp')
+def application(mcp, *, scheduler_only=False):
+    service_identity = identity(scheduler_only=True) if scheduler_only else identity()
+    public=None if scheduler_only else mcp.http_app(path='/mcp')
     internal=scheduler.http_app(path='/mcp',stateless_http=True)
     @asynccontextmanager
     async def lifespan(app):
         async with AsyncExitStack() as stack:
-            await stack.enter_async_context(public.lifespan(public))
+            if public is not None:
+                await stack.enter_async_context(public.lifespan(public))
             await stack.enter_async_context(internal.lifespan(internal))
             yield
     async def health(request):
         return JSONResponse({**service_identity, 'pid': os.getpid(), 'status': 'ready'})
-    return Starlette(routes=[Route('/health',health),Mount('/scheduler',internal),Mount('/',public)],lifespan=lifespan)
+    routes = [Route('/health',health), Mount('/scheduler',internal)]
+    if public is not None:
+        routes.append(Mount('/',public))
+    return Starlette(routes=routes,lifespan=lifespan)

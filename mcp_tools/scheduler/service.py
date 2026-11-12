@@ -32,9 +32,9 @@ def control_dir():
     return path
 
 
-def identity():
+def identity(*, scheduler_only=False):
     runtime = [str(control_dir().resolve()), os.getenv("WEBUI_V2_MODE", "local").strip().lower(),
-               sys.executable, sys.prefix, sys.version]
+               sys.executable, sys.prefix, sys.version, "scheduler-only" if scheduler_only else "public-and-scheduler"]
     return {"service": "venusfactory-tools", "repository_id": REPOSITORY_ID,
             "source_id": loaded_source_revision(),
             "runtime_id": hashlib.sha256(json.dumps(runtime).encode()).hexdigest()}
@@ -85,15 +85,20 @@ def _check_identity(state, expected, *, pid=None):
         raise RuntimeError("MCP service process identity differs")
 
 
-def ensure_service():
+def ensure_service(*, listener=None, scheduler_only=False, env_overrides=None):
     import fcntl
     from backend.web_v2.job_queue import process_token, stop_process_tree
 
     control = control_dir()
-    expected = identity()
+    expected = identity(scheduler_only=True) if scheduler_only else identity()
+    if listener is not None:
+        import socket
+        if (listener.getsockname() != ("127.0.0.1", port())
+                or not listener.getsockopt(socket.SOL_SOCKET, socket.SO_ACCEPTCONN)):
+            raise ValueError("MCP listener must be a bound loopback listening socket")
     with (control / "startup.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        state = _reachable_health()
+        state = _reachable_health() if listener is None else None
         if state is not None:
             _check_identity(state, expected)
             if state.get("status") != "ready":
@@ -103,12 +108,16 @@ def ensure_service():
         service_key()
         bootstrap = control / "bootstrap.py"
         paths = [str(ROOT / "src"), str(ROOT), *(p for p in sys.path if p and Path(p).exists())]
+        options = {"_VENUS_SCHEDULER_ONLY": scheduler_only, "_VENUS_LISTENER_FD": listener.fileno() if listener is not None else None}
         bootstrap.write_text("import sys,runpy,os\nsys.path=" + repr(paths) + "\nos.chdir(" + repr(str(ROOT)) +
-                             ")\nrunpy.run_module(\"mcp_tools.mcp_server\",run_name=\"__main__\")\n")
+                             ")\nrunpy.run_module(\"mcp_tools.mcp_server\",run_name=\"__main__\",init_globals=" + repr(options) + ")\n")
         env = dict(os.environ, MCP_HTTP_HOST="127.0.0.1", MCP_HTTP_PORT=str(port()), PYTHONDONTWRITEBYTECODE="1")
+        if env_overrides:
+            env.update(env_overrides)
         with (control / "server.log").open("ab") as log:
             proc = subprocess.Popen([sys.executable, "-I", "-u", str(bootstrap)], cwd=ROOT, env=env,
-                                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+                                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+                                    pass_fds=(listener.fileno(),) if listener is not None else ())
         token = process_token(proc.pid)
         record = {"pid": proc.pid, "token": token, **expected}
         record_path = control / "process.json"

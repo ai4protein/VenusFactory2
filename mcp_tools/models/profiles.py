@@ -41,17 +41,28 @@ def _read_runtime_settings(path, base):
     data = json.loads(path.read_text(encoding='utf-8'))
     if not isinstance(data, dict):
         raise ValueError('Model runtimes must be a JSON object')
-    result = {}
-    for name, raw in data.items():
-        if not isinstance(raw, dict):
-            raise ValueError('Each model runtime must be an object: ' + name)
-        entry = dict(raw)
-        if 'enabled' in entry and not isinstance(entry['enabled'], bool):
-            raise ValueError('Runtime enabled must be a boolean: ' + name)
-        for key in PATH_FIELDS & entry.keys():
-            if entry[key]:
-                if not isinstance(entry[key], str):
-                    raise ValueError('Runtime path must be text: ' + name + '.' + key)
-                entry[key] = str(repository_path(entry[key], root=base))
-        result[name] = entry
-    return result
+    return {name: normalize_runtime_entry(raw, name=name, root=base) for name, raw in data.items()}
+
+
+def normalize_runtime_entry(raw, *, name, root):
+    """Resolve declared installation paths, including explicitly named variants."""
+    from copy import deepcopy
+
+    if not isinstance(raw, dict):
+        raise ValueError('Each model runtime must be an object: ' + name)
+    entry = deepcopy(raw)
+    if 'enabled' in entry and not isinstance(entry['enabled'], bool):
+        raise ValueError('Runtime enabled must be a boolean: ' + name)
+    for key in PATH_FIELDS & entry.keys():
+        if entry[key]:
+            if not isinstance(entry[key], str):
+                raise ValueError('Runtime path must be text: ' + name + '.' + key)
+            entry[key] = str(repository_path(entry[key], root=root))
+    if 'variants' in entry:
+        if not isinstance(entry['variants'], dict):
+            raise ValueError('Runtime variants must be an object: ' + name)
+        entry['variants'] = {
+            variant: normalize_runtime_entry(config, name=name + '.' + variant, root=root)
+            for variant, config in entry['variants'].items()
+        }
+    return entry

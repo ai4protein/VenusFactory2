@@ -46,7 +46,7 @@ def environment(cfg):
     allowed = {'PATH','HOME','USER','LANG','LC_ALL','TMPDIR','TEMP','TMP','SYSTEMROOT',
                'LD_LIBRARY_PATH','CUDA_HOME','CUDA_VISIBLE_DEVICES','OMP_NUM_THREADS','MKL_NUM_THREADS',
                'HF_HOME','HF_HUB_CACHE','TORCH_HOME','HF_HUB_OFFLINE','TRANSFORMERS_OFFLINE',
-               'TEMP_OUTPUTS_DIR','VENUS_RUNTIME_ROOT','WEBUI_V2_MODE','VENUS_CKPT_AUTO_DOWNLOAD',
+               'TEMP_OUTPUTS_DIR','VENUS_RUNTIME_ROOT','WEBUI_V2_MODE','VENUS_CKPT_AUTO_DOWNLOAD','VENUS_CKPT_DIR',
                'VENUS_JOB_QUEUE_ROOT','VENUS_CAPABILITY_DB','VENUS_MODEL_RUNTIMES_CONFIG'}
     env = {k:v for k,v in os.environ.items() if k in allowed}
     env.update(PYTHONPATH=os.pathsep.join([str(PROJECT),str(PROJECT/'src')]),

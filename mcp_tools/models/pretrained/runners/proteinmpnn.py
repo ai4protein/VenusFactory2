@@ -7,7 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 
-from mcp_tools.models.profiles import PROJECT, repository_path
+from mcp_tools.models.profiles import repository_path
 from mcp_tools.models.execution import command, execute, profile
 
 VARIANTS={'vanilla':'vanilla_model_weights','soluble':'soluble_model_weights','ca':'ca_model_weights'}
@@ -17,7 +17,8 @@ PATH_ARGUMENTS={'pdb_path','out_folder','path_to_fasta','jsonl_path','chain_id_j
 
 def weight_root(settings=None):
     cfg,_=profile('proteinmpnn',settings)
-    root=repository_path(cfg['weights']) if cfg.get('weights') else PROJECT/'ckpt/ProteinMPNN'
+    from src.ckpt_hub import ckpt_root
+    root=repository_path(cfg['weights']) if cfg.get('weights') else ckpt_root()/'ProteinMPNN'
     if cfg.get('weights') and not root.is_dir():raise ValueError('ProteinMPNN weights are not installed')
     return root
 

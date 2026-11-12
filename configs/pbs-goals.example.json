@@ -26,5 +26,11 @@
       "memory_gb": 16,
       "wall_seconds": 7200
     }
-  }
+  },
+  "capability_db": null,
+  "model_runtimes": null,
+  "execution_catalog": null,
+  "tool_credential_refs": [],
+  "checkpoint_root": null,
+  "huggingface_cache": null
 }

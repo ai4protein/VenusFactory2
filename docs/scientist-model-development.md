@@ -143,10 +143,30 @@ needs to resume. Neither flag grants a new model-call budget. Direct `run` and
 `resume` refuse a goal owned by an active PBS execution. Existing observations,
 checkpoints and model artifacts remain part of that goal across attempts.
 
-The standalone worker uses the frozen source catalog and configuration with a
-job-private runtime and capability store; live Web administrator database
-overrides are not inherited automatically. Binding Web policies and submitting
-Web topics to PBS require a separate integration.
+Each PBS worker starts an authenticated MCP scheduler and a bounded worker pool
+inside its allocation. Tool jobs carry a real parent lease and use the research
+workspace. A stopped research task cancels its children and stops those services;
+the web service queue and its processes are separate.
+
+Submission freezes the installation's local administrator switches, model runtime
+paths and free LLM catalog. Disabled capabilities remain disabled in that attempt.
+Relative model paths are resolved against `runtime_root`, so the source snapshot
+does not need a copy of installed models. Optional `capability_db`,
+`model_runtimes` and `execution_catalog` select explicit administrator files.
+`checkpoint_root` selects installed Factory and ProteinMPNN checkpoints (default:
+`runtime_root/ckpt`). `huggingface_cache` optionally selects an existing Hub cache.
+These paths are passed to trusted runtime workers; each job keeps its own home
+and research workspace. The asset manifest binds directory
+locations, not immutable weight contents.
+These are execution snapshots: later Web policy changes require a new attempt.
+The standalone PBS identity does not grant access to other Web users' private
+models; live Web identity and policy integration remain separate.
+
+To enable configured search services, list only the needed variable names in
+`tool_credential_refs`, for example `TAVILY_API_KEY` or `SERPAPI_API_KEY`.
+Their values are read from the protected `env_file` into trusted MCP processes;
+model-generated code and native harness processes do not receive them. LLM
+credentials are not exported to the tool service.
 
 This CLI does not automatically submit web Scientist topics to PBS. GPU allocation
 also does not establish scientific success: SC acceptance and technical Review

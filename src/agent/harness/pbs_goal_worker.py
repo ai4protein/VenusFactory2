@@ -81,6 +81,11 @@ def _environment(record_path, record):
     if not isinstance(extras, list) or any(not isinstance(p, str) or not Path(p).is_absolute() or not Path(p).is_dir() for p in extras):
         raise ValueError("Worker dependency paths must be explicit absolute directories")
     env["PYTHONPATH"] = os.pathsep.join([str(source / "src"), str(source), *extras])
+    from .pbs_goal_policy import verify_settings
+    env.update(verify_settings(record))
+    env.update({"VENUS_WORKERS_RESEARCH": "1", "VENUS_WORKERS_CPU": "1",
+                "VENUS_WORKERS_GPU": "1", "VENUS_WORKERS_API": "1",
+                "VENUS_QUEUE_API_SLOTS": "1", "VENUS_QUEUE_RESEARCH_SLOTS": "1"})
     return env
 
 
@@ -145,7 +150,12 @@ def run_record(record_path):
         if not workspace.is_dir() or workspace.is_symlink():
             raise ValueError("Research workspace is unavailable")
         os.chdir(workspace)
-        result = asyncio.run(AutonomousResearch(store, credential, runtimes).run())
+        async def execute():
+            from .pbs_goal_queue import queue_run
+            from .pbs_goal_tools import tool_service
+            async with queue_run(record), tool_service(record):
+                return await AutonomousResearch(store, credential, runtimes).run()
+        result = asyncio.run(execute())
         goal_status = result["status"]
         return result
     except BaseException as exc:

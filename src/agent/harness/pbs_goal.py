@@ -299,6 +299,8 @@ class Controller:
                 try:
                     from .pbs_goal_snapshot import freeze_source
                     record["source"] = freeze_source(Path(self.settings["repository"]), attempt / "source")
+                    from .pbs_goal_policy import freeze_settings
+                    record["tool_settings"] = freeze_settings(self.settings, attempt)
                     entry = Path(record["source"]["root"]) / "scripts/rsi/pbs_goal_worker.py"
                     if not entry.is_file():
                         raise ValueError("Frozen source has no PBS goal worker")

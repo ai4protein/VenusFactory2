@@ -153,6 +153,9 @@ def prepared(tmp_path, monkeypatch):
     entry.parent.mkdir(parents=True)
     entry.write_text("# Trusted worker entry fixture; the fake scheduler never executes it.\n")
     subprocess.run(["git", "init", "-q", str(repository)], check=True)
+    catalog = repository / "configs/harness/free_execution_catalog.json"
+    catalog.parent.mkdir(parents=True)
+    catalog.write_text('{"models": []}')
     subprocess.run(["git", "add", "."], cwd=repository, check=True)
     subprocess.run(
         [

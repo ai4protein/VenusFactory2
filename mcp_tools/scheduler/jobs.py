@@ -50,15 +50,22 @@ class ToolJobs:
         workspace = None
         if parent_job and parent['kind'] == 'scientist':
             meta = parent['metadata']
-            folder = Path(meta['goal_folder'])
-            session = meta.get('session_id')
-            if (not isinstance(session, str) or not session
-                    or folder.name != meta.get('goal_id')
-                    or folder.parent.name != hashlib.sha256(session.encode()).hexdigest()
-                    or folder.is_symlink() or folder.parent.is_symlink()
-                    or (folder / 'workspace').is_symlink()):
-                raise ValueError('Invalid research workspace')
-            workspace = str((folder / 'workspace').resolve(strict=True))
+            if meta.get('origin') == 'pbs_goal.v1':
+                from agent.harness.pbs_goal_queue import workspace_for_parent
+                workspace = workspace_for_parent(self.queue, parent)
+                if session_id is not None and session_id != meta['session_id']:
+                    raise ValueError('PBS tool session differs from its parent goal')
+                session_id = meta['session_id']
+            else:
+                folder = Path(meta['goal_folder'])
+                session = meta.get('session_id')
+                if (not isinstance(session, str) or not session
+                        or folder.name != meta.get('goal_id')
+                        or folder.parent.name != hashlib.sha256(session.encode()).hexdigest()
+                        or folder.is_symlink() or folder.parent.is_symlink()
+                        or (folder / 'workspace').is_symlink()):
+                    raise ValueError('Invalid research workspace')
+                workspace = str((folder / 'workspace').resolve(strict=True))
         spec_id=uuid.uuid4().hex
         spec=self.queue.root/'mcp-inputs'/(spec_id+'.json')
         save_json(spec,{'name':name,'arguments':arguments,'route':route,'session_id':session_id,'workspace':workspace})

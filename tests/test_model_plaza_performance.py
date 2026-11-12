@@ -19,7 +19,8 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv('WEBUI_V2_MODE', 'online')
     monkeypatch.setattr(policy, 'is_online_mode', lambda: os.getenv('WEBUI_V2_MODE') == 'online')
     store = CapabilityStore(tmp_path / 'switches.sqlite3')
-    monkeypatch.setattr(CapabilityStore, '__init__', lambda self, path=None: setattr(self, 'path', store.path))
+    initialize = CapabilityStore.__init__
+    monkeypatch.setattr(CapabilityStore, '__init__', lambda self, path=None: initialize(self, path or store.path))
     return store
 
 

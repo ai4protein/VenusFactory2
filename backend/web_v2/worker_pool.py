@@ -85,7 +85,10 @@ def _ensure_pool_locked(q, namespace, env, folder):
                               stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     token=process_token(proc.pid)
     if not token:raise RuntimeError('Worker supervisor did not start')
-    temp=record.with_suffix('.tmp');temp.write_text(json.dumps({'pid':proc.pid,'token':token}));os.replace(temp,record)
+    temp=record.with_suffix('.tmp')
+    temp.write_text(json.dumps({'pid':proc.pid,'token':token}))
+    temp.chmod(0o600)
+    os.replace(temp,record)
 
 
 def ensure_pool(q, namespace, env):

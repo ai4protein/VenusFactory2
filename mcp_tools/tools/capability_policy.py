@@ -133,9 +133,12 @@ def selector(card):
 class CapabilityStore:
     def __init__(self, path=None):
         from backend.web_v2.runtime_paths import runtime_root
-        self.path = Path(path or runtime_root(mode()) / 'state/capabilities.sqlite3')
+        self.snapshot = Path(os.environ['VENUS_CAPABILITY_POLICY_SNAPSHOT']) if path is None and os.getenv('VENUS_CAPABILITY_POLICY_SNAPSHOT') else None
+        self.path = self.snapshot or Path(path or runtime_root(mode()) / 'state/capabilities.sqlite3')
 
     def connect(self):
+        if self.snapshot is not None:
+            raise CapabilityDisabled("Frozen execution policies are read-only")
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         c = sqlite3.connect(self.path, timeout=10)
         self.path.chmod(0o600)
@@ -146,6 +149,9 @@ class CapabilityStore:
         return c
 
     def rows(self):
+        if self.snapshot is not None:
+            from .capability_snapshot import read
+            return read(self.snapshot)
         if not self.path.exists(): return {}
         with self.connect() as c:
             return workspace_switch_rows(c.execute('SELECT * FROM switches'))

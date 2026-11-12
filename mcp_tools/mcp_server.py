@@ -68,4 +68,6 @@ def start_http_server(host=None, port=None):
 
 if __name__ == "__main__":
     from mcp_tools.scheduler.mcp_service import application
-    uvicorn.run(application(mcp), host="127.0.0.1", port=int(os.getenv("MCP_HTTP_PORT", "8080")))
+    uvicorn.run(application(mcp, scheduler_only=globals().get("_VENUS_SCHEDULER_ONLY", False)),
+                host="127.0.0.1", port=int(os.getenv("MCP_HTTP_PORT", "8080")),
+                fd=globals().get("_VENUS_LISTENER_FD"))

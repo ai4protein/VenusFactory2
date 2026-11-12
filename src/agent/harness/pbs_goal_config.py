@@ -18,7 +18,9 @@ def configuration(value, base=None):
     if not isinstance(value, dict) or value.get("schema") != SCHEMA:
         raise ValueError("Invalid PBS configuration schema")
     allowed = {"schema", "repository", "control_root", "goal_roots", "python", "runtime_root", "pbs_bin",
-               "profiles", "env_file", "credential_toml", "environment", "extra_python_paths"}
+               "profiles", "env_file", "credential_toml", "environment", "extra_python_paths",
+               "capability_db", "model_runtimes", "execution_catalog", "tool_credential_refs",
+               "checkpoint_root", "huggingface_cache"}
     if set(value) - allowed:
         raise ValueError("Unknown PBS configuration fields")
     result = copy.deepcopy(value)
@@ -32,7 +34,8 @@ def configuration(value, base=None):
 
     for field in ("repository", "control_root", "python", "runtime_root", "pbs_bin"):
         result[field] = path(result[field])
-    for field in ("env_file", "credential_toml"):
+    for field in ("env_file", "credential_toml", "capability_db", "model_runtimes", "execution_catalog",
+                  "checkpoint_root", "huggingface_cache"):
         result[field] = path(result[field]) if result.get(field) else None
     for field in ("goal_roots", "extra_python_paths"):
         values = result.get(field, [])
@@ -46,6 +49,11 @@ def configuration(value, base=None):
         raise ValueError("PBS environment supports only named runtime settings, never credentials")
     if any(not isinstance(v, str) or len(v) > 4096 or "\x00" in v for v in env.values()):
         raise ValueError("Invalid PBS runtime environment")
+    from .pbs_goal_policy import TOOL_CREDENTIALS
+    references = result.setdefault("tool_credential_refs", [])
+    if (not isinstance(references, list) or any(not isinstance(name, str) for name in references)
+            or len(set(references)) != len(references) or set(references) - TOOL_CREDENTIALS):
+        raise ValueError("Use supported tool credential names, never values")
     profiles = result.get("profiles")
     if not isinstance(profiles, dict) or not profiles:
         raise ValueError("At least one bounded PBS resource profile is required")

@@ -125,6 +125,19 @@ def context(tmp_path, monkeypatch):
                       "credential_toml": None, "environment": {}, "extra_python_paths": []},
         "resources": {"queue": "fixture", "ncpus": 2, "ngpus": 1, "memory_gb": 16, "wall_seconds": 120},
         "job_id": "123.fixture", "nonce": "a" * 32, "cancel_requested": False}
+    from agent.harness.pbs_goal_policy import freeze_settings
+    catalog_file = tmp_path / "catalog.json"
+    catalog_file.write_text('{"models": []}')
+    record["settings"] = {"runtime_root": str(tmp_path), "repository": str(ROOT), "environment": {}, "execution_catalog": str(catalog_file)}
+    record["tool_settings"] = freeze_settings(record["settings"], attempt)
+    from contextlib import asynccontextmanager
+
+    from agent.harness import pbs_goal_queue, pbs_goal_tools
+    @asynccontextmanager
+    async def private_context(_):
+        yield
+    monkeypatch.setattr(pbs_goal_queue, "queue_run", private_context)
+    monkeypatch.setattr(pbs_goal_tools, "tool_service", private_context)
     calls, finished = [], []
     monkeypatch.setattr(os, "environ", dict(os.environ, PBS_JOBID="123.fixture", CUDA_VISIBLE_DEVICES="GPU-fixture",
                                            UNRELATED_HOST_SECRET="not-forwarded", VENUS_PBS_GOAL_ATTEMPT="a" * 32))
