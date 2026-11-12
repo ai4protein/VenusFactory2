@@ -142,6 +142,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
     runtime_profile = replace(profile, budget=replace(profile.budget, tool_calls=transport_limit))
     workspace_call = asyncio.Lock()
     discovery_lock = asyncio.Lock()
+    active_requests = set()
+    closing = False
 
     def host_paths(value):
         if isinstance(value, str) and (value == "/workspace" or value.startswith("/workspace/")):
@@ -198,6 +200,16 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
         })
 
     async def rpc(http):
+        if closing:
+            raise web.HTTPServiceUnavailable()
+        task = asyncio.current_task()
+        active_requests.add(task)
+        try:
+            return await dispatch_rpc(http)
+        finally:
+            active_requests.discard(task)
+
+    async def dispatch_rpc(http):
         nonlocal calls, executions, lookups, checkpoint_saved, checkpoint_calls
         if not secrets.compare_digest(http.headers.get("Authorization", ""), "Bearer " + token):
             raise web.HTTPUnauthorized()
@@ -472,12 +484,20 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
         ]
         send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
     finally:
-        if not pending.done():
-            pending.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await pending
-        else:
-            with contextlib.suppress(asyncio.CancelledError):
-                pending.exception()
-        await server.cleanup()
-        connection.unlink(missing_ok=True)
+        async def shutdown():
+            nonlocal closing
+            closing = True
+            # HTTP handlers outlive their clients by default. End admitted tool
+            # work with its native phase, and await sandbox/process cleanup before
+            # releasing the server or allowing the next iteration to start.
+            tasks = [pending, *tuple(active_requests)]
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            await server.cleanup()
+            connection.unlink(missing_ok=True)
+
+        from .session_sandbox import _settle
+
+        await _settle(asyncio.create_task(shutdown()), propagate=True)
