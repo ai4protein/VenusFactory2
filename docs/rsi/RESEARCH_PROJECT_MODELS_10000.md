@@ -215,3 +215,33 @@ snapshots stay under ignored `research_runs/sources/` with URLs, dates and check
 Source availability alone does not imply an adequate independent training/test split.
 The CatPred Ki and Km experiments both occupy the enzyme-catalysis family in this policy;
 they do not fill the molecular-recognition quota simply by renaming the endpoint.
+
+### Curate the localization source
+
+`import_deeploc_source.py` validates an existing, hash-bound source snapshot and
+writes one localization dataset with Swiss-Prot and HPA cohorts. It retains the
+ten-label output space, source annotations, original 0..4 folds, and sequence
+identity hashes. Extracellular and plastid labels are null in HPA, which provides
+only eight localization columns. Source zeros retain their annotation meaning;
+they are not additional experimentally confirmed absence measurements. Membrane
+annotation and kingdom stay metadata and must not become predictive inputs.
+
+```bash
+python scripts/rsi/data_preparation/import_deeploc_source.py \
+  --manifest research_runs/sources/my_snapshot/manifest.json \
+  --sha256 <frozen-source-manifest-sha256> \
+  --output research_runs/sources/my_deeploc_curated
+```
+
+The command never downloads, calls an LLM, starts training or registers a model.
+It checks source sizes, hashes, CSV schemas, binary labels, protein identities,
+sequence lengths and exact-sequence split overlaps. A new output directory is
+required. Counts, source coordinates and output checksums remain in `source.json`;
+raw source files remain unchanged. The author's homology partition is preserved,
+not independently recalculated. Full folds and bounded pilot subsets must be
+reported separately; no silent truncation to Scientist's row limits is permitted.
+
+Task admission still requires native multilabel training and probability metrics,
+observed-label masks in development and independent Review, training-only controls,
+and validation-only threshold calibration. One source's labels, folds and protein
+rows do not multiply its study or model counts.
