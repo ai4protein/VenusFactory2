@@ -235,6 +235,10 @@ async def run_goal(
             fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise RuntimeError("A runner already owns this goal") from exc
+        # PBS assignments and ordinary CLI/Web runners share this same lease.
+        # A queued/claimed assignment cannot be bypassed by a second local run.
+        from agent.harness.pbs_goal import assert_execution_allowed
+        assert_execution_allowed(store.root)
         state = store.read()
         if state["status"] != "active":
             return state

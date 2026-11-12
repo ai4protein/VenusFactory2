@@ -93,6 +93,65 @@ and terminal states with the experiment. A completed training integration test
 establishes execution, while a scientific model still requires measured utility,
 independent SC acceptance and technical Review.
 
+## Submit a complete Scientist goal to PBS
+
+The command-line PBS runner places the complete research loop on one allocated
+node, including its isolated training and prediction processes. It is separate
+from the web service allocation. This initial resource profile requires one GPU;
+the model can still choose CPU experiments within that allocation.
+
+Copy [the configuration example](../configs/pbs-goals.example.json) to a private
+configuration file and adapt its queue, Python environment and installation root.
+Relative paths resolve from the configuration file's directory. `runtime_root`
+is the project installation root containing optional harness runtimes;
+`control_root` holds private job records and frozen source snapshots.
+`goal_roots` bounds the research directories this controller may execute.
+The selected Python environment must contain the training dependencies; optional
+`extra_python_paths` are trusted host dependencies, not extra sandbox mounts.
+The worker uses a private HOME. For a globally installed Kimi, set
+`environment.VENUS_KIMI_BIN` to its absolute executable path; runtime paths inside
+`environment` are not resolved relative to the configuration file.
+
+Keep provider keys in the administrator-owned `env_file` or configured credential
+file. Do not put key values in the PBS configuration. The worker reads only the
+selected provider credential after validating its allocation. The model route
+must be admitted as free; there is no paid fallback.
+
+Create a goal with its profile and budget, then submit it from a clean, committed
+checkout. For an already prepared goal, start at `submit-pbs`:
+
+```bash
+python scripts/rsi/run_autonomous_research.py create \
+  --output runtime/local/scientist-goals/my-topic \
+  --profile configs/my-scientist-profile.json \
+  --objective "Develop and evaluate a predictor from the supplied measurements."
+python scripts/rsi/run_autonomous_research.py submit-pbs \
+  --output runtime/local/scientist-goals/my-topic \
+  --pbs-config configs/pbs-goals.local.json --resource-profile gpu
+python scripts/rsi/run_autonomous_research.py status-pbs \
+  --output runtime/local/scientist-goals/my-topic \
+  --pbs-config configs/pbs-goals.local.json
+python scripts/rsi/run_autonomous_research.py cancel-pbs \
+  --output runtime/local/scientist-goals/my-topic \
+  --pbs-config configs/pbs-goals.local.json
+```
+
+Submission freezes the source revision and records the goal, profile, resource
+request and scheduler identity. Status and cancellation use that recorded job.
+A later attempt requires `--new-attempt`; add `--resume-goal` when the goal itself
+needs to resume. Neither flag grants a new model-call budget. Direct `run` and
+`resume` refuse a goal owned by an active PBS execution. Existing observations,
+checkpoints and model artifacts remain part of that goal across attempts.
+
+The standalone worker uses the frozen source catalog and configuration with a
+job-private runtime and capability store; live Web administrator database
+overrides are not inherited automatically. Binding Web policies and submitting
+Web topics to PBS require a separate integration.
+
+This CLI does not automatically submit web Scientist topics to PBS. GPU allocation
+also does not establish scientific success: SC acceptance and technical Review
+still govern model delivery.
+
 ## Repeated experiments and model changes
 
 A renamed source or another parent link does not create a new model. If an
@@ -459,8 +518,15 @@ Sources: [DeepLoc 2.0 data](https://services.healthtech.dtu.dk/services/DeepLoc-
 
 ## Authored GPU training on PBS
 
-Create a Scientist goal with the normal `run_autonomous_research.py create`
-command, then submit that existing goal from the repository root:
+Use `submit-pbs`, `status-pbs` and `cancel-pbs` from the section above for
+standalone research jobs. They freeze the source and track the allocation with
+an execution record.
+
+The older `scientist_gpu.pbs` template below is a **low-level recipe** for running
+a goal inside an operator-managed PBS allocation. Its direct `qsub` command does
+not use the durable controller, freeze a source snapshot or reconcile submission
+receipts. Keep it for manual allocation integrations, rather than as an equivalent
+entrypoint to `submit-pbs`:
 
 ```bash
 qsub -q YOUR_GPU_QUEUE \

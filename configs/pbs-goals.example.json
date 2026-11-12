@@ -1,0 +1,30 @@
+{
+  "schema": "venusfactory.pbs-config.v1",
+  "repository": "..",
+  "control_root": "../runtime/local/pbs-goals",
+  "python": "../.venv/bin/python",
+  "runtime_root": "..",
+  "pbs_bin": "/opt/pbs/bin",
+  "goal_roots": [
+    "../runtime/local",
+    "../runtime/verification",
+    "../research_runs"
+  ],
+  "env_file": "../.env",
+  "extra_python_paths": [],
+  "environment": {
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "profiles": {
+    "gpu": {
+      "queue": "ai4090d",
+      "ncpus": 2,
+      "ngpus": 1,
+      "memory_gb": 16,
+      "wall_seconds": 7200
+    }
+  }
+}
