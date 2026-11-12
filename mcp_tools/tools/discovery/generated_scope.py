@@ -18,11 +18,13 @@ class GeneratedScope:
 
     def references(self, rank):
         """Rank IDs only; schemas, evidence and model weights stay unloaded."""
-        settings = capability_policy.CapabilityStore()
+        # Snapshot this inventory operation only; the next request and the
+        # invocation gate read current administrator settings again.
+        settings = capability_policy.CapabilityStore().catalog_rows()
         result = []
         for library, options in self.sources.items():
             for identity, score in catalog.ranked_references(library, rank, **options):
-                if identity in self.origins or not settings.enabled("model:capability:" + identity):
+                if identity in self.origins or not settings.get("model:capability:" + identity, {}).get("enabled", True):
                     continue
                 self.origins[identity] = library
                 result.append((identity, score))
