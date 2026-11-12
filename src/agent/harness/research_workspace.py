@@ -210,14 +210,14 @@ class ResearchWorkspace:
         """Get model-development strategies, evidence requirements and measured prior generations. Supports custom algorithms, few-shot, semi-supervised and meta-learning; PLM training is optional."""
         from .research_development import guide
         return {**guide(),'development':self.development.summary(),
-                'reference_baselines':{'tool':'get_research_baseline','task':'regression',
-                    'scope':'Fixed canonical-sequence composition controls; inspect scope before choosing.'}}
+                'reference_baselines':{'tool':'get_research_baseline','tasks':['regression','multilabel'],
+                    'scope':'Fixed sequence controls for the declared task; inspect scope before choosing.'}}
 
-    async def get_research_baseline(self, reference: str='', sequence_column: str='sequence', output_field: str='value', output_file: str='') -> dict:
-        """List classic sequence-regression controls. Select a reference ID and output_file to save runnable fit/predict code with verified sequence encoding; omit output_file to read the source. Existing different files are never overwritten. Fit it with train_research_model, then develop a measured revision. Preserve its platform-reference provenance."""
+    async def get_research_baseline(self, reference: str='', sequence_column: str='sequence', output_field: str='value', output_file: str='', task: str='regression') -> dict:
+        """List classic sequence controls for task=regression or task=multilabel. Select a reference ID and output_file to save runnable fit/predict code with verified sequence encoding; omit output_file to read the source. Existing different files are never overwritten. Fit it with train_research_model, then develop a measured revision. Preserve its platform-reference provenance."""
         from .research_development import immutable_copy
         from .research_reference_baselines import reference_baseline
-        result=reference_baseline(reference,sequence_column,output_field)
+        result=reference_baseline(reference,sequence_column,output_field,task=task)
         if output_file:
             if not reference or not isinstance(output_file,str) or not output_file.endswith('.py'):
                 raise ValueError('Select a reference ID and a relative .py output_file')
@@ -228,7 +228,7 @@ class ResearchWorkspace:
                 next_step='Call train_research_model with this source_file, the prepared evaluation_file and variant=baseline. '
                 'Then develop and measure a candidate using its parent_experiment_id; preserve the reference provenance.')
         return self.record('get_research_baseline',{'reference':reference,'sequence_column':sequence_column,
-            'output_field':output_field,'output_file':output_file},result)
+            'output_field':output_field,'output_file':output_file,'task':task},result)
 
     async def restore_research_evaluation(self, experiment_id: str, output_file: str='') -> dict:
         """Export the measured generation's frozen evaluation to a new session file for final Review. Never overwrite different existing data. Use the returned path in review_spec.evaluation_file and evidence_files; keep targets and splits unchanged."""

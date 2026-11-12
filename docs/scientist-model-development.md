@@ -127,7 +127,15 @@ prediction key. Reading or saving a reference does not fit or register a model.
 These adapters reuse the repository's classical controls: canonical amino-acid composition
 and log sequence length, with target scaling learned from training data. They do not
 represent assay covariates or mutation positions. They apply to regression datasets with
-canonical protein sequences; other tasks need an appropriate custom baseline.
+canonical protein sequences.
+
+For a sequence multilabel task, request `task="multilabel"` on the same tool. It
+provides per-label prevalence, composition logistic regression and logistic
+regression with N/C-terminal composition. These controls use all observed training
+labels, skip null cells, retain ambiguous residues in a separate composition bin,
+and fit scaling only on training rows. A label with one observed class uses its
+training prevalence. Probabilities are independent; they do not sum to one. These
+are sequence-only controls, not pretrained DeepLoc models or biological discoveries.
 
 Save and fit a selected reference as `variant="baseline"`. Use the same frozen splits
 to develop and measure a justified candidate. Keep the reference identity and code provenance
@@ -345,3 +353,36 @@ bounded free-model run records real request/tool evidence when available.
 
 References: [MAML](https://proceedings.mlr.press/v70/finn17a.html),
 [scikit-learn semi-supervised learning](https://scikit-learn.org/stable/modules/semi_supervised.html).
+
+
+## DeepLoc localization study preparation
+
+After `import_deeploc_source.py`, run
+`scripts/rsi/data_preparation/prepare_deeploc_task.py --source <source.json>
+--sha256 <frozen-source-hash> --output <new-private-directory>`.
+The exporter verifies both curated assets and preserves the original DeepLoc 2.0
+folds: 0/1/2 for training, 3 for validation, and 4 for internal test. It retains all
+17,145 training rows. The native evaluator currently supports 512 rows per holdout;
+a fixed sequence-hash ordering selects each holdout without looking at labels.
+The protocol records every selected and omitted protein, source hashes and source
+terms. One ten-output localization task counts as one model task.
+
+`dataset.csv` is host-only staging input. Ingest it with `ResearchDataStore` and
+use the frozen `native_prepare` parameters from `protocol.json`. Scientist then
+sees only training rows and an opaque evaluation reference. Kingdom, membrane
+annotations and partition IDs are not predictive input features. The 1,717-row HPA
+cohort remains external to fitting and model selection. Source-coded zeros are
+not independently confirmed absence assays; unobserved HPA locations remain null.
+
+Run `scripts/rsi/evaluation/measure_deeploc_references.py --protocol <protocol.json>
+--sha256 <frozen-protocol-hash> --output <new-run-directory>` in a bounded compute
+job. It fits the three fixed controls through the same isolated training and
+fresh-process validation API used by Scientist. It makes no LLM calls, does not
+score final test/HPA, and does not register models. This validates the data and
+execution path; autonomous development and utility acceptance are separate steps.
+The bounded holdout study is not the published five-fold benchmark. Full-fold and
+external evaluation require a frozen candidate and a separate declared protocol.
+
+Sources: [DeepLoc 2.0 data](https://services.healthtech.dtu.dk/services/DeepLoc-2.0/),
+[publication](https://pmc.ncbi.nlm.nih.gov/articles/PMC9252801/), and the authors'
+[code license](https://github.com/teevee112/DeepLoc-2.0/blob/main/LICENSE).

@@ -64,7 +64,7 @@ jobs:
           tests/harness/test_codex_adapter.py tests/harness/test_web_live_text.py
           tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
           tests/harness/test_scientific_acceptance.py
-          tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py tests/harness/test_multilabel_evaluation.py tests/harness/test_multilabel_training.py
+          tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py tests/harness/test_multilabel_evaluation.py tests/harness/test_multilabel_training.py tests/harness/test_multilabel_references.py
           tests/test_research_review_recovery.py tests/test_research_measurements.py
           tests/harness/test_research_algorithm_checks.py tests/harness/test_focused_repair.py tests/harness/test_outbound_strings.py
 
@@ -134,7 +134,7 @@ jobs:
           tests/rsi/test_numerical_evidence.py tests/rsi/test_shared_model_publication.py
           tests/test_research_source_review_flow.py tests/test_evolved_tool_scheduling.py tests/test_scientist_tool_scheduling.py
           tests/rsi/test_package_layout.py tests/rsi/test_sabio_assay_tasks.py
-          tests/rsi/test_property_coverage.py tests/rsi/test_deeploc_source.py tests/rsi/test_shared_acquisition_plan.py tests/rsi/test_research_project_catalog.py
+          tests/rsi/test_property_coverage.py tests/rsi/test_deeploc_source.py tests/rsi/test_deeploc_protocol.py tests/rsi/test_shared_acquisition_plan.py tests/rsi/test_research_project_catalog.py
           tests/rsi/test_model_retention.py tests/rsi/test_model_curation.py
           tests/rsi/test_capability_discovery.py tests/test_platform_model_discovery.py
           tests/test_mutation_tool_contracts.py tests/harness/test_tool_disclosure.py

@@ -12,6 +12,12 @@ METHODS = {
     "aac_svr": "Support-vector regression on the same composition and length features.",
     "training_mean": "Training-target mean reference without predictive sequence effects.",
 }
+MULTILABEL_METHODS = {
+    "training_prevalence": "Per-label training prevalence; unobserved targets are excluded.",
+    "aac_logistic": "Independent logistic regressions on composition and log length.",
+    "terminal_logistic": "Logistic regressions with additional N/C-terminal composition (50 residues).",
+}
+MULTILABEL_REFERENCE = Path(__file__).resolve().parents[1] / "rsi/engine/multilabel_baselines.py"
 REFERENCE = Path(__file__).resolve().parents[1] / "rsi/engine/traditional_baselines.py"
 IMPORTS = """import math
 import numpy as np
@@ -54,7 +60,11 @@ def predict(model, inputs):
 """
 
 
-def reference_baseline(reference="", sequence_column="sequence", output_field="value"):
+def reference_baseline(reference="", sequence_column="sequence", output_field="value", *, task="regression"):
+    if task not in {"regression", "multilabel"}:
+        raise ValueError("Reference task must be regression or multilabel")
+    if task == "multilabel":
+        return multilabel_reference(reference, sequence_column, output_field)
     if not isinstance(reference, str):
         raise ValueError("Choose a listed reference baseline")
     if not reference:
@@ -93,3 +103,34 @@ def reference_baseline(reference="", sequence_column="sequence", output_field="v
             "scope": "Canonical amino-acid sequences only; sequence composition cannot resolve all positional or mechanistic effects.",
             "provenance": "A fixed platform reference implementation, not a Scientist-created method or a fitted model.",
             "next_step": "Save this source and fit with train_research_model(variant='baseline'). Develop and measure a justified candidate with that baseline's parent_experiment_id; retain the reference provenance in the report."}
+
+
+def multilabel_reference(reference, sequence_column, output_field):
+    if not isinstance(reference, str) or (reference and reference not in MULTILABEL_METHODS):
+        raise ValueError("Choose a listed multilabel reference baseline")
+    scope = ("Sequence-only independent probabilities; includes ambiguous-residue composition. "
+             "No assay metadata or pretrained embeddings; fixed 0.5 decisions are not calibrated per label.")
+    if not reference:
+        return {"kind": "platform_reference", "task": "multilabel", "scope": scope,
+                "references": [{"id": key, "description": text} for key, text in MULTILABEL_METHODS.items()],
+                "next_step": "Select a reference ID with task=multilabel and output_file to save runnable fit/predict code."}
+    for field in (sequence_column, output_field):
+        if not isinstance(field, str) or not field.strip() or len(field) > 80 or any(ord(c) < 32 for c in field):
+            raise ValueError("Use a nonempty column/output name of at most 80 characters")
+    raw = MULTILABEL_REFERENCE.read_bytes()
+    upstream_hash = hashlib.sha256(raw).hexdigest()
+    text = raw.decode("utf-8")
+    version = next(ast.literal_eval(node.value) for node in ast.parse(text).body
+                   if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "VERSION" for t in node.targets))
+    source = "# Platform reference: " + reference + " (" + version + ")\n"
+    source += "# Upstream: src/agent/rsi/engine/multilabel_baselines.py; sha256=" + upstream_hash + "\n"
+    source += text + "\nREFERENCE_METHOD = " + repr(reference)
+    source += "\nSEQUENCE_COLUMN = " + repr(sequence_column) + "\nOUTPUT_FIELD = " + repr(output_field) + "\n"
+    ast.parse(source)
+    return {"kind": "platform_reference", "reference_id": reference, "version": version,
+            "description": MULTILABEL_METHODS[reference], "task": "multilabel",
+            "source": source, "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+            "upstream": "src/agent/rsi/engine/multilabel_baselines.py", "upstream_sha256": upstream_hash,
+            "input_field": sequence_column, "output_field": output_field, "scope": scope,
+            "provenance": "A fixed platform reference implementation, not a Scientist-created method or a fitted model.",
+            "next_step": "Fit as variant=baseline on the frozen multilabel data; develop a justified revision and preserve reference provenance."}
