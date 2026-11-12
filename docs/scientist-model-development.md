@@ -576,7 +576,9 @@ Native implementation has a physical API-request ceiling that leaves three calls
 for SC and technical Review. Retries count toward that ceiling. If the native
 phase reaches it without a valid checkpoint, admitted tools are stopped before
 SC reviews the preserved partial results. This review cannot complete the plan
-or publish a model; the next episode continues from the saved work.
+or publish a model; the next episode continues from the saved work. Native
+failures after host-recorded scientific tool attempts use the same partial-review
+path. Startup failures without such evidence and external cancellation do not.
 
 For analysis deliverables, checkpoint the report and the recorded computation
 artifacts. SC cites exact report quotations, result fields and input provenance.

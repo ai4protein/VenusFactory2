@@ -499,20 +499,25 @@ class AutonomousResearch:
                 execution=next((e for e in reversed(events) if e.get('kind') in {'completed','research_interrupted'}),None)
                 if not execution:raise ValueError('Native executor did not complete')
                 interrupted=(execution.get('kind')=='research_interrupted'
-                    and execution.get('reason')=='native_model_request_limit'
+                    and execution.get('reason') in {'native_model_request_limit','native_execution_failed'}
                     and execution.get('research_complete') is False)
                 if execution.get('kind')=='research_interrupted' and not interrupted:
                     raise ValueError('Native executor interruption was not recognized')
+                if interrupted and execution.get('reason')=='native_execution_failed':
+                    attempts=execution.get('scientific_tool_attempts')
+                    if not isinstance(attempts,list) or not any(isinstance(row,dict) and
+                        row.get('status') in {'completed','failed','cancelled'} for row in attempts):
+                        raise ValueError('Native failure has no host-recorded scientific tool attempt')
                 if not interrupted and not (execution.get('event_audit') or {}).get('passed'):
                     raise ValueError('Scientific execution evidence was not validated')
-                execution_report=('Execution reached its model request limit. Review partial evidence; research is not complete.'
+                execution_report=('Execution stopped without a valid final checkpoint. Review partial evidence; research is not complete.'
                     if interrupted else execution['text'])
                 self.activity(folder,'MLS',execution_report)
                 checkpoint=service.checkpoint
                 context['execution']={'report':execution_report,'checkpoint':checkpoint,'receipts':service.receipts,'tool_results':[e for e in events if e.get('kind')=='tool_result'][-20:]}
                 if interrupted:
                     context['execution']['interruption']={key:copy.deepcopy(execution[key]) for key in
-                        ('reason','research_complete','event_audit','native_termination') if key in execution}
+                        ('reason','research_complete','event_audit','native_termination','native_error_type','scientific_tool_attempts') if key in execution}
                 previews=[]
                 for row in (checkpoint or {}).get('artifacts',[]):
                     p=safe_file(workspace,row['path']);preview={'path':row['path'],'sha256':row['sha256']}
@@ -563,7 +568,7 @@ class AutonomousResearch:
                 checkpoint_valid=verified_checkpoint(workspace,checkpoint,service.receipts,require_completed_steps=False)
                 request_valid=audit_requests(folder/'model_requests.jsonl')['passed']
                 host_issues=[row['error'] for row in context['execution']['failures']]
-                if interrupted:host_issues.append('Execution reached its model request limit; inspect partial work and submit a verified checkpoint in a later episode.')
+                if interrupted:host_issues.append('Execution stopped without a valid final checkpoint; inspect partial work and submit verified evidence in a later episode.')
                 if not checkpoint_valid:host_issues.append('Submit a checkpoint with unchanged artifacts and execution receipts.')
                 if not request_valid:host_issues.append('Model request evidence did not pass verification.')
                 reviewable=not host_issues

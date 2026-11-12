@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import secrets
 import shutil
 from dataclasses import replace
@@ -145,6 +146,13 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
     workspace_call = asyncio.Lock()
     discovery_lock = asyncio.Lock()
     active_requests = set()
+    scientific_attempts = []
+    scientific_workspace_tools = set()
+    if checkpoint_handoff is not None:
+        from .research_workspace import RESEARCH_TOOLS
+        scientific_workspace_tools = set(RESEARCH_TOOLS) - {
+            'get_research_strategy_guide', 'get_research_review_requirements', 'submit_research_checkpoint',
+        }
     reference_hashes = {}
     closing = False
 
@@ -202,6 +210,25 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
             'isError': inspection_required,
         })
 
+    def record_scientific_attempt(name, call_id, classification):
+        if checkpoint_handoff is None:
+            return None
+        from mcp_tools.scheduler.catalog import INLINE
+        if name not in scientific_workspace_tools and (
+            name in INLINE or classification['category'] in {'workspace', 'platform_help'}
+        ):
+            return None
+        # Only reached after authenticated dispatch, disclosure, permission,
+        # schema/workspace validation and compute admission. Native trace text
+        # alone cannot create this host-owned evidence of an invocation.
+        attempt = {'tool': name, 'call_id': call_id, 'status': 'running'}
+        scientific_attempts.append(attempt)
+        return attempt
+
+    def diagnostic_code(value, fallback):
+        value = public_value(value, workspace)
+        return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,63}', value) else fallback
+
     async def rpc(http):
         if closing:
             raise web.HTTPServiceUnavailable()
@@ -222,6 +249,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         queued_tool = False
         accepted_call = False
         analysis_artifact = None
+        scientific_attempt = None
         try:
             if method == "initialize":
                 result = {
@@ -315,19 +343,37 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                                 raise ValueError("Research context reference changed; its content is unavailable")
                     from mcp_tools.scheduler.catalog import classify, native_tools
                     registered = native_tools()
-                    if canonical_name in registered and classify(canonical_name, tool.metadata)["execution"] == "queued":
+                    classification = classify(canonical_name, tool.metadata)
+                    if canonical_name in registered and classification["execution"] == "queued":
                         queued_tool = True
                         from mcp_tools.scheduler.client import invoke
+                        def record_queued_attempt(job):
+                            nonlocal scientific_attempt
+                            if scientific_attempt is None:
+                                scientific_attempt = record_scientific_attempt(canonical_name, call_id, classification)
+                                if scientific_attempt is not None:
+                                    scientific_attempt['job_id'] = job['id']
+
                         def queue_status(job):
                             send({"kind": "research_tool_status", "status": job["status"], "tool": name, "call_id": call_id,
                                   "job_id": job["id"], "job_number": job["job_number"], "position": job["position"],
                                   "progress": public_value(job.get("progress"), workspace)})
                         terminal = []
+                        def queue_terminal(job):
+                            terminal.append(job)
+                            # Running includes process startup and policy checks.
+                            # Only a tool value proves this queued handler produced
+                            # scientific work; pre-handler failures remain unproven.
+                            if job['status'] in {'completed', 'failed'} and 'value' in job.get('result', {}):
+                                record_queued_attempt(job)
+                                if scientific_attempt is not None:
+                                    scientific_attempt['status'] = ('failed' if job['status'] == 'failed' or job['result'].get('is_error') else 'completed')
+
                         owner = os.getenv('VENUS_QUEUE_OWNER') or "chat:" + str(request.get("session_id") or token)
                         parent_job = os.getenv('VENUS_QUEUE_JOB_ID')
                         value = await invoke(canonical_name, args, owner=owner, parent_job=parent_job,
                                              session_id=request.get("session_id"), on_status=queue_status,
-                                             **({"on_terminal": terminal.append} if analysis_recorder else {}))
+                                             on_terminal=queue_terminal)
                         if analysis_recorder is not None:
                             analysis_artifact = analysis_recorder(
                                 job=terminal[-1] if terminal else None, name=canonical_name,
@@ -338,7 +384,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                         from backend.web_v2.usage_store import Observation
                         observation = Observation('tool', canonical_name)
                         from backend.web_v2.compute_access import inline_prediction
-                        inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), canonical_name, classify(canonical_name, tool.metadata)['category'])
+                        inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), canonical_name, classification['category'])
+                        scientific_attempt = record_scientific_attempt(canonical_name, call_id, classification)
                         value = await tool.ainvoke(args, config={"configurable": {"session_id": request.get("session_id")}})
                     if canonical_name == "read_session_file" and reference in reference_hashes:
                         if not isinstance(value, dict) or value.get("file_sha256") != reference_hashes[reference]:
@@ -357,7 +404,10 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                         send({"kind": "model_result", "result": public_value(card, workspace)})
                 value = public_value(value, workspace)
                 failed, _ = _tool_output_indicates_failure(value)
-                if observation: observation.finish(failed=failed)
+                if scientific_attempt is not None:
+                    scientific_attempt["status"] = "failed" if failed or scientific_attempt["status"] == "failed" else "completed"
+                if observation:
+                    observation.finish(failed=failed)
                 if event_sink:
                     send({"kind": "research_tool_status", "status": "failed" if failed else "completed", "tool": name, "call_id": call_id, "result": str(value)[:3000]})
                 result = {
@@ -378,6 +428,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                 raise ValueError("Unknown MCP method")
             return web.json_response({"jsonrpc": "2.0", "id": body["id"], "result": result})
         except asyncio.CancelledError:
+            if scientific_attempt is not None:
+                scientific_attempt["status"] = "cancelled"
             if observation:
                 observation.write('cancelled', error_type='CancelledError')
             if event_sink and method == 'tools/call':
@@ -386,6 +438,11 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                       'call_id': locals().get('call_id')})
             raise
         except Exception as exc:
+            if scientific_attempt is not None:
+                from mcp_tools.tools.capability_policy import CapabilityDisabled
+                # A late policy/owner rejection is not scientific execution.
+                scientific_attempt.update(status='rejected' if isinstance(exc, (PermissionError, CapabilityDisabled)) else 'failed',
+                                          error_type=type(exc).__name__)
             if method == 'tools/call' and not queued_tool:
                 from backend.web_v2.usage_store import Observation
                 observation = observation or Observation('tool', str(params.get('name', 'unknown')))
@@ -546,25 +603,39 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
             interruption = {"kind": "research_interrupted", "reason": "native_model_request_limit",
                             "native_termination": termination, "research_complete": False}
         else:
-            result = await pending
-            forward()
-            if result.get("status") != "completed":
-                raise RuntimeError(result.get("error_type") or result.get("status", "Native turn failed"))
-            event_audit = None
-            if request.get("audit_required"):
-                from .events import audit_trace
-                event_audit = audit_trace(trace, disclosure.names, transport_limit)
-                if not event_audit["passed"]:
-                    raise ValueError("Scientific tool trace did not pass validation")
-            text = result.get("final_text") or result.get("text") or result.get("final_message") or ""
-            if not text.strip():
-                raise ValueError("Empty native answer")
-            send({"kind": "text", "text": text})
-            messages = request.get("messages", []) + [
-                {"role": "user", "content": request["text"]},
-                {"role": "assistant", "content": text},
-            ]
-            send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
+            result = None
+            try:
+                result = await pending
+                if result.get("status") != "completed":
+                    raise RuntimeError(result.get("error_type") or result.get("status", "Native turn failed"))
+                text = result.get("final_text") or result.get("text") or result.get("final_message") or ""
+                if not text.strip():
+                    raise ValueError("Empty native answer")
+            except Exception as exc:
+                if checkpoint_handoff is None or not any(row['status'] != 'rejected' for row in scientific_attempts):
+                    raise
+                native_status = diagnostic_code(result.get('status'), 'unknown') if isinstance(result, dict) else 'exception'
+                error_type = diagnostic_code(result.get('error_type'), type(exc).__name__) if isinstance(result, dict) else type(exc).__name__
+                interruption = {
+                    'kind': 'research_interrupted', 'reason': 'native_execution_failed', 'research_complete': False,
+                    'native_termination': native_status + ':' + error_type,
+                    'native_status': native_status, 'native_error_type': error_type,
+                    'native_exception_type': type(exc).__name__,
+                }
+            else:
+                forward()
+                event_audit = None
+                if request.get("audit_required"):
+                    from .events import audit_trace
+                    event_audit = audit_trace(trace, disclosure.names, transport_limit)
+                    if not event_audit["passed"]:
+                        raise ValueError("Scientific tool trace did not pass validation")
+                send({"kind": "text", "text": text})
+                messages = request.get("messages", []) + [
+                    {"role": "user", "content": request["text"]},
+                    {"role": "assistant", "content": text},
+                ]
+                send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
     finally:
         async def shutdown():
             nonlocal closing
@@ -592,5 +663,12 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         audit = audit_trace(trace, disclosure.names, transport_limit)
         interruption.update(tool_calls=executions, discovery_calls=lookups,
                             checkpoint_calls=checkpoint_calls, event_audit=audit)
-        (control / "request_budget_interruption.json").write_text(json.dumps(interruption, ensure_ascii=False, indent=2))
+        receipt_name = "request_budget_interruption.json"
+        if interruption['reason'] == 'native_execution_failed':
+            attempts = [row for row in scientific_attempts if row['status'] in {'completed', 'failed', 'cancelled'}]
+            if not attempts:
+                raise RuntimeError('Native failure has no admitted scientific tool attempt')
+            interruption['scientific_tool_attempts'] = attempts
+            receipt_name = "execution_failure_interruption.json"
+        (control / receipt_name).write_text(json.dumps(interruption, ensure_ascii=False, indent=2))
         send(interruption)

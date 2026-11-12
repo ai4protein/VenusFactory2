@@ -36,9 +36,10 @@ def setup(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("reason", ["native_model_request_limit", "native_execution_failed"])
 @pytest.mark.parametrize("audit_passed", [True, False])
 @pytest.mark.parametrize("critic_ready", [True, False])
-async def test_native_limit_reviews_partial_evidence_but_cannot_accept(tmp_path, monkeypatch, audit_passed, critic_ready):
+async def test_native_failure_reviews_partial_evidence_but_cannot_accept(tmp_path, monkeypatch, reason, audit_passed, critic_ready):
     store = setup(tmp_path, monkeypatch)
     roles = []
 
@@ -49,7 +50,7 @@ async def test_native_limit_reviews_partial_evidence_but_cannot_accept(tmp_path,
         if role == "CB":
             return json.dumps({"summary": "Compute lengths", "deliverable": "analysis", "needs_input": [],
                 "steps": [{"id": "calculate", "title": "Compute lengths", "acceptance": "Save computed lengths"}]})
-        assert context["execution"]["interruption"]["reason"] == "native_model_request_limit"
+        assert context["execution"]["interruption"]["reason"] == reason
         assert context["execution"]["interruption"]["event_audit"]["passed"] is audit_passed
         assert context["execution"]["receipts"]
         return json.dumps({"decision": "ready_for_host_validation" if critic_ready else "needs_revision",
@@ -62,9 +63,10 @@ async def test_native_limit_reviews_partial_evidence_but_cannot_accept(tmp_path,
         # Even a previously valid partial checkpoint cannot turn a later interruption into success.
         await service.submit_research_checkpoint("Computed lengths", ["calculate"], ["lengths.json"], [])
         events.extend([{"kind": "tool_call_start"}, {
-            "kind": "research_interrupted", "reason": "native_model_request_limit",
+            "kind": "research_interrupted", "reason": reason,
             "research_complete": False, "event_audit": {"passed": audit_passed},
             "native_termination": "stopped",
+            "scientific_tool_attempts": [{"tool": "run_research_python", "call_id": "calculation", "status": "completed"}],
         }])
 
     state = await ar.AutonomousResearch(store, "fixture", {}, consult=consult, executor=execute, tools=[]).run()
@@ -85,6 +87,9 @@ async def test_native_limit_reviews_partial_evidence_but_cannot_accept(tmp_path,
     {"kind": "research_interrupted", "reason": "untrusted_reason", "research_complete": False},
     {"kind": "research_interrupted", "reason": "native_model_request_limit", "research_complete": True},
     {"kind": "completed", "text": "Done", "event_audit": {"passed": False}},
+    {"kind": "research_interrupted", "reason": "native_execution_failed", "research_complete": False},
+    {"kind": "research_interrupted", "reason": "native_execution_failed", "research_complete": False,
+     "scientific_tool_attempts": [{"tool": "run_research_python", "status": "rejected"}]},
 ])
 async def test_unrecognized_endings_do_not_gain_partial_review_path(tmp_path, monkeypatch, terminal):
     store = setup(tmp_path, monkeypatch)
