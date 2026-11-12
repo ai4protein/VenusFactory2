@@ -9,9 +9,11 @@ from __future__ import annotations
 import copy
 import json
 
+from . import study_review_state
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_workspace import safe_file
+from .study_review_state import StudyReviewInconsistent
 
 POLICY = "scientific-acceptance.v1"
 CHECKS = ("goal_fit", "scientific_value", "evaluation_validity", "scope_and_limits")
@@ -26,7 +28,12 @@ STUDY_PROMPT = 'You are the independent Scientific Critic (SC) of an ongoing pro
 def prompt_for_review(context):
     acceptance = context.get("scientific_acceptance", {})
     if acceptance.get("study_evidence_required") and not acceptance.get("models"):
-        return STUDY_PROMPT
+        return STUDY_PROMPT + (
+            " Return revision_requests under the supplied study_review_policy. "
+            "Use missing_evidence only for a specifically absent host fact; scientific_concern "
+            "can question utility, generalization or split adequacy despite recorded measurements. "
+            "measurement_state is host-owned and is not a verdict."
+            if acceptance.get("study_review_policy") else "")
     return PROMPT
 
 
@@ -75,10 +82,13 @@ def parse_model_review(raw):
 def parse_study_review(raw, context):
     from .scientist_role_output import specification, validate_output
 
-    value = json.loads(validate_output(raw, specification("SC", "chat_completions", study_acceptance=True)))
+    value = json.loads(validate_output(raw, specification(
+        "SC", "chat_completions", study_acceptance=True,
+        study_review_policy=context["scientific_acceptance"].get("study_review_policy"))))
     known = {row["id"] for row in context.get("development_measurements", {}).get("experiments", [])}
     if not set(value["evidence_ids"]) <= known:
         raise ValueError("Study review must cite only host experiment IDs from development_measurements.")
+    study_review_state.validate(value, context)
     return value
 
 
@@ -231,6 +241,9 @@ def evidence_context(context, proposals, development):
     history = result["development_measurements"]["experiments"]
     models = result["scientific_acceptance"]["models"]
     result["scientific_acceptance"]["study_evidence_required"] = bool(history) and not models
+    if result["scientific_acceptance"]["study_evidence_required"]:
+        result["scientific_acceptance"]["study_review_policy"] = study_review_state.POLICY
+        result["measurement_state"] = study_review_state.measurement_state(result)
     facts = {"evaluated_experiment_ids": [row["id"] for row in history],
              "baseline_experiment_ids": [row["id"] for row in history if row["variant"] == "baseline"],
              "revised_experiment_ids": [row["id"] for row in history if row["variant"] == "candidate"],
@@ -248,6 +261,11 @@ def assess(review, context):
     """Fail closed on missing assessments, unmeasured versions or fabricated IDs."""
     models = context["scientific_acceptance"]["models"]
     issues = list(review["issues"])
+    if context["scientific_acceptance"].get("study_review_policy") is not None:
+        try:
+            study_review_state.validate(review, context)
+        except StudyReviewInconsistent as exc:
+            issues.append("review_evidence_inconsistent: " + str(exc))
     if context["scientific_acceptance"].get("study_evidence_required"):
         known = {row["id"] for row in context["development_measurements"]["experiments"]}
         citations = review.get("evidence_ids", [])
@@ -335,6 +353,8 @@ def record(folder, review, context, *, goal_root):
 
 def revision_feedback(acceptance, context, review, episode):
     models = context["scientific_acceptance"]["models"]
+    study_feedback = (study_review_state.feedback(review, context)
+                      if context["scientific_acceptance"].get("study_review_policy") is not None else {})
     return {
         "episode": episode,
         "summary": review["summary"],
@@ -354,6 +374,7 @@ def revision_feedback(acceptance, context, review, episode):
         ],
         "receipt": acceptance["receipt"],
         "sha256": acceptance["sha256"],
+        **study_feedback,
     }
 
 

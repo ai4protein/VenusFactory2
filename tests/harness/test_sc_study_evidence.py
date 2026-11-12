@@ -5,9 +5,15 @@ import pytest
 from test_research_training import LINEAR, service_at
 
 from agent.harness import scientific_acceptance as sc
+from agent.harness import study_review_state as study
 from agent.harness.autonomous_research import development_next_action
 from agent.harness.contracts import digest
 from agent.harness.research_development import Development
+
+
+def request(requirement="measured_revision", *, kind="missing_evidence", identity=""):
+    return {"kind": kind, "requirement": requirement, "experiment_id": identity,
+            "reason": "A justified revision is still needed.", "proposed_action": "Measure a revised learner."}
 
 
 def add_measurement(development, index=1):
@@ -83,7 +89,8 @@ def test_study_rejection_returns_to_pi_without_erasing_measured_stage(tmp_path):
     measured, _ = add_measurement(development)
     context = sc.evidence_context({}, [], development)
     review = {"decision": "needs_revision", "summary": "Submit a scoped model proposal.",
-              "issues": ["Evaluation exists, but reproducible model delivery is missing."]}
+              "issues": ["Evaluation exists, but a model proposal is missing."],
+              "evidence_ids": [measured["id"]], "revision_requests": [request("model_submission")]}
     acceptance = {**sc.assess(review, context), "receipt": "episodes/cycle_001/scientific_acceptance.json", "sha256": "c"*64}
     feedback = sc.revision_feedback(acceptance, context, review, 1)
     assert feedback["requests"] == [] and feedback["experiment_ids"] == []
@@ -91,7 +98,8 @@ def test_study_rejection_returns_to_pi_without_erasing_measured_stage(tmp_path):
     action = development_next_action({"generations": [{"id": "candidate", "variant": "candidate", "parent": measured["id"]}]},
                                      {"sc_revision": feedback})
     assert action["stage"] == "submit_for_review" and action["tool"] == "propose_research_capability"
-    assert action["scientific_feedback"]["issues"] == acceptance["issues"]
+    assert action["scientific_feedback"]["issues"] == ["Submit a scoped model candidate"]
+    assert feedback["reviewer_commentary"]["issues"] == review["issues"]
     assert action["scientific_feedback"]["measured_experiment_ids"] == [measured["id"]]
 
 
@@ -119,8 +127,9 @@ def test_study_review_citations_are_typed_and_bound_to_real_measurements(tmp_pat
     context = sc.evidence_context({}, [], development)
     assert context["scientific_acceptance"]["study_evidence_required"]
     review = {"decision": "needs_revision", "summary": "A measured reference exists; develop a justified revision.",
-              "issues": ["No measured revision or submitted model yet."], "evidence_ids": [row["id"]]}
-    spec = specification("SC", protocol, study_acceptance=True)
+              "issues": ["No measured revision or submitted model yet."], "evidence_ids": [row["id"]],
+              "revision_requests": [request()]}
+    spec = specification("SC", protocol, study_acceptance=True, study_review_policy=study.POLICY)
     assert json.loads(validate_output(json.dumps(review), spec)) == review
     assert sc.parse_study_review(json.dumps(review), context) == review
     missing = {key:value for key,value in review.items() if key != "evidence_ids"}
@@ -134,7 +143,7 @@ def test_study_review_citations_are_typed_and_bound_to_real_measurements(tmp_pat
         assert not assessment["passed"] and "SC study feedback must cite" in " ".join(assessment["issues"])
     assert "evidence_ids" not in specification("SC", protocol)["schema"]["properties"]
     # A valid interim review is still not approval of any unsubmitted model.
-    valid = {**review, "decision": "ready_for_host_validation", "issues": []}
+    valid = {**review, "decision": "ready_for_host_validation", "issues": [], "revision_requests": []}
     result = sc.assess(valid, context)
     assert result["passed"] and result["approved_models"] == {}
 
@@ -179,7 +188,7 @@ async def test_bad_study_citation_gets_bounded_repair_without_changing_evidence(
         calls.append(current)
         return json.dumps({"decision":"needs_revision","summary":"Measure a justified revision of the reference.",
                            "issues":["The revised experiment remains incomplete."],
-                           "evidence_ids":["f"*32 if len(calls)==1 else measured["id"]]})
+                           "evidence_ids":["f"*32 if len(calls)==1 else measured["id"]], "revision_requests":[request()]})
     runner = AutonomousResearch(SimpleNamespace(root=tmp_path), "unused", {}, consult=consult)
     result = await runner.structured("SC", context, profile(), SimpleNamespace(calls=0), tmp_path/"review",
                                     lambda raw: sc.parse_study_review(raw, context))

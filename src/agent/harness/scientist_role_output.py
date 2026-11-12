@@ -12,7 +12,7 @@ def object_schema(properties):
             "required": list(properties), "additionalProperties": False}
 
 
-def specification(role, protocol, *, model_acceptance=False, study_acceptance=False):
+def specification(role, protocol, *, model_acceptance=False, study_acceptance=False, study_review_policy=None):
     text = {"type": "string", "minLength": 1, "maxLength": 2000}
     strings = {"type": "array", "items": {"type": "string"}}
     if role == "PI":
@@ -42,6 +42,12 @@ def specification(role, protocol, *, model_acceptance=False, study_acceptance=Fa
                 "items": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
                 "description": "Host experiment IDs supporting this study review. Cite measurements from development_measurements; these are not accepted model IDs."}
             schema["required"].append("evidence_ids")
+            if study_review_policy is not None:
+                from .study_review_state import POLICY, request_schema
+                if study_review_policy != POLICY:
+                    raise ValueError("Unsupported study review evidence policy")
+                schema["properties"]["revision_requests"] = request_schema()
+                schema["required"].append("revision_requests")
     else:
         return None
     if role == "CB":

@@ -41,6 +41,7 @@ def development_next_action(summary, progress, prepared=None, *, materials=None)
         action['scientific_feedback'] = {
             'summary': feedback.get('summary', ''), 'issues': feedback['issues'],
             'measured_experiment_ids': feedback.get('measured_experiment_ids', []),
+            **{key:feedback[key] for key in ('measurement_state','study_revision_requests') if key in feedback},
             'instruction': 'Address SC study feedback using the existing host measurements. '
                 'Distinguish a missing experiment from incomplete submission or delivery; '
                 'preserve completed evidence and revise only the unresolved work.'}
@@ -206,7 +207,7 @@ class AutonomousResearch:
     async def consult(self, role, context, profile, relay, folder):
         if self.consult_override:return await self.consult_override(role,context)
         from .scientist_role_output import specification, request_fields, output_content
-        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False)) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
+        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False), study_review_policy=context.get('scientific_acceptance',{}).get('study_review_policy')) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
         output_spec = spec
         role_prompt=sc_acceptance.prompt_for_review(context) if role=='SC' else ROLES[role]
         instruction=SCIENTIST_PURPOSE+role_prompt+' Respond in the language of the research objective.'
@@ -288,6 +289,7 @@ class AutonomousResearch:
     async def structured(self, role, context, profile, relay, folder, validator):
         """One bounded format repair within the existing model-call budget."""
         current=context
+        consistency_error=None
         for attempt in range(2):
             from .scientist_role_output import RoleOutputError
             problem=None
@@ -297,10 +299,19 @@ class AutonomousResearch:
             if problem is None:
                 try:return validator(raw)
                 except (ValueError,KeyError,TypeError) as exc:problem=exc
-            if attempt or relay.calls>=profile.budget.model_calls-3:raise problem
+            if isinstance(problem, sc_acceptance.StudyReviewInconsistent):
+                consistency_error=problem
+            if attempt or relay.calls>=profile.budget.model_calls-3:
+                if consistency_error:
+                    raise sc_acceptance.StudyReviewInconsistent(str(problem)) from problem
+                raise problem
+            repair_instruction=('Correct the typed missing-evidence assertions against host measurement_state. '
+                'Preserve the objective and legitimate scientific concerns; do not invent results or force acceptance. '
+                'Return one valid JSON object. Do not execute tools.'
+                if consistency_error else
+                'Reformat the same research content as one valid JSON object with the required fields. Do not invent results, change the objective or execute any tools.')
             current={**context,'format_repair':{'previous_response':raw[:12000],
-                'validation_error':str(problem)[:400],
-                'instruction':'Reformat the same research content as one valid JSON object with the required fields. Do not invent results, change the objective or execute any tools.'}}
+                'validation_error':str(problem)[:400], 'instruction':repair_instruction}}
         raise AssertionError('Bounded structured request')
 
     def activity(self, folder, role, text):
@@ -501,6 +512,9 @@ class AutonomousResearch:
                 progress.pop('reviewed_episode',None)
                 progress['research_completed']=False
                 sc_context=sc_acceptance.evidence_context(context,service.proposals,development)
+                if "measurement_state" in sc_context:
+                    progress["measurement_state"]=copy.deepcopy(sc_context["measurement_state"])
+                write_json(folder/'sc_evidence.json',sc_context)
                 validator = critic_decision
                 if sc_context['scientific_acceptance']['models']:
                     validator = sc_acceptance.parse_model_review
@@ -508,6 +522,7 @@ class AutonomousResearch:
                     def validator(raw):
                         return sc_acceptance.parse_study_review(raw, sc_context)
                 review=await self.structured('SC',sc_context,profile,relay,folder,validator)
+                progress.pop('review_evidence_error',None)
                 write_json(folder/'review.json',review)
                 acceptance=sc_acceptance.record(folder,review,sc_context,goal_root=self.store.root)
                 progress['scientific_acceptance']=acceptance
@@ -594,6 +609,18 @@ class AutonomousResearch:
                 else:progress.pop('delivery_pending',None)
                 if any(r['status']!='approved' for r in progress.get('publication_reviews',[])): ready=False
                 result.update(status='completed' if ready else 'needs_revision',summary=review['summary'],needs_input=bool(questions))
+        except sc_acceptance.StudyReviewInconsistent as exc:
+            error={'code':'review_evidence_inconsistent','episode':index,
+                   'message':'SC could not provide an evidence-consistent review. Completed measurements are preserved; no model was accepted.',
+                   'validation_error':str(exc)[:500]}
+            progress['review_evidence_error']=error
+            # Prior review requests describe an older evidence state. They must not
+            # become current instructions after an inconsistent replacement review.
+            progress.pop('sc_revision',None)
+            progress.pop('reviewed_episode',None)
+            progress['research_completed']=False
+            result.update(status='needs_revision',summary=error['message'],error_type='StudyReviewInconsistent')
+            write_json(folder/'review_evidence_error.json',error)
         except AwaitUser:
             result.update(status='needs_revision',summary='Waiting for your response',needs_input=True)
         except asyncio.CancelledError:

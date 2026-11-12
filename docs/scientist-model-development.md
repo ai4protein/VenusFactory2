@@ -33,6 +33,15 @@ are omitted, while successful observations and failure summaries remain. Citatio
 checks bind the opinion to a study; they do not by themselves prove its scientific
 interpretation correct.
 
+New interim reviews also receive a host-owned measurement state and return typed
+revision requests. A request claiming absent validation, partition records, a
+baseline or a revision is checked against that state. Reviewers may still question
+the scientific adequacy of existing evidence. Conflicting requests receive one
+bounded correction attempt; an unresolved conflict preserves the measurements
+and records `review_evidence_inconsistent` without model acceptance. PI receives
+verified state and revision categories separately from reviewer commentary.
+Historical reviews retain their original policy and receipts.
+
 A negative verdict or missing evidence prevents technical Review and registration,
 persists an actionable request for PI, and continues the research loop. Accepted
 verdicts are bound to the selected experiment, runtime, evaluation and manifest
@@ -61,7 +70,9 @@ prove that user-supplied grouping labels encode true protein homology.
 ## CPU and PBS GPU training
 
 Agent-authored `train_research_model` fits use CPU by default; the opt-in PBS
-backend below supports isolated GPU fitting and CPU prediction. Platform PLM
+backend below supports isolated GPU fitting and CPU prediction. Reuse through
+`run_generated_capability` uses the CPU queue, including when GPU slots are busy;
+prediction quotas and session ownership still apply. Platform PLM
 training uses enabled tools: `generate_training_config` prepares the
 session data and settings, `train_protein_model` produces a fitted checkpoint,
 and `protein_model_predict` checks the resulting model. These calls use the

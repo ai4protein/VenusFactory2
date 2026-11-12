@@ -208,7 +208,7 @@ async def test_coordinator_reaches_independent_review_after_measured_replacement
             evidence = ([row["id"] for row in context["development_measurements"]["experiments"]]
                         if context["scientific_acceptance"].get("study_evidence_required") else [])
             return json.dumps({"decision":"ready_for_host_validation","summary":"Measured work inspected","issues":[],
-                               **({"evidence_ids": evidence} if evidence else {})})
+                               **({"evidence_ids": evidence, "revision_requests": []} if evidence else {})})
         raise AssertionError(role)
     async def executor(request,service,events):
         iterations.append(True)
