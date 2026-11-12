@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import uuid
@@ -26,7 +27,17 @@ ExperimentVariant = Annotated[
     )),
 ]
 
-LIBRARY = Path(__file__).resolve().parents[3] / 'research_runs/rsi/research_capabilities'
+def _library_root():
+    configured = os.getenv("VENUS_RESEARCH_CAPABILITY_ROOT")
+    if configured:
+        path = Path(configured)
+        if not path.is_absolute() or any(character in configured for character in "\x00\r\n"):
+            raise ValueError("The research capability root must be an absolute host-configured path")
+        return path
+    return Path(__file__).resolve().parents[3] / 'research_runs/rsi/research_capabilities'
+
+
+LIBRARY = _library_root()
 RESEARCH_TOOLS = ('get_research_strategy_guide', 'get_research_baseline', 'prepare_research_dataset', 'validate_research_evaluation', 'train_research_model', 'evaluate_research_model', 'restore_research_evaluation', 'get_research_review_requirements', 'propose_research_capability', 'submit_research_checkpoint')
 
 def safe_file(root, name, *, exists=True):

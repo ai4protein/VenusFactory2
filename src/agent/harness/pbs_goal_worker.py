@@ -70,6 +70,7 @@ def _environment(record_path, record):
            "VENUS_SANDBOX_BACKEND": "bwrap", "VENUS_SESSION_SANDBOX": "bwrap",
            "VENUS_SCIENTIST_PBS_RECORD": str(Path(record_path).resolve()),
            "VENUS_RUNTIME_ROOT": str(private), "VENUS_JOB_QUEUE_ROOT": str(private / "queue"),
+           "VENUS_RESEARCH_CAPABILITY_ROOT": str(private / "research_capabilities"),
            "VENUS_SANDBOX_CONTROL_ROOT": str(private / "sandbox"), "TEMP_OUTPUTS_DIR": str(private / "outputs"),
            "VENUS_USAGE_DB": str(private / "usage.sqlite"), "VENUS_ACCESS_DB": str(private / "access.sqlite"),
            "VENUS_QUEUE_CPU_SLOTS": str(record["resources"]["ncpus"]), "VENUS_QUEUE_GPU_SLOTS": "1",
