@@ -12,6 +12,7 @@ from backend.web_v2.job_records import JobRecords
 from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
 from mcp_tools.scheduler.catalog import classify, native_tools
 from mcp_tools.common.tool_arguments import validate_tool_arguments
+from mcp_tools.scheduler.receipt_binding import value_digest
 
 MAX_PAYLOAD = 4_000_000
 MAX_RESULT = 16_000_000
@@ -64,7 +65,7 @@ class ToolJobs:
         try:
             identity,_=launch([sys.executable,'-u','-m','mcp_tools.scheduler.worker',str(spec)],owner=owner,kind='mcp:'+policy['category'],
                               resource=policy['resource'],timeout=policy['timeout_seconds'],queue=self.queue,
-                               metadata={'tool':name,'category':policy['category'],'route':route,'parent_job':parent_job,'session_id':session_id})
+                               metadata={'tool':name,'category':policy['category'],'route':route,'parent_job':parent_job,'session_id':session_id,'arguments_sha256':value_digest(arguments)})
         except BaseException:
             spec.unlink(missing_ok=True);raise
         self.records.register('mcp',identity,owner,'mcp:'+policy['category'],name,self.queue.get(identity,owner)['created'])
@@ -77,6 +78,7 @@ class ToolJobs:
         public=self.queue.public(identity,owner)
         public.update(self.records.register('mcp',identity,owner,row['kind'],row['metadata']['tool'],row['created']))
         public.update(tool=row['metadata']['tool'],category=row['metadata']['category'])
+        public.update({key:row['metadata'][key] for key in ('arguments_sha256','parent_job') if key in row['metadata']})
         result=self.queue.files(identity)/'mcp-result.json'
         progress=self.queue.files(identity)/'mcp-progress.json'
         if progress.is_file():public['progress']=json.loads(progress.read_text())

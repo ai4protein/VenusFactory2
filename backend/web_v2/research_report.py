@@ -183,7 +183,7 @@ async def knowledge_tool(name, arguments):
     from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
     assert_tool_call_allowed(name, arguments)
     if os.getenv('VENUS_QUEUE_JOB_ID') and os.getenv('VENUS_MCP_QUEUE_WORKER') != '1':
-        from mcp_tools.scheduler.client import invoke
+        from .research_receipts import invoke
         value = await invoke(name, arguments, owner=os.environ['VENUS_QUEUE_OWNER'],
                              parent_job=os.environ['VENUS_QUEUE_JOB_ID'])
     else:
@@ -227,6 +227,12 @@ def literature_arguments(query):
 
 async def literature(query):
     obj = await knowledge_tool('query_europepmc', literature_arguments(query))
+    return literature_records(obj)
+
+
+def literature_records(obj):
+    if not isinstance(obj, dict) or obj.get('status') not in {'completed', 'empty'}:
+        raise ValueError('Public knowledge query unavailable')
     return [{'title': plain(r.get('title'), 240), 'url': r['url'],
              'kind': 'literature', 'text': plain(r.get('abstractText'), 2400), 'year': r.get('pubYear', ''),
              'authors': plain(r.get('authorString'), 300), 'evidence_level': r['evidence_level'], 'doi': r.get('doi', ''),
@@ -536,6 +542,7 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
         step('materials','running')
         add(payload['material_sources'])
         step('materials','completed',str(len(payload['material_sources'])))
+    identity_partial = bool(state['partial'])
     step('plan', 'running')
     queries = [protein[:180], (protein[:150] + ' protein engineering mutation stability')]
     state['plan'] = [{'id': s, 'label': next(x[1] for x in SCOPES if x[0] == s)} for s in scopes]
@@ -664,6 +671,10 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
             step(topic, 'completed')
         except Exception:
             state['partial'] = True; step(topic, 'unavailable', 'Prediction could not be completed')
+    state['collection_nonprediction_partial'] = bool(
+        identity_partial or
+        any(x.get('status') in {'unavailable', 'pending'} for x in steps if x['id'] != 'ai_predictions') or
+        any(x.get('status') in {'pending', 'unavailable'} for x in state['remote_services']))
     if not synthesize:
         return state
     step('synthesis', 'running')

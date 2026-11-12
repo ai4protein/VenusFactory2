@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from agent.harness.model_availability import ModelServiceUnavailable
 from backend.web_v2 import research_report as research
+from mcp_tools.scheduler.receipt_binding import value_digest
 
 from .research_chapter_context import source_context as source_context
 
@@ -42,6 +43,7 @@ from .research_documents import (
 from .research_documents import (
     text_size as text_size,
 )
+from .research_receipts import receipt_scope
 
 CHAPTERS = [
     ('identity_evolution', 'Identity, sequence & evolution', '身份、序列与进化', 'Protein and gene identifiers, organism, isoforms, mature-chain numbering, sequence composition, domains, homologs, orthologs, family evolution and conservation.', 'sequence evolution ortholog isoform'),
@@ -183,8 +185,9 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
     publish()
     if not state.get('collection_complete'):
         input_options = {'input_store': input_store, 'input_snapshot': state.get('input_snapshot')} if input_store is not None else {}
-        base = await research.run_research(payload, collect_update, synthesize=False, model_call=model_call,
-                                           service_cache=service_cache, **input_options)
+        with receipt_scope(state, publish):
+            base = await research.run_research(payload, collect_update, synthesize=False, model_call=model_call,
+                                               service_cache=service_cache, **input_options)
         state.update(base); state['collection_complete'] = True
         state['collection_partial'] = bool(base.get('partial'))
     state['phase'] = 'chapters'
@@ -207,6 +210,54 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         records = await structure_evidence(entry)
         base_sources += add(records)
         state['steps'][-1].update(status='completed' if records else 'empty', message=str(len(records)))
+    def selected_evidence(index, identity, terms, retrieved):
+        relevant = {
+            'identity_evolution': {'blast', 'interpro'},
+            'function_pathways': {'interpro', 'quickgo', 'reactome', 'kegg'},
+            'structure_binding': {'foldseek_remote', 'pdbe', 'alphafold', 'interpro'},
+            'interactions_regulation': {'string', 'reactome', 'quickgo', 'kegg'},
+            'variants_modifications': {'interpro', 'quickgo'},
+            'biophysics_production': {'alphafold', 'interpro'},
+            'engineering_design': {'blast', 'foldseek_remote', 'interpro'},
+            'datasets_applications': research.public_services.SERVICE_IDS,
+        }[identity]
+        core = chapter_database_sources(base_sources, identity)
+        remote = [s for s in base_sources if s.get('kind') == 'public_service' and s.get('service') in relevant]
+        if identity in {'function_pathways', 'interactions_regulation'}:
+            remote.sort(key=lambda s: s.get('service') != 'kegg')
+        from .research_chapter_context import chapter_predictions, select_chapter_evidence
+        predictions = chapter_predictions([s for s in base_sources if s.get('kind') == 'prediction'], identity)
+        from backend.web_v2.research_materials import chapter_materials
+        materials=chapter_materials(base_sources,index,terms)
+        curated = [s for s in base_sources if s.get('kind') == 'literature'][:4]
+        return select_chapter_evidence(core, materials, predictions, remote, retrieved, curated)
+
+    def topic_sources(chapter):
+        identities = set(chapter.get('topic_source_ids', []))
+        return [s for s in state['sources'] if s['id'] in identities]
+
+    def evidence_signature(index, specification):
+        from .research_chapter_context import chapter_bundle
+        identity, _, _, remit, terms = specification
+        chapter = state['chapters'][index]
+        evidence = selected_evidence(index, identity, terms, topic_sources(chapter))
+        return value_digest(chapter_bundle(state, payload, chapter, remit, evidence)['sources'])
+
+    if checkpoint and state.get('tool_receipts'):
+        from .research_recovery import invalidate_chapter, recover_evidence
+        previous = {spec[0]: state['chapters'][i].get('evidence_sha256') or evidence_signature(i, spec)
+                    for i, spec in enumerate(CHAPTERS)}
+        recovered = await recover_evidence(state, publish, add, service_cache=service_cache, input_store=input_store)
+        known_base = {source['id'] for source in base_sources}
+        base_sources += [source for source in state['sources']
+                         if source['kind'] == 'prediction' and source['id'] not in known_base]
+        changed = [state['chapters'][i] for i, spec in enumerate(CHAPTERS)
+                   if state['chapters'][i].get('draft') and
+                   (spec[0] in recovered or previous[spec[0]] != evidence_signature(i, spec))]
+        for i, chapter in enumerate(changed):
+            invalidate_chapter(state, chapter, 'Recovered tool evidence changed this chapter context', archive_shared=i == 0)
+        publish()
+
     semaphore = asyncio.Semaphore(2)
     async def specialist(index, specification):
         identity, en, zh, remit, terms = specification
@@ -214,31 +265,15 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         if chapter_ready(chapter, state['sources']) or (chapter.get('draft_status') == 'completed' and chapter.get('draft')): return
         async with semaphore:
             chapter.update(status='searching', started=time.time()); publish()
-            relevant = {
-                'identity_evolution': {'blast', 'interpro'},
-                'function_pathways': {'interpro', 'quickgo', 'reactome', 'kegg'},
-                'structure_binding': {'foldseek_remote', 'pdbe', 'alphafold', 'interpro'},
-                'interactions_regulation': {'string', 'reactome', 'quickgo', 'kegg'},
-                'variants_modifications': {'interpro', 'quickgo'},
-                'biophysics_production': {'alphafold', 'interpro'},
-                'engineering_design': {'blast', 'foldseek_remote', 'interpro'},
-                'datasets_applications': research.public_services.SERVICE_IDS,
-            }[identity]
-            core = chapter_database_sources(base_sources, identity)
-            remote = [s for s in base_sources if s.get('kind') == 'public_service' and s.get('service') in relevant]
-            if identity in {'function_pathways', 'interactions_regulation'}:
-                remote.sort(key=lambda s: s.get('service') != 'kegg')
-            from .research_chapter_context import chapter_bundle, chapter_predictions, select_chapter_evidence
-            predictions = chapter_predictions([s for s in base_sources if s.get('kind') == 'prediction'], identity)
-            from backend.web_v2.research_materials import chapter_materials
-            materials=chapter_materials(base_sources,index,terms)
-            retrieved = []
+            retrieved = topic_sources(chapter)
             retrieval = []
             if 'literature' in payload['analyses'] or 'engineering' in payload['analyses']:
-                query = research.literature_topic_query(entry, identity_text, terms)
+                query = chapter.get('literature_query') or research.literature_topic_query(entry, identity_text, terms)
                 chapter['literature_query'] = query
                 try:
-                    retrieved += add(await research.literature(query)); retrieval.append({'tool': 'literature', 'status': 'completed'})
+                    with receipt_scope(state, publish, 'chapter:' + identity + ':literature'):
+                        retrieved += add(await research.literature(query))
+                    retrieval.append({'tool': 'literature', 'status': 'completed'})
                 except Exception:
                     retrieval.append({'tool': 'literature', 'status': 'unavailable'})
             if 'web' in payload['analyses']:
@@ -247,11 +282,13 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
                     retrieved += add(await research.web_search(chapter['web_query'])); retrieval.append({'tool': 'web', 'status': 'completed'})
                 except Exception:
                     retrieval.append({'tool': 'web', 'status': 'unavailable'})
-            # The curated core literature remains available when topic searches return little evidence.
-            curated = [s for s in base_sources if s.get('kind') == 'literature'][:4]
-            evidence = select_chapter_evidence(core, materials, predictions, remote, retrieved, curated)
+            # Retain the exact retrieved evidence for deterministic resume.
+            chapter['topic_source_ids'] = list(dict.fromkeys(s['id'] for s in retrieved))
+            evidence = selected_evidence(index, identity, terms, retrieved)
             chapter.update(status='writing', retrieval=retrieval, source_ids=[s['id'] for s in evidence]); publish()
+            from .research_chapter_context import chapter_bundle
             bundle = chapter_bundle(state, payload, chapter, remit, evidence)
+            chapter['evidence_sha256'] = value_digest(bundle['sources'])
             system = ('You are an independent protein research specialist. Write only your assigned chapter in ' + ('Chinese' if lang == 'zh' else 'English') +
                 '. Produce a detailed scholarly chapter: 1,500–2,200 Chinese characters or 700–1,100 English words when evidence permits. '
                 'Use descriptive subsections, quantitative evidence tables, mechanisms, assay conditions, conflicting findings and specific gaps. '

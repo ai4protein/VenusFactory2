@@ -72,7 +72,7 @@ def read_result(path):
 
 
 async def queued_prediction(spec, sequence_file, output, on_status):
-    from mcp_tools.scheduler.client import invoke
+    from .research_receipts import invoke
     owner = os.environ.get('VENUS_QUEUE_OWNER')
     if not owner: raise ValueError('Predictions require an owned research job')
     arguments = {'fasta_file': str(sequence_file), 'task': spec['task'],
@@ -80,7 +80,8 @@ async def queued_prediction(spec, sequence_file, output, on_status):
     # A report may wait in the queue while an administrator disables a model.
     assert_tool_call_allowed(spec['tool'], arguments)
     return await invoke(spec['tool'], arguments, owner=owner,
-        parent_job=os.environ.get('VENUS_QUEUE_JOB_ID'), on_status=on_status)
+        parent_job=os.environ.get('VENUS_QUEUE_JOB_ID'), on_status=on_status,
+        slot='prediction:' + spec['id'] if spec.get('id') else None)
 
 
 async def run_predictions(context, update, folder, *, execute=None):

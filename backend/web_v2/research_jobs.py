@@ -132,6 +132,8 @@ class ResearchJobs:
             status = 'failed'
         if status == 'completed' and state.get('minimum_met') is False:
             status = 'incomplete'
+        # Internal task parameters and owner bindings never leave the checkpoint.
+        state.pop('tool_receipts', None)
         from .research_documents import assemble, report_view
         lang = row['payload'].get('lang', 'en')
         state = report_view({**state, 'status': status}, lang)
