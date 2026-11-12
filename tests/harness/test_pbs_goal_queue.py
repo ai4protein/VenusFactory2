@@ -24,6 +24,8 @@ from mcp_tools.scheduler import jobs
 
 @pytest.fixture
 def context(tmp_path, monkeypatch):
+    # Fault injection must not restore a finished parent lease into later tests.
+    monkeypatch.setattr(os, "environ", dict(os.environ))
     for key in subject.ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("WEBUI_V2_MODE", "local")
