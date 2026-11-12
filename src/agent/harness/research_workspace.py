@@ -268,7 +268,7 @@ class ResearchWorkspace:
 
     @guard_operation('train_research_model')
     async def train_research_model(self, name: str,
-            source_file: Annotated[str, Field(description="Workspace-relative .py file containing complete fit(training, seed) and predict(model, inputs) implementations. This is model code, not the dataset.")],
+            source_file: Annotated[str, Field(description="Workspace-relative .py file containing complete module-level fit(training, seed) and predict(model, inputs) functions. This is model code, not the dataset.")],
             evaluation_file: Annotated[str, Field(description="Evaluation reference returned by prepare_research_dataset; pass it unchanged, not as data to pandas or fit. For a revision, use an empty string to reuse the parent experiment's frozen splits.")],
             hypothesis: str, strategy: str='supervised', parent_experiment_id: Annotated[str, Field(description="Use experiment.id from a successfully measured training/evaluation result, never a model name or failed training-attempt ID. Leave empty for the first baseline; a candidate needs a measured parent on the same frozen dataset.")]='',
             variant: ExperimentVariant = "auto", prediction_key: str='value', seed: int=0,
