@@ -87,11 +87,21 @@ def _development_next_action(summary, progress, prepared=None, *, materials=None
                    if isinstance(row,dict) and isinstance(row.get('path'),str)
                    and row['path'].endswith('.py') and row.get('sha256')][:4]
         action['evaluation_file'] = prepared['evaluation_file']
-        action['tool'] = 'read_session_file' if sources else 'write_session_file'
+        reference_task = prepared.get('task')
+        reference_available = (reference_task in {'regression', 'multilabel'}
+            and 'sequence' in prepared.get('model_interface', {}).get('input_fields', {}))
+        action['tool'] = ('read_session_file' if sources else
+                          'get_research_baseline' if reference_available else 'write_session_file')
         if sources:
             action['supplied_sources'] = sources
             action['instruction'] = ('Read the supplied Python source with read_session_file before writing a replacement. '
                 'Check its task, features and fit/predict contract; reuse compatible code and preserve its attribution. ')
+        elif reference_available:
+            action['arguments'] = {'task': reference_task}
+            action['instruction'] = ('Inspect the available reference controls with get_research_baseline before choosing an implementation. '
+                'Compare their declared features, scope and provenance with the plan and supplied inputs. '
+                'Choose a compatible comparison or implement a justified alternative; a sequence-only control does not '
+                'establish a substrate-aware or few-shot method. Do not mistake available reference code for a measured model. ')
         else:
             action['instruction'] = 'Implement a complete fit(training, seed) and predict(model, inputs) module before fitting. '
         action['instruction'] += ('Data preparation is complete, but no baseline has been measured. '

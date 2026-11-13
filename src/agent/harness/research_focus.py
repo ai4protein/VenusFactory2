@@ -29,7 +29,9 @@ def repair_action(action, repair):
             or not isinstance(repair, dict) or not all(key in repair for key in ("path", "sha256", "code", "redacted", "source_check"))):
         return action
     tool = "edit_session_file" if repair["redacted"] else "write_session_file"
-    return {**action, "stage": "repair_model", "resume_stage": action["stage"], "tool": tool,
+    # A new tool target must not inherit the previous tool's suggested arguments.
+    base_action = {key: value for key, value in action.items() if key != "arguments"}
+    return {**base_action, "stage": "repair_model", "resume_stage": action["stage"], "tool": tool,
             "source_file": repair["path"], "expected_sha256": repair["sha256"],
             "instruction": "Repair the current saved source identified by model_development.repair_source before another fit. "
                 "Use its actual diagnostic and source hash. For local changes use edit_session_file; for structural changes "
