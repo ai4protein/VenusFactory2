@@ -76,6 +76,28 @@ def _input_contract_hints(functions, input_fields, issue):
     fit = functions.get("fit")
     if fit and fit.args.posonlyargs + fit.args.args:
         training = (fit.args.posonlyargs + fit.args.args)[0].arg
+        # Only hint at direct reads in this entrypoint. Nested scopes may bind a
+        # different object; custom transformations remain legal, never blockers.
+        pending = list(fit.body)
+        while pending:
+            node = pending.pop()
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                continue
+            if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)) and any(
+                    isinstance(name, ast.Name) and name.id == training
+                    for generator in node.generators for name in ast.walk(generator.target)):
+                continue
+            pending.extend(ast.iter_child_nodes(node))
+            if (isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Load)
+                    and isinstance(node.value, ast.Name) and node.value.id == training
+                    and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)
+                    and node.slice.value in fields | {"inputs", "target"}
+                    and node.slice.value not in {"task", "strategy", "train", "unlabeled", "labels"}):
+                key = repr(node.slice.value)[:100]
+                issue("training_root_field", f"{training}[{key}] reads a sample field from the training envelope. "
+                      f"Use rows = {training}['train']; each row contains row['inputs'] and row['target']. "
+                      "Read features from row['inputs'][field]. Check this access unless you explicitly "
+                      "transformed the training envelope first.", node, severity="warning")
         for node in ast.walk(fit):
             if not isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp)) or len(node.generators) != 1:
                 continue

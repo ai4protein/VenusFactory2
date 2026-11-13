@@ -161,3 +161,49 @@ def test_long_syntax_error_excerpt_remains_near_the_error():
     assert len(item["source_excerpt"]) <= 200
     assert 1 <= item["excerpt_column"] <= len(item["source_excerpt"])
     assert item["source_excerpt"][item["excerpt_column"]-1] == "]"
+
+
+@pytest.mark.parametrize("expression", ["training['sequence']", "training['inputs']['sequence']", "training['target']"])
+def test_direct_training_envelope_feature_reads_have_nonblocking_hints(expression):
+    source = ("def fit(training, seed):\n    return " + expression
+              + "\ndef predict(model, query):\n    return {'value': 0}\n")
+    result = algorithm_diagnostics(source, input_fields=("sequence", "substrate_smiles"))
+    hints = [row for row in result["issues"] if row["code"] == "training_root_field"]
+    assert len(hints) == 1 and hints[0]["line"] == 2
+    assert hints[0]["severity"] == "warning" and result["valid"]
+    assert "rows = training['train']" in hints[0]["message"]
+    assert "row['inputs'][field]" in hints[0]["message"]
+    assert algorithm_diagnostics(source)["issues"] == []
+
+
+@pytest.mark.parametrize("body", [
+    "return training['train']",
+    "return training['unlabeled']",
+    "return training['labels']",
+    "training['sequence'] = []\n    return training['train']",
+    "def helper(training):\n        return training['sequence']\n    return helper(training['train'][0]['inputs'])",
+    "return [training['sequence'] for training in training['train']]",
+    "return training['train'][0]['inputs']['sequence']",
+])
+def test_training_envelope_hints_do_not_reject_valid_or_other_scope_code(body):
+    source = "def fit(training, seed):\n    " + body + "\ndef predict(model, query):\n    return {'value': 0}\n"
+    result = algorithm_diagnostics(source, input_fields=("sequence", "inputs"))
+    assert result["valid"]
+    assert not any(row["code"] == "training_root_field" for row in result["issues"])
+
+
+def test_training_root_hint_reaches_actual_source_repair_context(tmp_path):
+    import hashlib
+    from agent.harness.research_execution_feedback import repair_source_context
+
+    source = ("def fit(training, seed):\n    return training['inputs']['sequence']\n"
+              "def predict(model, inputs):\n    return {'value': 0}\n")
+    (tmp_path / "candidate.py").write_text(source)
+    feedback = {"pending": [{"tool": "train_research_model", "failure_kind": "execution",
+                             "source_file": "candidate.py", "error": "KeyError: 'inputs'"}]}
+    context = repair_source_context(tmp_path, feedback, input_fields=("sequence",))
+    assert context["code"] == source and not context["redacted"]
+    assert context["sha256"] == hashlib.sha256(source.encode()).hexdigest()
+    assert any(row["code"] == "training_root_field" for row in context["source_check"]["issues"])
+    assert "KeyError" in context["error"]
+    assert (tmp_path / "candidate.py").read_text() == source
