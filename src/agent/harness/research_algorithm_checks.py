@@ -49,7 +49,8 @@ def _entrypoint_message(name, node, tree):
                    and method.name == name]
         if methods:
             owner, method = methods[0]
-            detail = f"Found {owner}.{name} as a class method, not a module entrypoint. "
+            detail = (f"Found {owner}.{name} as a class method, not a module entrypoint. "
+                      f"Place def {signature} at file scope, outside the class, without self or cls. ")
             location = method
         else:
             detail = f"The module has no callable {name} entrypoint. "
