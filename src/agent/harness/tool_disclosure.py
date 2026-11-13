@@ -75,6 +75,7 @@ class ToolDisclosure:
         self.inspected = set()
         self._model_matches = {}
         self._model_selectors = {}
+        self._catalog_model_selections = set()
         self._navigation_queries = {}
 
 
@@ -367,13 +368,18 @@ class ToolDisclosure:
             from mcp_tools.tools.capability_policy import canonical
             from mcp_tools.tools.discovery.platform_models import describe_model_choices
             tool_name = getattr(tool, 'name', name)
+            requested_models = self._model_matches.get(canonical(tool_name), [])
             model_details, selectors = describe_model_choices(
-                tool_name, result['inputSchema'], self._model_matches.get(canonical(tool_name), [])
+                tool_name, result['inputSchema'], requested_models
             )
+            if canonical(tool_name) == 'predict_protein_function' and requested_models:
+                self._catalog_model_selections.add(name)
+            else:
+                self._catalog_model_selections.discard(name)
+            self._model_selectors[name] = selectors
             result.update(model_details)
             if model_details.get('matching_models'):
                 result['description'] = re.split(r'\n\s*\n|\n\s*(?:Args|Arguments|Parameters|Returns)\s*:', str(tool.description), maxsplit=1)[0].strip()[:600]
-                self._model_selectors[name] = selectors
             self.inspected.add(name)
             return result
         raise DisclosureError('Unknown discovery operation.')
@@ -400,6 +406,8 @@ class ToolDisclosure:
                 return self.model_catalog.resolve(name, arguments)
             except ValueError as exc:
                 raise DisclosureError(str(exc)) from None
+        if name in self._catalog_model_selections and arguments.get('adapter_path'):
+            raise DisclosureError('The selected catalog model cannot be replaced by adapter_path. Search and describe the generic tool to use a private adapter.')
         for key in self._model_selectors.get(name, ()):
             if not arguments.get(key):
                 raise DisclosureError('Specify the requested model explicitly using matching_models from describe_tool; do not use a generic default.')

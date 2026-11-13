@@ -141,7 +141,7 @@ def test_model_choices_follow_declared_fields_without_changing_original_schema(
         model_field: "ESM2-8M", dataset_field: "solubility", "task": "regression"
     }
     assert detail["scientific_inputs"] == ["sequence"]
-    assert set(detail["inputSchema"]["required"]) == {"sequence", model_field}
+    assert set(detail["inputSchema"]["required"]) == {"sequence", model_field, dataset_field}
     assert "default" not in detail["inputSchema"]["properties"][model_field]
     assert schema == original
     with pytest.raises(DisclosureError, match="explicitly"):

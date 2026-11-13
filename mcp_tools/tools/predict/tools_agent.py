@@ -139,6 +139,7 @@ class PredictProteinFunctionInput(BaseModel):
     ckpt_base: str = Field(default="ckpt", description="Base dir for adapter. Default ckpt.")
     output_file: Optional[str] = Field(default=None, description="Output CSV path.")
     out_dir: Optional[str] = Field(default=None, description="Output directory.")
+    dataset: str | None = Field(default=None, description="Catalog dataset for the selected task, e.g. DeepSol, DeepSoluE or ProtSolM for Solubility. Omit to use the task default; cannot combine with adapter_path.")
 
 
 class PredictResidueFunctionInput(BaseModel):
@@ -160,6 +161,7 @@ def predict_protein_function_tool(
     ckpt_base: str = "ckpt",
     output_file: Optional[str] = None,
     out_dir: Optional[str] = None,
+    dataset: str | None = None,
 ) -> str:
     """Run finetuned protein function prediction (task = e.g. Solubility, Optimal Temperature). Returns status JSON with file_info."""
     try:
@@ -173,6 +175,7 @@ def predict_protein_function_tool(
             ckpt_base=ckpt_base,
             output_file=output_file,
             out_dir=out_dir,
+            dataset=dataset,
         )
     except Exception as e:
         return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)

@@ -77,6 +77,7 @@ class PredictProteinFunctionBody(BaseModel):
     ckpt_base: str = Field(default="ckpt", description="Checkpoint base directory.")
     output_file: Optional[str] = Field(default=None, description="Output path.")
     out_dir: Optional[str] = Field(default=None, description="Output directory.")
+    dataset: str | None = Field(default=None, description="Catalog dataset for the selected task, e.g. DeepSol, DeepSoluE or ProtSolM for Solubility. Omit to use the task default; cannot combine with adapter_path.")
 
 
 class PredictResidueFunctionBody(BaseModel):
@@ -190,6 +191,7 @@ def api_predict_protein_function(body: PredictProteinFunctionBody):
             ckpt_base=body.ckpt_base,
             output_file=body.output_file,
             out_dir=body.out_dir,
+            dataset=body.dataset,
         )
         return _ensure_dict(result)
     except Exception as e:

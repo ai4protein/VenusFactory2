@@ -73,17 +73,25 @@ def describe_model_choices(tool_name, input_schema, requested=()):
                     preset[key] = selection[field]
                     break
         options.append({"name": candidate["name"], "arguments": preset})
-    if not options:
+    factory_prediction = canonical(tool_name) == "predict_protein_function"
+    if not options and not factory_prediction:
         return result, set()
 
-    model_keys = {
+    selector_keys = {
         key for option in options for key in option["arguments"]
-        if key in {"model_name", "model"}
+        if key in {"model_name", "model", "dataset_name", "dataset"}
     }
-    for key in model_keys:
+    if factory_prediction:
+        # A named catalog choice needs its dataset; a private adapter does not.
+        selector_keys.discard("dataset")
+        if "model_name" in properties:
+            selector_keys.add("model_name")
+        if requested and "dataset" in properties:
+            selector_keys.add("dataset")
+    for key in selector_keys:
         properties[key].pop("default", None)
         properties[key]["description"] = (
-            "Explicit model selector. Use the requested model from matching_models; "
+            "Explicit model/dataset selector. Use the selected matching_models arguments; "
             "there is no implicit model choice."
         )
         required = result["inputSchema"].setdefault("required", [])
@@ -91,7 +99,7 @@ def describe_model_choices(tool_name, input_schema, requested=()):
             required.append(key)
     result.update(
         scientific_inputs=[
-            key for key in result["inputSchema"].get("required", []) if key not in model_keys
+            key for key in result["inputSchema"].get("required", []) if key not in selector_keys
         ],
         model_count=len(wanted),
         matching_models=options,
@@ -100,6 +108,12 @@ def describe_model_choices(tool_name, input_schema, requested=()):
             "Fields absent from inputSchema.required are optional and may be omitted."
         ),
     )
+    if factory_prediction:
+        result["selection_rule"] += (
+            " This catalog selection cannot be replaced by adapter_path."
+            if requested else
+            " For an existing private adapter, specify model_name and adapter_path, and omit dataset."
+        )
     if len(wanted) > len(options):
         result["more_models"] = "Search by the requested model name to narrow the catalog."
-    return result, model_keys
+    return result, selector_keys

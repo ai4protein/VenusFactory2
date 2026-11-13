@@ -78,6 +78,7 @@ def mcp_predict_protein_function(
     ckpt_base: str = "ckpt",
     output_file: Optional[str] = None,
     out_dir: Optional[str] = None,
+    dataset: str | None = None,
 ) -> str:
     """Run finetuned protein function prediction (e.g. Solubility, Optimal Temperature). Returns status JSON with file_info."""
     return predict_protein_function(
@@ -88,6 +89,7 @@ def mcp_predict_protein_function(
         ckpt_base=ckpt_base,
         output_file=output_file,
         out_dir=out_dir,
+        dataset=dataset,
     )
 
 

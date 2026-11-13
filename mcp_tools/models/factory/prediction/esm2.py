@@ -1,4 +1,3 @@
-import copy
 import sys
 import os
 from pathlib import Path
@@ -8,6 +7,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from mcp_tools.models.factory.training.models.adapter_model import AdapterModel
+from mcp_tools.models.factory.prediction.checkpoint_config import apply_checkpoint_config
 import argparse
 import torch
 import json
@@ -59,14 +59,12 @@ def load_model_and_tokenizer(args):
 
     config_path = os.path.join(model_path, "lr5e-4_bt12k_ga8.json")
     model_adapter_path = os.path.join(model_path, "lr5e-4_bt12k_ga8.pt")
-    # Load model configuration from config.json, but command-line arguments have higher priority.
+    # Apply checkpoint model settings without replacing host-selected paths.
     try:
         with open(config_path, "r") as f:
             config = json.load(f)
             print(f"Loaded configuration from {config_path}")
-            for key, value in config.items():
-                setattr(args, key, value)
-            args._inference_checkpoint_config = copy.deepcopy(config)
+            apply_checkpoint_config(args, config)
             # args.structure_seq = ""
     except FileNotFoundError:
         print(

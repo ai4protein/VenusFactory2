@@ -144,7 +144,8 @@ def test_four_real_loaders_record_independent_config_at_actual_read(tmp_path, mo
     module.load_model_and_tokenizer(args)
     assert args._inference_checkpoint_config == ({} if missing else actual)
     if not missing:
-        args.nested["items"].append(2)
+        assert not hasattr(args, "nested")
+        args.problem_type = "runtime-only-change"
         assert args._inference_checkpoint_config == actual
 
 

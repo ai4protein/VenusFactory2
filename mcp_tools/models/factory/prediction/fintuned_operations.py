@@ -6,6 +6,7 @@ Error: status "error", error { type, message, suggestion }, file_info null.
 """
 
 from mcp_tools.tools.capability_policy import guard_operation
+from mcp_tools.models.factory.prediction.checkpoint_config import apply_checkpoint_config
 from mcp_tools.models.factory.runners.finetuned import in_runtime
 
 import csv
@@ -135,11 +136,15 @@ def _resolve_residue_adapter_path(task: str, model_name: str, adapter_path: Opti
     return os.path.join(ckpt_base, dataset, folder)
 
 
-def _task_to_dataset(task: str) -> Optional[str]:
-    """Map task (通俗命名) to first dataset name. e.g. Optimal Temperature -> DeepET_Topt."""
+def _task_to_dataset(task: str, dataset: str | None = None) -> Optional[str]:
+    """Resolve a catalog dataset; omitted selectors keep the legacy task default."""
     const = _load_constant()
     mapping = const.get("dataset_mapping_function", {})
     names = mapping.get(task) if isinstance(mapping.get(task), list) else ([mapping.get(task)] if mapping.get(task) else None)
+    if dataset is not None:
+        if not isinstance(dataset, str) or dataset not in (names or []):
+            raise ValueError(f"dataset must be one of {names or []} for task {task!r}")
+        return dataset
     return names[0] if names else None
 
 
@@ -162,11 +167,17 @@ def _model_key_to_adapter_folder(model_key: str) -> str:
     return func.get(model_key, model_key)
 
 
-def _resolve_adapter_path(task: str, model_name: str, adapter_path: Optional[str], ckpt_base: str) -> str:
-    """Resolve adapter path: if adapter_path given use it; else ckpt_base/{dataset_name}/{adapter_folder}."""
-    if adapter_path and Path(adapter_path).exists():
+def _resolve_adapter_path(task: str, model_name: str, adapter_path: Optional[str], ckpt_base: str,
+                          dataset: str | None = None) -> str:
+    """Resolve the selected catalog artifact, or the existing private adapter route."""
+    if dataset is not None and adapter_path:
+        raise ValueError("Choose a catalog dataset or an adapter_path override, not both")
+    selected = _task_to_dataset(task, dataset)
+    if adapter_path:
+        if not Path(adapter_path).is_dir():
+            raise ValueError("The explicit adapter_path must be an existing adapter directory")
         return adapter_path
-    dataset = _task_to_dataset(task)
+    dataset = selected
     if not dataset:
         return adapter_path or ""
     model_key = _model_name_to_key(model_name)
@@ -274,6 +285,7 @@ def predict_protein_function(
     ckpt_base: str = _CKPT_BASE,
     output_file: Optional[str] = None,
     out_dir: Optional[str] = None,
+    dataset: str | None = None,
 ) -> str:
     """
     Run finetuned protein function prediction. task = 通俗命名 (e.g. Solubility, Optimal Temperature).
@@ -288,7 +300,13 @@ def predict_protein_function(
     model_key = _model_name_to_key(model_name)
     if model_key not in _MODEL_KEYS:
         return _error_response("ValidationError", f"model_name must map to one of {_MODEL_KEYS}.", suggestion="Use e.g. Ankh-large, ESM2-650M, ProtBert, ProtT5-xl-uniref50.")
-    resolved_adapter = _ensure_adapter_dir(_resolve_adapter_path(task, model_name, adapter_path, ckpt_base))
+    try:
+        selected_dataset = _task_to_dataset(task, dataset)
+        resolved_adapter = _ensure_adapter_dir(
+            _resolve_adapter_path(task, model_name, adapter_path, ckpt_base, dataset)
+        )
+    except ValueError as exc:
+        return _error_response("ValidationError", str(exc), suggestion="Use the dataset from the selected model's matching_models arguments.")
     if not resolved_adapter or not Path(resolved_adapter).exists():
         return _error_response(
             "ValidationError",
@@ -314,8 +332,7 @@ def predict_protein_function(
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
-                for k, v in config.items():
-                    setattr(args, k, v)
+                apply_checkpoint_config(args, config, record_snapshot=False)
         if not hasattr(args, "problem_type"):
             args.problem_type = "single_label_classification"
 
@@ -337,10 +354,13 @@ def predict_protein_function(
 
         content_str = json.dumps(all_results, ensure_ascii=False, indent=2)
         scale, classification = _prediction_interpretation(args, all_results)
+        if adapter_path:
+            snapshot = getattr(args, "_inference_checkpoint_config", None)
+            selected_dataset = snapshot.get("dataset") if isinstance(snapshot, dict) else None
         meta: Dict[str, Any] = {
             "fasta_file": fasta_file,
             "task": task,
-            "dataset_name": _task_to_dataset(task),
+            "dataset_name": selected_dataset,
             "adapter_path": resolved_adapter,
             "model_name": model_name,
             "sequence_count": len(all_results),
@@ -430,8 +450,7 @@ def predict_residue_function(
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
-                for k, v in config.items():
-                    setattr(args, k, v)
+                apply_checkpoint_config(args, config, record_snapshot=False)
         if not hasattr(args, "problem_type"):
             args.problem_type = "residue_single_label_classification"
 
