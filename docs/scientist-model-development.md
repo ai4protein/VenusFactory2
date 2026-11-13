@@ -28,10 +28,15 @@ obligations to PI; it does not replace the user's requirements. User revisions
 remain part of the task contract. Ordinary Agent conversations keep their existing
 history and memory behavior.
 
-Role inputs have a versioned policy and private audit snapshots. Native planning
-handoffs use bounded structured JSON; malformed, duplicate or oversized fields
-are rejected instead of silently dropping requirements. Original answers, tool
-logs and evidence references remain available for audit. Legacy evidence keeps
+Role inputs use `scientist_role_context.v2` and private audit snapshots. Native
+planning handoffs use typed structured JSON; malformed or duplicate fields are
+rejected. Role isolation imposes no fixed byte limit on requirements, evidence or
+handoffs and never truncates or summarizes them. Finite JSON validation and deep
+snapshots remain mandatory; a caller can separately declare an explicit transport
+limit. Native execution retains the selected harness's context management. Web
+PI, CB and SC currently use direct model requests, so this policy does not grant
+those roles native compaction. Original answers, tool logs and evidence references
+remain available for audit. Legacy evidence keeps
 its original policy: a failed new-policy audit cannot fall back to old handoff
 rules.
 
@@ -702,3 +707,96 @@ SC uses an interim progress review before a measured model is submitted. It
 separates completed validation from later failed fits and unfinished submission
 or delivery. Submitted candidates still receive the full independent usefulness
 assessment before technical Review; interim feedback cannot approve a model.
+
+## Scientist runtime acceptance matrix
+
+`scripts/rsi/run_scientist_runtime_matrix.py` is separate from the scientific
+comparison runner. Its default is **dry-run**: inventory every enabled zero-price
+model × configured Scientist Harness, retain blocked cells, and write
+`allocation.json`, `report.json`, and one report per cell. It does not resolve
+credentials or start a goal. Publication switches are read through a read-only
+SQLite connection and a temporary private policy snapshot.
+
+```bash
+PYTHON_DOTENV_DISABLED=1 python scripts/rsi/run_scientist_runtime_matrix.py \
+  --runtime-root /path/to/installation \
+  --output runtime/verification/scientist-matrix-dryrun
+```
+
+Use the installation root when running from a separate source worktree. The
+2026-11-14 inventory contains 13 models × 4 Harnesses = 52 static cells; this is
+not 52 successful online runs. Two configured thinking-enabled routes are
+incompatible with the Claude bridge. The runner records them and does not
+silently disable thinking, change the selected model, or use a paid fallback.
+
+`--execute` requires an explicit `--case case.json`. The supported non-research
+smoke case is fixed synthetic token counting, selected by this contract:
+
+```json
+{
+  "schema": 1,
+  "id": "synthetic-token-counts.v1",
+  "kind": "non_research_smoke",
+  "limits": {
+    "max_cycles": 2,
+    "model_calls": 48,
+    "tool_calls": 32,
+    "wall_seconds": 600
+  }
+}
+```
+
+An `approved_topic` case instead requires an explicit `objective`,
+`approval: {"status": "approved", "reference": "..."}`, the same explicit limits,
+and any supplied `inputs` as relative `path`/`sha256` pairs. The approval
+reference is a caller-supplied declaration, not an automatically verified topic
+bank approval. The runner never chooses a topic. Execution uses the full
+`AutonomousResearch.run()` goal loop with a separate goal directory for each
+cell; credentials remain inside the existing host resolver.
+
+Reports separate platform execution, research outcome, provider availability,
+protocol compatibility, and native context compression. A scientific rejection
+does not establish a platform defect. Authentication, quotas, rate limits and
+context failures remain distinguishable from runtime errors. Native compression
+stays owned by the selected Harness; the runner does not summarize or reset the
+session to imitate it. Missing native evidence is `not_observed`, and an
+advisory notice or unverified continuation cannot establish compression success.
+
+The Web Scientist goal path persists a host binding for each native phase,
+including followup execution. The matrix checks the bound result and authorized
+tools, then delegates raw-session and call-interval verification to the shared
+native audit. Missing bindings, unknown counters, cancelled native phases without
+a successful terminal, and advisory notices remain `continuation_unverified`;
+the matrix never reconstructs a terminal result or request interval from events.
+Separately audited native CLI probes are distinct evidence.
+
+
+### Native context checks
+
+The platform preserves native context management. Codex uses its native local
+compaction through the configured Responses gateway; the provider does not
+advertise a remote compaction endpoint. DeepSeek's minimal profile includes the
+official token meter and compaction plugin. Claude compaction boundaries remain
+native events. Role handoffs copy complete structured inputs without an implicit
+byte cap; they do not replace a Harness's own summary.
+
+Protocol CI uses offline fixtures. Optional installed-runtime tests also use a
+scripted local provider, and require the managed runtime plus bubblewrap:
+
+```bash
+PYTHONPATH=.:src PYTHON_DOTENV_DISABLED=1 VENUS_TEST_NATIVE_CODEX=1 \
+  VENUS_TEST_RUNTIME_ROOT=/path/to/installation \
+  python -m pytest -q tests/harness/test_native_codex_compaction.py
+
+# Set VENUS_DSH_BIN and VENUS_DSH_SITE when using a separate installation.
+PYTHONPATH=.:src PYTHON_DOTENV_DISABLED=1 VENUS_TEST_NATIVE_DSH=1 \
+  python -m pytest -q tests/harness/test_native_dsh_recovery.py
+```
+
+A provider context rejection can still be terminal if the native SDK does not
+recover it. Such a run retains its context-limit diagnosis, rather than inventing
+a platform summary. Recovery audits preserve the failed physical request and
+require original native events, the same session, call boundaries, a subsequent
+successful tool call, and a genuine native completion. Host checkpoint cancellation
+is a distinct ending and is not currently sufficient for this recovery proof.
+A dry-run or an observed advisory is not a live compression test.
