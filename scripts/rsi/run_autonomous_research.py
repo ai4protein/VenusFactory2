@@ -20,6 +20,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=[
         "create", "run", "resume", "submit-pbs", "status-pbs", "cancel-pbs",
+        "submit-cluster", "status-cluster", "cancel-cluster",
     ])
     parser.add_argument("--output", required=True, help="Scientist goal directory")
     parser.add_argument("--profile", help="Profile JSON used when creating a goal")
@@ -27,7 +28,9 @@ def main(argv=None):
     parser.add_argument("--input", action="append", default=[], metavar="PATH",
                         help="Local input file to snapshot when creating a goal; repeat for multiple files")
     parser.add_argument("--credential-toml")
-    parser.add_argument("--pbs-config", help="Administrator-owned PBS configuration")
+    configs = parser.add_mutually_exclusive_group()
+    configs.add_argument("--pbs-config", help="Legacy administrator-owned PBS configuration")
+    configs.add_argument("--cluster-config", help="Administrator-owned local PBS or Slurm configuration")
     parser.add_argument("--resource-profile", default="gpu")
     parser.add_argument("--new-attempt", action="store_true")
     parser.add_argument("--resume-goal", action="store_true")
@@ -39,24 +42,25 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.input and args.action != "create":
         parser.error("--input applies only to create; later attachments use research revision")
-    pbs_action = args.action.endswith("-pbs")
-    if pbs_action and not args.pbs_config:
-        parser.error("--pbs-config is required for PBS actions")
-    if args.action != "submit-pbs" and (args.new_attempt or args.resume_goal):
-        parser.error("--new-attempt and --resume-goal apply only to submit-pbs")
-    if pbs_action:
+    cluster_action = args.action.endswith(("-pbs", "-cluster"))
+    config = args.cluster_config or args.pbs_config
+    if cluster_action and not config:
+        parser.error("--cluster-config (or legacy --pbs-config) is required for cluster actions")
+    if args.action not in {"submit-pbs", "submit-cluster"} and (args.new_attempt or args.resume_goal):
+        parser.error("--new-attempt and --resume-goal apply only to cluster submission")
+    if cluster_action:
         from backend.compute.access import require_local_execution
 
         require_local_execution()
         from agent.harness.pbs_goal import Controller
 
-        controller = Controller.from_file(args.pbs_config)
-        if args.action == "submit-pbs":
+        controller = Controller.from_file(config)
+        if args.action in {"submit-pbs", "submit-cluster"}:
             result = controller.submit(
                 args.output, profile=args.resource_profile,
                 resume=args.resume_goal, new_attempt=args.new_attempt,
             )
-        elif args.action == "status-pbs":
+        elif args.action in {"status-pbs", "status-cluster"}:
             result = controller.status(args.output)
         else:
             result = controller.cancel(args.output)

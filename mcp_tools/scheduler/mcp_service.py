@@ -92,6 +92,11 @@ class QueueMiddleware(Middleware):
         from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
         name=context.message.name
         assert_tool_call_allowed(name, context.message.arguments or {})
+        if os.getenv('VENUS_SCIENTIST_CLUSTER_RECORD') or os.getenv('VENUS_SCIENTIST_PBS_RECORD'):
+            from agent.harness.cluster_allocation import assert_resource_admitted
+            from mcp_tools.scheduler.catalog import native_tools
+            tool = native_tools().get(name)
+            assert_resource_admitted(classify(name, getattr(tool, 'metadata', None))['resource'])
         if os.getenv('VENUS_MCP_QUEUE_WORKER') == '1': return await call_next(context)
         if classify(name)['execution']=='inline':return await call_next(context)
         # Resolve before queuing so an unknown name never starts a worker.

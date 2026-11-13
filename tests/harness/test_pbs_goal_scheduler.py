@@ -15,6 +15,7 @@ import multiprocessing
 import shlex
 import subprocess
 import sys
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -93,6 +94,7 @@ class FakePBS:
                 identity = str(state["counter"]) + ".fs"
                 state["jobs"][identity] = {
                     "Job_Name": name,
+                    "ctime": int(time.time()),
                     "Job_Owner": getpass.getuser() + "@submit-node",
                     "job_state": "H",
                     "Hold_Types": "u",
@@ -510,7 +512,7 @@ def test_altered_pbs_resources_block_execution_but_allow_exact_owner_cancellatio
     monkeypatch.setattr(pbs_goal, "bounded_run", server)
     records = list(Path(settings["control_root"]).glob("*/*/submission.json"))
     assert len(records) == 1
-    with pytest.raises(ValueError, match="PBS"):
+    with pytest.raises(ValueError, match="allocation|resource"):
         pbs_goal.worker_claim(records[0])
     assert not json.loads(records[0].read_text()).get("worker")
 

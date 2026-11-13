@@ -29,12 +29,13 @@ def _write_receipt(path, value):
 
 
 def _verified_root(record):
+    from .cluster_allocation import record_environment_matches, worker_job_matches
     from .pbs_goal import _record, assert_execution_allowed
 
     current = _record(record["record_path"])
     expected = Path(current["record_path"]).parent / "runtime"
     if (current["nonce"] != record.get("nonce")
-            or current.get("job_id") != os.getenv("PBS_JOBID")
+            or not worker_job_matches(current) or not record_environment_matches(current)
             or current.get("worker", {}).get("state") != "running"
             or current.get("worker", {}).get("allocation", {}).get("job_id") != current["job_id"]
             or current.get("cancel_requested")):

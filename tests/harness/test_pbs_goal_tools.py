@@ -210,6 +210,11 @@ def test_fixed_worker_entry_sets_private_umask(tmp_path):
     script.parent.mkdir(parents=True)
     repository = Path(__file__).resolve().parents[2]
     shutil.copyfile(repository / "scripts/rsi/pbs_goal_worker.py", script)
+    access = frozen / "backend/compute"
+    access.mkdir(parents=True)
+    shutil.copyfile(repository / "backend/__init__.py", access.parent / "__init__.py")
+    (access / "__init__.py").touch()
+    shutil.copyfile(repository / "backend/compute/access.py", access / "access.py")
     package = frozen / "src/agent/harness"
     package.mkdir(parents=True)
     (package.parent / "__init__.py").touch()

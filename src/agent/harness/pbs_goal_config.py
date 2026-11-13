@@ -7,8 +7,11 @@ import re
 from pathlib import Path
 
 from backend.compute.access import require_local_execution
+from backend.compute.contracts import ResourceRequest
+from backend.compute.contracts import name as scheduler_name
 
 SCHEMA = "venusfactory.pbs-config.v1"
+CLUSTER_SCHEMA = "venusfactory.cluster-config.v1"
 ENVIRONMENT = frozenset({
     "VENUS_KIMI_BIN", "VENUS_CODEX_BIN", "VENUS_CLAUDE_BIN", "VENUS_DSH_BIN", "VENUS_DSH_SITE",
     "VENUS_MODEL_RUNTIMES_CONFIG", "VENUS_SESSION_SANDBOX", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE",
@@ -18,12 +21,14 @@ ENVIRONMENT = frozenset({
 
 def configuration(value, base=None):
     require_local_execution()
-    if not isinstance(value, dict) or value.get("schema") != SCHEMA:
-        raise ValueError("Invalid PBS configuration schema")
+    if not isinstance(value, dict) or value.get("schema") not in {SCHEMA, CLUSTER_SCHEMA}:
+        raise ValueError("Invalid cluster configuration schema")
+    legacy = value["schema"] == SCHEMA
     allowed = {"schema", "repository", "control_root", "goal_roots", "python", "runtime_root", "pbs_bin",
                "profiles", "env_file", "credential_toml", "environment", "extra_python_paths",
                "capability_db", "model_runtimes", "execution_catalog", "tool_credential_refs",
                "checkpoint_root", "huggingface_cache"}
+    allowed = (allowed - {"pbs_bin"}) | {"scheduler"} if not legacy else allowed
     if set(value) - allowed:
         raise ValueError("Unknown PBS configuration fields")
     result = copy.deepcopy(value)
@@ -35,8 +40,20 @@ def configuration(value, base=None):
         # Do not resolve venv Python symlinks to their base interpreter.
         return os.path.abspath(base / Path(raw).expanduser())
 
-    for field in ("repository", "control_root", "python", "runtime_root", "pbs_bin"):
+    for field in ("repository", "control_root", "python", "runtime_root"):
         result[field] = path(result[field])
+    if legacy:
+        result["pbs_bin"] = path(result["pbs_bin"])
+        backend = "pbs"
+    else:
+        scheduler = result.get("scheduler")
+        if not isinstance(scheduler, dict) or set(scheduler) != {"backend", "cluster", "bin_directory"}:
+            raise ValueError("Cluster configuration requires an explicit scheduler endpoint")
+        backend = scheduler["backend"]
+        if backend not in {"pbs", "slurm"}:
+            raise ValueError("Unsupported scheduler backend")
+        scheduler_name(scheduler["cluster"])
+        scheduler["bin_directory"] = path(scheduler["bin_directory"])
     for field in ("env_file", "credential_toml", "capability_db", "model_runtimes", "execution_catalog",
                   "checkpoint_root", "huggingface_cache"):
         result[field] = path(result[field]) if result.get(field) else None
@@ -67,10 +84,15 @@ def configuration(value, base=None):
             raise ValueError("Invalid PBS resource fields")
         if not isinstance(resource["queue"], str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", resource["queue"]):
             raise ValueError("Use a queue name without PBS options")
-        bounds = {"ncpus": (1, 8), "ngpus": (1, 1), "memory_gb": (16, 64), "wall_seconds": (30, 86400)}
+        gpu_bounds = (1, 1) if backend == "pbs" else (0, 0)
+        bounds = {"ncpus": (1, 8), "ngpus": gpu_bounds, "memory_gb": (16, 64), "wall_seconds": (30, 86400)}
         for field, (low, high) in bounds.items():
             if type(resource[field]) is not int or not low <= resource[field] <= high:
-                raise ValueError("PBS resource request exceeds its supported bounds")
+                raise ValueError("Cluster resource request exceeds its supported bounds (Slurm is CPU-only)")
+        if backend == "slurm" and resource["wall_seconds"] % 60:
+            raise ValueError("Slurm wall time must use whole minutes")
+        ResourceRequest(resource["queue"], resource["ncpus"], resource["ngpus"],
+                        resource["memory_gb"] * 1024, resource["wall_seconds"])
     return result
 
 

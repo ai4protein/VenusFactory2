@@ -21,8 +21,10 @@ from pathlib import Path
 from agent.rsi.engine.storage import atomic_json, file_lock
 from agent.science_goal import GoalStore
 from backend.compute.access import require_local_execution
+from backend.compute.contracts import JobRef, ResourceRequest, SubmissionBinding, WorkerLaunch
+from backend.compute.factory import adapter_for
 
-from .pbs_goal_config import configuration, validate_observed_resources
+from .pbs_goal_config import configuration
 from .pbs_goal_transport import bounded_run
 
 SCHEMA = "venusfactory.pbs-goal.v1"
@@ -30,6 +32,30 @@ ASSIGNMENT = ".pbs-assignment.json"
 NONCE_ENV = "VENUS_PBS_GOAL_ATTEMPT"
 TERMINAL = {"finished", "cancelled", "preparation_failed"}
 JOB_ID = re.compile(r"[0-9]+\.[A-Za-z0-9_.-]+")
+
+
+def _backend(record):
+    scheduler = record.get("scheduler")
+    return "pbs" if scheduler is None else scheduler["backend"]
+
+
+def _binding(record):
+    scheduler = record.get("scheduler")
+    if scheduler is None:
+        return SubmissionBinding("pbs", record["nonce"], record["uid"], 0, 0)
+    return SubmissionBinding(scheduler["cluster"], record["nonce"], record["uid"],
+                             scheduler["submitted_after"], scheduler["submitted_before"])
+
+
+def _reference(record):
+    if record.get("job_id") is None:
+        return None
+    return JobRef(_backend(record), _binding(record).cluster, record["job_id"])
+
+
+def _resources(resource):
+    return ResourceRequest(resource["queue"], resource["ncpus"], resource["ngpus"],
+                           resource["memory_gb"] * 1024, resource["wall_seconds"])
 
 
 def _private(path):
@@ -75,6 +101,8 @@ def _save(record):
 
 def _public(record):
     return {"attempt_id": record["nonce"], "job_id": record.get("job_id"), "state": record["state"],
+            "backend": _backend(record), "cluster": _binding(record).cluster,
+            "scheduler_state": record.get("scheduler_state", record.get("pbs_state")),
             "goal_status": GoalStore(record["goal"]).read()["status"], "pbs_state": record.get("pbs_state"),
             "exit_code": record.get("exit_code"), "cancel_requested": record["cancel_requested"],
             "worker": record.get("worker"), "error_type": record.get("error_type")}
@@ -127,44 +155,30 @@ class Controller:
             raise ValueError("Invalid PBS current-attempt pointer")
         return _record(folder / nonce / "submission.json")
 
-    def _invoke(self, command, arguments, record):
-        require_local_execution()
-        user = pwd.getpwuid(os.getuid())
-        env = {"HOME": user.pw_dir, "USER": user.pw_name, "LOGNAME": user.pw_name,
-               "PATH": record["settings"]["pbs_bin"] + ":/usr/bin:/bin", "LANG": "C.UTF-8"}
-        argv = [str(Path(record["settings"]["pbs_bin"]) / command), *arguments]
-        return self.runner(argv, timeout=30, env=env, capture_output=True, text=True)
+    def _adapter(self, record):
+        settings = record["settings"]
+        spec = settings.get("scheduler", {"backend": "pbs", "cluster": "pbs", "bin_directory": settings.get("pbs_bin")})
+        scheduler = record.get("scheduler")
+        if scheduler is not None and (scheduler.get("backend"), scheduler.get("cluster")) != (spec["backend"], spec["cluster"]):
+            raise ValueError("Scheduler endpoint differs from the saved submission")
+        if scheduler is None and spec["backend"] != "pbs":
+            raise ValueError("Slurm submissions require an explicit scheduler binding")
+        return adapter_for(spec["backend"], spec["cluster"], Path(spec["bin_directory"]),
+                           self.runner, legacy_pbs=scheduler is None)
 
-    def _query(self, record):
-        args = ["-x", "-f", "-F", "json"]
-        if record.get("job_id"):
-            args.append(record["job_id"])
-        response = self._invoke("qstat", args, record)
-        if response.returncode:
-            raise RuntimeError("PBS status is unavailable")
-        raw = response.stdout
-        if len(raw) > 64_000_000:
-            raise ValueError("PBS status response exceeds the limit")
-        rows = json.loads(raw).get("Jobs")
-        if not isinstance(rows, dict):
-            raise ValueError("Invalid PBS status response")
-        matched = []
-        for identity, row in rows.items():
-            if not isinstance(row, dict):
-                continue
-            variables = row.get("Variable_List")
-            match = (isinstance(variables, dict) and variables.get(NONCE_ENV) == record["nonce"]
-                     and row.get("Job_Name") == "vf_" + record["nonce"]
-                     and str(row.get("Job_Owner", "")).split("@", 1)[0] == record["owner"])
-            if record.get("job_id") == identity and not match:
-                raise ValueError("PBS owner or submission identity differs from its saved receipt")
-            if match:
-                if not JOB_ID.fullmatch(identity):
-                    raise ValueError("Unsupported PBS job identity")
-                matched.append((identity, row))
-        if len(matched) > 1:
-            raise ValueError("Multiple PBS jobs match one submission; operator reconciliation is required")
-        return matched[0] if matched else None
+    def _invoke(self, command, arguments, record):
+        # Kept as a guarded compatibility seam; adapters own command allowlists.
+        require_local_execution()
+        return self._adapter(record)._run(command, arguments)
+
+    def _observe_worker(self, record):
+        adapter = self._adapter(record)
+        reference = _reference(record)
+        if reference is None:
+            raise ValueError("Worker requires a recorded scheduler job identity")
+        observed = adapter.worker_identity(_binding(record), reference, os.environ)
+        adapter.validate_resources(observed, _resources(record["resources"]))
+        return observed
 
     def _release_assignment(self, record):
         try:
@@ -201,54 +215,60 @@ class Controller:
             self._release_assignment(record)
             _save(record)
             return record
-        try:
-            found = self._query(record)
-        except (OSError, RuntimeError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
-            record.update(state="unknown", error_type=type(exc).__name__)
-            _save(record)
+        adapter = self._adapter(record)
+        binding = _binding(record)
+        observed = adapter.observe(binding, _reference(record))
+        self._observe(record, observed)
+        if observed.state == "unknown":
             return record
-        if found is None:
-            record.update(state="unknown", error_type="SubmissionNotObserved")
-            _save(record)
-            return record
-        identity, row = found
-        record.update(job_id=identity, pbs_state=row.get("job_state"), observed_at=time.time(), error_type=None)
-        phase = row.get("job_state")
-        mapping = {"H": "held", "Q": "queued", "W": "queued", "T": "queued", "R": "running", "E": "exiting", "F": "finished"}
-        record["state"] = mapping.get(phase, "unknown")
-        if phase in {"Q", "W", "T", "R", "E", "F"}:
-            record["release_confirmed"] = True
-        if phase == "F":
-            record["exit_code"] = row.get("Exit_status")
-            if record["cancel_requested"]:
-                record["state"] = "cancelled"
+        if observed.state == "terminal":
             self._release_assignment(record)
             _save(record)
             return record
-        _save(record)
         if record["cancel_requested"]:
             if time.time() - record.get("cancel_sent_at", 0) >= 30:
                 record["cancel_sent_at"] = time.time()
                 _save(record)
-                try:
-                    response = self._invoke("qdel", [identity], record)
-                    record["cancel_command_exit"] = response.returncode
-                except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-                    record["error_type"] = type(exc).__name__
-                _save(record)
-        elif (release and not record.get("release_confirmed")
-              and phase == "H" and "u" in str(row.get("Hold_Types", ""))):
-            validate_observed_resources(row, record["resources"])
+                observed = adapter.cancel(binding, observed.ref)
+                self._observe(record, observed)
+        elif release and not record.get("release_confirmed") and observed.state == "held":
+            adapter.validate_resources(observed, _resources(record["resources"]))
             if time.time() - record.get("release_sent_at", 0) >= 30:
                 record["release_sent_at"] = time.time()
                 _save(record)
-                try:
-                    response = self._invoke("qrls", ["-h", "u", identity], record)
-                    record["release_command_exit"] = response.returncode
-                except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-                    record["error_type"] = type(exc).__name__
-                _save(record)
+                observed = adapter.release(binding, observed.ref, _resources(record["resources"]))
+                self._observe(record, observed)
+        if observed.state == "terminal":
+            self._release_assignment(record)
+            _save(record)
         return record
+
+    @staticmethod
+    def _observe(record, observed):
+        if observed.ref is not None:
+            previous = _reference(record)
+            binding = _binding(record)
+            if ((previous is not None and observed.ref != previous)
+                    or observed.ref.backend != _backend(record) or observed.ref.cluster != binding.cluster):
+                raise ValueError("Observed scheduler identity changed")
+            record["job_id"] = observed.ref.job_id
+        if observed.state != "unknown" and observed.ref is None:
+            raise ValueError("Verified scheduler state requires a job identity")
+        record.update(state="finished" if observed.state == "terminal" else observed.state,
+                      scheduler_state=observed.scheduler_state, observed_at=time.time(),
+                      error_type=observed.reason, scheduler_evidence_sha256=observed.evidence_sha256)
+        if _backend(record) == "pbs":
+            record["pbs_state"] = observed.scheduler_state
+        if observed.state in {"queued", "running", "terminal"}:
+            record["release_confirmed"] = True
+        if observed.state == "terminal":
+            exit_code = observed.exit_code
+            if _backend(record) == "pbs" and exit_code is not None and re.fullmatch(r"-?[0-9]+", str(exit_code)):
+                exit_code = int(exit_code)
+            record["exit_code"] = exit_code
+            if record["cancel_requested"]:
+                record["state"] = "cancelled"
+        _save(record)
 
     def submit(self, goal, profile="gpu", resume=False, new_attempt=False):
         require_local_execution()
@@ -303,30 +323,29 @@ class Controller:
                     record["tool_settings"] = freeze_settings(self.settings, attempt)
                     entry = Path(record["source"]["root"]) / "scripts/rsi/pbs_goal_worker.py"
                     if not entry.is_file():
-                        raise ValueError("Frozen source has no PBS goal worker")
+                        raise ValueError("Frozen source has no cluster goal worker")
+                    launch = WorkerLaunch(Path(self.settings["python"]), entry, Path(record["record_path"]),
+                                          Path(record["goal"]) / "workspace", attempt / "scheduler.log")
+                    request = _resources(resource)
                 except Exception as exc:
                     record.update(state="preparation_failed", error_type=type(exc).__name__)
                     _save(record)
                     marker.unlink()
                     raise
+            spec = self.settings.get("scheduler", {"backend": "pbs", "cluster": "pbs"})
+            after = int(time.time()) - 5
+            record["scheduler"] = {"backend": spec["backend"], "cluster": spec["cluster"],
+                                   "submitted_after": after, "submitted_before": after + 300}
             record["state"] = "submitting"
             _save(record)
-            wall = resource["wall_seconds"]
-            args = ["-h", "-r", "n", "-m", "n", "-N", "vf_" + nonce, "-q", resource["queue"],
-                    "-l", f"select=1:ncpus={resource['ncpus']}:ngpus=1:mem={resource['memory_gb']}gb",
-                    "-l", f"walltime={wall // 3600:02}:{wall % 3600 // 60:02}:{wall % 60:02}",
-                    "-j", "oe", "-o", str(attempt / "pbs.log"), "-v", NONCE_ENV + "=" + nonce,
-                    "--", self.settings["python"], str(entry), "--record", record["record_path"]]
             try:
-                response = self._invoke("qsub", args, record)
-                identity = response.stdout.strip()
-                if response.returncode == 0 and JOB_ID.fullmatch(identity):
-                    record["job_id"] = identity
-                else:
-                    record["error_type"] = "AmbiguousSubmissionResponse"
+                observed = self._adapter(record).submit_held(_binding(record), request, launch)
+                self._observe(record, observed)
+            except PermissionError:
+                raise
             except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                 record["error_type"] = type(exc).__name__
-            _save(record)
+                _save(record)
             return _public(self._poll(record, release=True))
 
     def status(self, goal):
@@ -355,6 +374,15 @@ class Controller:
             return _public(self._poll(record))
 
 
+def worker_observation(record):
+    """Re-read private identity and verify the real scheduler before allocation use."""
+    require_local_execution()
+    current = _record(record["record_path"])
+    if any(current.get(key) != record.get(key) for key in ("nonce", "job_id", "definition_sha256")):
+        raise ValueError("Worker submission binding changed")
+    return Controller(current["settings"])._observe_worker(current)
+
+
 def worker_claim(record_path):
     require_local_execution()
     record = _record(record_path)
@@ -365,10 +393,7 @@ def worker_claim(record_path):
         current = controller._current(controller._folder(goal))
         if not current or current["nonce"] != record["nonce"] or record["cancel_requested"]:
             raise ValueError("PBS submission is no longer runnable")
-        found = controller._query(record)
-        if not found or found[0] != os.getenv("PBS_JOBID") or found[0] != record.get("job_id") or found[1].get("job_state") != "R":
-            raise ValueError("Worker does not own the running PBS submission")
-        validate_observed_resources(found[1], record["resources"])
+        controller._observe_worker(record)
         state = GoalStore(goal).read()
         if state["definition_sha256"] != record["definition_sha256"] or state["status"] != "active" or state.get("inflight") is not None:
             raise ValueError("Goal definition or execution state changed while queued")
@@ -383,43 +408,48 @@ def worker_claim(record_path):
 
 def worker_ready(record_path, allocation_receipt):
     """Persist verified kernel allocation evidence before any provider request."""
+    from .cluster_allocation import backend, worker_job_matches
+
     with file_lock(Path(record_path).parent.parent / ".controller.lock"):
         record = _record(record_path)
-        if (os.getenv("PBS_JOBID") != record.get("job_id") or record["cancel_requested"]
+        if (not worker_job_matches(record, os.environ) or record["cancel_requested"]
                 or record.get("worker", {}).get("state") != "claimed"
                 or not isinstance(allocation_receipt, dict)
                 or allocation_receipt.get("job_id") != record["job_id"]
-                or allocation_receipt.get("backend") != "pbs"):
+                or allocation_receipt.get("backend") != backend(record)):
             raise ValueError("Verified allocation does not match the claimed worker")
         record["worker"].update(state="running", allocation=allocation_receipt, ready_at=time.time())
         _save(record)
 
 
 def worker_finish(record_path, goal_status, error_type=None):
+    from .cluster_allocation import worker_job_matches
+
     with file_lock(Path(record_path).parent.parent / ".controller.lock"):
         record = _record(record_path)
-        if os.getenv("PBS_JOBID") != record.get("job_id"):
-            raise ValueError("Worker completion does not match the PBS job")
+        if not worker_job_matches(record, os.environ):
+            raise ValueError("Worker completion does not match the cluster job")
         record["worker"] = {**record.get("worker", {}), "state": "failed" if error_type else "finished",
                             "finished_at": time.time(), "goal_status": goal_status, "error_type": error_type}
         _save(record)
 
 
 def assert_execution_allowed(goal):
+    from .cluster_allocation import capture_allocation, record_environment_matches, worker_job_matches
+
     marker = Path(goal).resolve() / ASSIGNMENT
     if not marker.exists() and not marker.is_symlink():
         return
+    require_local_execution()
     assignment = _private(marker)
     record = _record(assignment["record"])
     if (record["goal"] != str(Path(goal).resolve()) or record["nonce"] != assignment.get("nonce")
             or record["definition_sha256"] != assignment.get("definition_sha256")
             or record["cancel_requested"] or record.get("state") in TERMINAL
-            or os.getenv("VENUS_SCIENTIST_PBS_RECORD") != record["record_path"]
-            or os.getenv("PBS_JOBID") != record.get("job_id")
+            or not record_environment_matches(record)
+            or not worker_job_matches(record, os.environ)
             or GoalStore(goal).read()["definition_sha256"] != record["definition_sha256"]):
-        raise RuntimeError("This goal is assigned to PBS; use its status or cancellation command")
-    from .pbs_gpu import capture
-    from .sandbox_resources import Limits
-    allocation = capture(Limits.load())
+        raise RuntimeError("This goal is assigned to a cluster; use its status or cancellation command")
+    allocation = capture_allocation(record)
     if allocation.job_id != record["job_id"]:
-        raise RuntimeError("PBS GPU allocation differs from the assigned goal")
+        raise RuntimeError("Cluster allocation differs from the assigned goal")

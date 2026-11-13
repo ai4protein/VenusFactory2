@@ -60,7 +60,11 @@ def _environment(record_path, record):
         raise ValueError("Unsupported worker environment setting")
     if configured.get("WEBUI_V2_MODE", "local") != "local" or configured.get("VENUS_SCIENTIST_ONLINE") == "1":
         raise ValueError("Authored PBS GPU research is local-only")
-    allocated = {name: os.environ[name] for name in ("PBS_JOBID", "PBS_NODEFILE", "PBS_GPUFILE", "CUDA_VISIBLE_DEVICES", "VENUS_PBS_GOAL_ATTEMPT") if name in os.environ}
+    from .cluster_allocation import backend
+    scheduler = backend(record)
+    allocated_names = (("PBS_JOBID", "PBS_NODEFILE", "PBS_GPUFILE", "CUDA_VISIBLE_DEVICES", "VENUS_PBS_GOAL_ATTEMPT")
+                       if scheduler == "pbs" else ("SLURM_JOB_ID", "SLURM_CLUSTER_NAME", "SLURM_STEP_ID"))
+    allocated = {name: os.environ[name] for name in allocated_names if name in os.environ}
     private = Path(record_path).parent / "runtime"
     home = private / "home"
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -68,17 +72,21 @@ def _environment(record_path, record):
            "HOME": str(home), "PYTHON_DOTENV_DISABLED": "1", "PYTHONDONTWRITEBYTECODE": "1",
            "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "OMP_NUM_THREADS": "1",
            "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", **configured, **allocated,
-           "WEBUI_V2_MODE": "local", "VENUS_SCIENTIST_ONLINE": "0", "VENUS_RESEARCH_GPU_BACKEND": "pbs",
+           "WEBUI_V2_MODE": "local", "VENUS_SCIENTIST_ONLINE": "0", "VENUS_RESEARCH_GPU_BACKEND": "pbs" if scheduler == "pbs" else "disabled",
            "VENUS_SANDBOX_BACKEND": "bwrap", "VENUS_SESSION_SANDBOX": "bwrap",
-           "VENUS_SCIENTIST_PBS_RECORD": str(Path(record_path).resolve()),
+           "VENUS_SCIENTIST_CLUSTER_RECORD": str(Path(record_path).resolve()),
            "VENUS_RUNTIME_ROOT": str(private), "VENUS_JOB_QUEUE_ROOT": str(private / "queue"),
            "VENUS_RESEARCH_CAPABILITY_ROOT": str(private / "research_capabilities"),
            "VENUS_SANDBOX_CONTROL_ROOT": str(private / "sandbox"), "TEMP_OUTPUTS_DIR": str(private / "outputs"),
            "VENUS_USAGE_DB": str(private / "usage.sqlite"), "VENUS_ACCESS_DB": str(private / "access.sqlite"),
-           "VENUS_QUEUE_CPU_SLOTS": str(record["resources"]["ncpus"]), "VENUS_QUEUE_GPU_SLOTS": "1",
+           "VENUS_QUEUE_CPU_SLOTS": str(record["resources"]["ncpus"]), "VENUS_QUEUE_GPU_SLOTS": str(record["resources"]["ngpus"]),
            "VENUS_SANDBOX_TOTAL_MEMORY_MB": str(record["resources"]["memory_gb"] * 1024),
            "VENUS_SANDBOX_LOCAL_MEMORY_MB": "8192", "VENUS_SANDBOX_MEMORY_RESERVE_MB": "4096",
            "VENUS_SANDBOX_MAX_PARALLEL": "1"}
+    if scheduler == "pbs":
+        env["VENUS_SCIENTIST_PBS_RECORD"] = str(Path(record_path).resolve())
+    else:
+        env["CUDA_VISIBLE_DEVICES"] = ""
     source = Path(record["source"]["root"])
     extras = execution.get("extra_python_paths", [])
     if not isinstance(extras, list) or any(not isinstance(p, str) or not Path(p).is_absolute() or not Path(p).is_dir() for p in extras):
@@ -93,13 +101,10 @@ def _environment(record_path, record):
 
 
 def _allocation(record):
-    from .pbs_gpu import capture
-    from .sandbox_resources import Limits
-    if record["resources"]["ngpus"] != 1:
-        raise ValueError("This PBS worker requires one isolated GPU allocation")
-    allocation = capture(Limits.load())
+    from .cluster_allocation import capture_allocation
+    allocation = capture_allocation(record)
     if allocation.job_id != record["job_id"]:
-        raise ValueError("GPU allocation differs from the claimed PBS job")
+        raise ValueError("Allocation differs from the claimed cluster job")
     return allocation
 
 

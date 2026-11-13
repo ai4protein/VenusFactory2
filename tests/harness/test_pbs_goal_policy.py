@@ -268,7 +268,7 @@ def test_readonly_assets_work_from_frozen_source_and_private_home(prepared, tmp_
         target = source / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(repository / name, target)
-    record.update(source={"root": str(source)}, resources={"ncpus": 2, "memory_gb": 16},
+    record.update(source={"root": str(source)}, resources={"ncpus": 2, "ngpus": 1, "memory_gb": 16},
                   execution={"python": sys.executable, "environment": {}})
     env = _environment(record["record_path"], record)
     assert env["HOME"] != str(cache.parents[2])

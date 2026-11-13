@@ -19,9 +19,15 @@ from agent.science_goal import GoalStore
 from backend.web_v2.job_queue import TERMINAL, JobQueue
 from backend.web_v2.task_store import LeaseLost
 
+from .cluster_allocation import backend, record_environment_matches, worker_job_matches
 from .pbs_goal import ASSIGNMENT, SCHEMA, _private, _record
 
 ORIGIN = "pbs_goal.v1"
+ORIGINS = {ORIGIN, "cluster_goal.v1"}
+
+
+def _owner(record):
+    return ("pbs:" if backend(record) == "pbs" else "cluster:slurm:") + record["nonce"]
 ENV_KEYS = ("VENUS_QUEUE_JOB_ID", "VENUS_QUEUE_OWNER", "VENUS_QUEUE_LEASE_TOKEN")
 
 
@@ -42,13 +48,21 @@ def _binding(record_path):
             or marker.get("schema") != SCHEMA or marker.get("nonce") != record["nonce"]
             or marker.get("record") != str(raw)
             or marker.get("definition_sha256") != record["definition_sha256"]
-            or os.getenv("VENUS_SCIENTIST_PBS_RECORD") != str(raw)
-            or not record.get("job_id") or os.getenv("PBS_JOBID") != record["job_id"]
+            or not record_environment_matches(record)
+            or not worker_job_matches(record)
             or record.get("cancel_requested") or record.get("state") in {"finished", "cancelled", "preparation_failed"}
             or record.get("worker", {}).get("state") != "running"
-            or record.get("worker", {}).get("allocation", {}).get("backend") != "pbs"
+            or record.get("worker", {}).get("allocation", {}).get("backend") != backend(record)
             or record.get("worker", {}).get("allocation", {}).get("job_id") != record["job_id"]):
         raise ValueError("PBS parent is not the current verified allocation")
+    if backend(record) == "slurm":
+        allocation = record["worker"]["allocation"]
+        if (allocation.get("cluster") != record["scheduler"]["cluster"]
+                or allocation.get("uid") != record["uid"] or allocation.get("nonce") != record["nonce"]
+                or allocation.get("device") != "cpu" or allocation.get("ngpus") != 0
+                or record.get("resources", {}).get("ngpus") != 0
+                or allocation.get("ncpus") != record["resources"]["ncpus"]):
+            raise ValueError("Slurm parent lacks its verified CPU allocation")
     if GoalStore(goal).read()["definition_sha256"] != record["definition_sha256"]:
         raise ValueError("PBS goal definition changed")
     return record
@@ -57,13 +71,16 @@ def _binding(record_path):
 def workspace_for_parent(queue, parent):
     """Validate a PBS MCP parent against private receipts, not client assertions."""
     meta = parent.get("metadata", {})
-    if meta.get("origin") != ORIGIN or parent.get("kind") != "scientist":
+    if meta.get("origin") not in ORIGINS or parent.get("kind") != "scientist":
         raise ValueError("Invalid PBS parent origin")
-    record = _binding(meta.get("pbs_record", ""))
+    record = _binding(meta.get("cluster_record") or meta.get("pbs_record", ""))
+    expected_origin = ORIGIN if backend(record) == "pbs" else "cluster_goal.v1"
+    if meta.get("origin") != expected_origin:
+        raise ValueError("Cluster parent origin does not match its scheduler")
     expected_root = Path(record["record_path"]).parent / "runtime" / "queue"
     if (queue.root != expected_root or expected_root != expected_root.resolve(strict=True)
             or os.getenv("VENUS_JOB_QUEUE_ROOT") != str(expected_root)
-            or parent.get("owner") != "pbs:" + record["nonce"]
+            or parent.get("owner") != _owner(record)
             or meta.get("nonce") != record["nonce"]
             or meta.get("definition_sha256") != record["definition_sha256"]
             or meta.get("goal_folder") != record["goal"]
@@ -144,14 +161,17 @@ async def queue_run(record):
     if any(os.getenv(key) for key in ENV_KEYS):
         raise ValueError("PBS parent cannot inherit another task identity")
     queue = JobQueue(root)
-    owner = "pbs:" + record["nonce"]
-    namespace = "pbs-parent-" + record["nonce"]
+    owner = _owner(record)
+    namespace = ("pbs-parent-" if backend(record) == "pbs" else "cluster-parent-") + record["nonce"]
     goal = Path(record["goal"])
-    metadata = {"origin": ORIGIN, "pbs_record": record["record_path"], "nonce": record["nonce"],
+    metadata = {"origin": ORIGIN if backend(record) == "pbs" else "cluster_goal.v1",
+                "cluster_record": record["record_path"], "nonce": record["nonce"],
                 "definition_sha256": record["definition_sha256"], "goal_folder": str(goal),
                 "goal_id": goal.name, "session_id": goal.name}
-    identity, created = queue.enqueue(owner, "scientist", "research", {"kind": "pbs_goal"}, namespace,
-                                      metadata=metadata, session_key="pbs:" + record["nonce"],
+    if backend(record) == "pbs":
+        metadata["pbs_record"] = record["record_path"]
+    identity, created = queue.enqueue(owner, "scientist", "research", {"kind": "pbs_goal" if backend(record) == "pbs" else "cluster_goal"}, namespace,
+                                      metadata=metadata, session_key=owner,
                                       request_key="pbs-parent:" + record["nonce"], request_hash=record["definition_sha256"])
     if not created:
         raise LeaseLost("This PBS attempt already has a parent task")

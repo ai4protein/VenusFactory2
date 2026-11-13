@@ -43,6 +43,9 @@ class DurableJobsMixin:
     def enqueue(self, owner, kind, resource, dispatch, namespace, *, metadata=None,
                 priority=0, session_key=None, request_key=None, request_hash=None):
         import re
+
+        from backend.compute.access import assert_resource_admitted
+        assert_resource_admitted(resource)
         if not re.fullmatch(r'(cpu|gpu|research|api:[a-z0-9._-]+)',resource):raise ValueError('Invalid queue resource')
         identity=uuid.uuid4().hex
         with self.connection(True) as c:

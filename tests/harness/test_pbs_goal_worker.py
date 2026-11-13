@@ -121,7 +121,7 @@ def context(tmp_path, monkeypatch):
     attempt = tmp_path / "attempt"
     attempt.mkdir()
     path = attempt / "submission.json"
-    record = {"goal": str(store.root), "record_path": str(path), "source": {"root": str(ROOT)},
+    record = {"uid": os.getuid(), "goal": str(store.root), "record_path": str(path), "source": {"root": str(ROOT)},
         "execution": {"python": sys.executable, "runtime_root": str(ROOT), "env_file": str(env_file),
                       "credential_toml": None, "environment": {}, "extra_python_paths": []},
         "resources": {"queue": "fixture", "ncpus": 2, "ngpus": 1, "memory_gb": 16, "wall_seconds": 120},

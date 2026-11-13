@@ -130,6 +130,8 @@ class JobQueue(DurableJobsMixin):
             c.execute('UPDATE jobs SET metadata=? WHERE id=?',(json.dumps(metadata),identity))
 
     def submit(self, owner, kind, resource='cpu', *, priority=0, metadata=None):
+        from backend.compute.access import assert_resource_admitted
+        assert_resource_admitted(resource)
         if not re.fullmatch(r'(cpu|gpu|research|api:[a-z0-9._-]+)', resource): raise ValueError('Invalid queue resource')
         identity = uuid.uuid4().hex
         with self.connection(True) as c:
@@ -151,6 +153,8 @@ class JobQueue(DurableJobsMixin):
             if r['status'] not in TERMINAL: c.execute('UPDATE jobs SET pid=?,token=? WHERE id=?',(pid,token,identity))
 
     def _eligible(self, c, resource):
+        from backend.compute.access import assert_resource_admitted
+        assert_resource_admitted(resource)
         active = c.execute("SELECT owner FROM jobs WHERE resource=? AND status='running'",(resource,)).fetchall()
         if len(active) >= self.capacity(resource): return None
         per_owner = max(1,int(os.getenv('VENUS_QUEUE_RUNNING_PER_OWNER','2')))
@@ -164,6 +168,8 @@ class JobQueue(DurableJobsMixin):
             r = c.execute('SELECT * FROM jobs WHERE id=?',(identity,)).fetchone()
             if not r: raise FileNotFoundError(identity)
             if r['cancel_requested'] or r['status'] in TERMINAL: raise QueueCancelled(r['status'])
+            from backend.compute.access import assert_resource_admitted
+            assert_resource_admitted(r['resource'])
             if r['pid'] != os.getpid() or r['token'] != process_token(os.getpid()): raise ValueError('Only the bound worker may acquire a slot')
             if r['status']=='running': return True
             if self._eligible(c,r['resource']) != identity: return False
@@ -231,6 +237,8 @@ def launch(command, *, owner, kind, resource='cpu', env=None, cwd=PROJECT, stdou
 
 @asynccontextmanager
 async def resource_slot(resource, *, owner=None, kind='compute', on_wait=None):
+    from backend.compute.access import assert_resource_admitted
+    assert_resource_admitted(resource)
     q=JobQueue()
     inherited=_held_slot.get() or os.getenv('VENUS_QUEUE_JOB_ID')
     if inherited:

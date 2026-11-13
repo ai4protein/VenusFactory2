@@ -22,3 +22,11 @@ def require_local_execution(environment: Mapping[str, str] | None = None) -> Non
         or online.strip().casefold() not in {"", "0", "false", "no", "off"}
     ):
         raise PermissionError("Cluster execution is available only in local deployment mode")
+
+
+def assert_resource_admitted(resource: str) -> None:
+    """Ordinary Web queues do not import the optional Scientist execution stack."""
+    if not (os.getenv("VENUS_SCIENTIST_CLUSTER_RECORD") or os.getenv("VENUS_SCIENTIST_PBS_RECORD")):
+        return
+    from agent.harness.cluster_allocation import assert_resource_admitted as verify
+    verify(resource)

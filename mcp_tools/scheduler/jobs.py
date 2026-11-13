@@ -44,13 +44,15 @@ class ToolJobs:
             if name != 'query_public_protein_service' or arguments.get('service') not in SERVICE_IDS:
                 raise ValueError('Unknown protein service')
         policy=classify(name,getattr(tools.get(name),'metadata',None))
+        from backend.compute.access import assert_resource_admitted
+        assert_resource_admitted(policy['resource'])
         if parent_job:
             parent=self.queue.get(parent_job,owner)
             if parent['status'] in TERMINAL or parent['cancel_requested']:raise ValueError('Parent job has stopped')
         workspace = None
         if parent_job and parent['kind'] == 'scientist':
             meta = parent['metadata']
-            if meta.get('origin') == 'pbs_goal.v1':
+            if meta.get('origin') in {'pbs_goal.v1', 'cluster_goal.v1'}:
                 from agent.harness.pbs_goal_queue import workspace_for_parent
                 workspace = workspace_for_parent(self.queue, parent)
                 if session_id is not None and session_id != meta['session_id']:
