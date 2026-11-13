@@ -187,6 +187,21 @@ class ToolDisclosure:
         if category and query.strip():
             exact = self._name(query.strip())
             if exact not in self.direct and self._available(exact) and exact not in candidates:
+                if exact not in self.mapping and self.model_catalog and self.model_catalog.owns(exact):
+                    # Dynamic IDs are not static tool objects. A guessed ID must
+                    # not become a discovered model merely by matching its format.
+                    result = self.overview([
+                        name for name in self.mapping
+                        if self.model_catalog.category in self._categories(name)
+                    ])
+                    result['categories'] = [row for row in result['categories']
+                                            if row['id'] == self.model_catalog.category]
+                    result['selection_error'] = 'Model identifiers use the RSI catalog.'
+                    result['next_step'] = (
+                        'Search the RSI category by model name or task. For an identifier already returned '
+                        'by that catalog, use describe_tool(name); access is checked there.'
+                    )
+                    return result
                 result = self.overview([exact])
                 result['selection_error'] = 'This named capability belongs to another category.'
                 result['next_step'] = 'Select its category below, or inspect the known name with describe_tool(name).'

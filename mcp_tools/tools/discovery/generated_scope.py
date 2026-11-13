@@ -5,8 +5,9 @@ from __future__ import annotations
 from agent.harness import capability_catalog as catalog
 from agent.harness import research_workspace as runtime
 from backend.web_v2.research_capability_access import private_libraries
+from mcp_tools.models.catalog_snapshot import catalog_snapshot
 from mcp_tools.tools import capability_policy
-from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
+from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed, is_tool_allowed
 
 
 class GeneratedScope:
@@ -56,11 +57,17 @@ class GeneratedScope:
         raise ValueError("Model unavailable. Search for an accessible model.")
 
 
+@catalog_snapshot
 def search(query="", limit=10, offset=0):
     if not isinstance(query, str) or len(query) > 200:
         raise ValueError("Use a search query of at most 200 characters")
     if type(limit) is not int or not 1 <= limit <= 50 or type(offset) is not int or offset < 0:
         raise ValueError("Use limit 1-50 and a nonnegative offset")
+    # A search entry point can remain enabled while execution is switched off.
+    # Match the progressive catalog without scanning any private/public registry.
+    if not is_tool_allowed("run_generated_capability"):
+        return {"total": 0, "items": [], "next_offset": None,
+                "next_step": "Search for an enabled capability."}
     scope = GeneratedScope()
     if not scope.private:
         return runtime.search_capabilities(query, limit, library=runtime.LIBRARY, offset=offset)
