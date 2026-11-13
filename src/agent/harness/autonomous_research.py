@@ -293,6 +293,8 @@ class AutonomousResearch:
                         payload.pop('response_format', None)
                         if spec:
                             instruction = instruction.replace(' Encode the response using only '+spec['name']+'. This is structured output, not an executable tool.', ' Return exactly one JSON object; do not call tools.')
+                            if ' Exact response schema: ' not in instruction:
+                                instruction += ' Exact response schema: '+json.dumps(output_spec['schema'],ensure_ascii=False)
                             if profile.model.protocol=='responses':payload['instructions']=instruction
                             else:payload['messages'][0]['content']=instruction
                             for key in ('tools','parallel_tool_calls'):payload.pop(key,None)
@@ -327,6 +329,14 @@ class AutonomousResearch:
                 'Return one valid JSON object. Do not execute tools.'
                 if consistency_error else
                 'Reformat the same research content as one valid JSON object with the required fields. Do not invent results, change the objective or execute any tools.')
+            from .study_review_state import PAIRING_GUIDANCE
+            from .study_review_state import POLICY as STUDY_POLICY
+            if role == 'SC' and context.get('scientific_acceptance',{}).get('study_review_policy') == STUDY_POLICY:
+                if not consistency_error:
+                    repair_instruction=('Correct the invalid structured fields using the response schema and host measurement_state. '
+                        'Preserve the objective and legitimate scientific concerns; do not invent results or force acceptance. '
+                        'Return one valid JSON object. Do not execute tools.')
+                repair_instruction += ' ' + PAIRING_GUIDANCE
             from .research_role_outputs import repair_feedback
             current={**context,'format_repair':repair_feedback(raw,problem,repair_instruction)}
         raise AssertionError('Bounded structured request')

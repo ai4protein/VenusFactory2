@@ -78,8 +78,11 @@ def specification(role, protocol, *, model_acceptance=False, study_acceptance=Fa
         choice = {"type": "function", "name": name}
     else:
         raise ValueError("Unsupported scientific role protocol")
-    return {"role": role, "protocol": protocol, "name": name, "schema": schema,
+    spec = {"role": role, "protocol": protocol, "name": name, "schema": schema,
             "tool": tool, "choice": choice}
+    if role == "SC" and study_acceptance and not model_acceptance and analysis_review_policy is None and study_review_policy is not None:
+        spec["study_review_policy"] = study_review_policy
+    return spec
 
 
 def request_fields(spec):
@@ -201,6 +204,15 @@ def validate_output(raw, spec):
     try:
         Draft202012Validator(spec["schema"]).validate(parsed)
     except ValidationError as exc:
+        from .study_review_state import POLICY, request_pair_diagnostic
+        location = list(exc.absolute_path)
+        if (spec.get("study_review_policy") == POLICY and exc.validator == "anyOf"
+                and len(location) == 2 and location[0] == "revision_requests"):
+            diagnostic = request_pair_diagnostic(exc.instance)
+            if diagnostic:
+                raise RoleOutputError(
+                    "Scientific role schema mismatch at revision_requests." + str(location[1]) + ". " + diagnostic,
+                    raw) from exc
         path = ".".join(re.sub(r"[^a-zA-Z0-9_]", "", str(part))[:40] for part in exc.absolute_path)[:160] or "plan"
         detail = "Expected " + str(exc.schema.get("type","the declared fields"))
         if exc.validator == "pattern":

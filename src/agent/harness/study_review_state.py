@@ -12,6 +12,15 @@ MISSING = (
     "data_partitions", "validation_measurement", "measured_baseline",
     "measured_revision", "model_submission",
 )
+REQUIREMENTS_BY_KIND = {
+    "missing_evidence": MISSING,
+    "execution_failure": ("execution_failure",),
+    "scientific_concern": ("scientific_value",),
+}
+PAIRING_GUIDANCE = "Valid revision pairs: " + "; ".join(
+    kind + " -> " + ", ".join(requirements)
+    for kind, requirements in REQUIREMENTS_BY_KIND.items()
+) + "."
 LABELS = {
     "data_partitions": "Record data partitions",
     "validation_measurement": "Complete validation measurement",
@@ -27,10 +36,44 @@ class StudyReviewInconsistent(ValueError):
     """A structured SC assertion contradicts the host-owned study state."""
 
 
+def request_pair_diagnostic(request):
+    """Describe an invalid field pairing without rewriting the review or its verdict."""
+    if not isinstance(request, dict):
+        return None
+    kind, requirement = request.get("kind"), request.get("requirement")
+    if not isinstance(kind, str) or kind not in REQUIREMENTS_BY_KIND:
+        return None  # Other malformed fields retain ordinary schema diagnostics.
+    allowed = REQUIREMENTS_BY_KIND[kind]
+    if not isinstance(requirement, str) or requirement in allowed:
+        return None
+    message = ("Invalid revision pair: kind=" + repr(kind) + ", requirement=" + repr(requirement[:80]) +
+               ". For this kind, requirement must be: " + ", ".join(allowed) + ".")
+    if requirement in {"measured_baseline", "measured_revision", "model_submission"}:
+        message += " Missing evidence uses kind='missing_evidence'; this requirement is study-wide, with experiment_id empty."
+    return message
+
+
 def request_schema():
     from .scientist_role_output import object_schema
 
     text = {"type": "string", "minLength": 1, "maxLength": 2000}
+    item = object_schema({
+        "kind": {"enum": list(REQUIREMENTS_BY_KIND)},
+        "requirement": {"enum": [*MISSING, "execution_failure", "scientific_value"]},
+        "experiment_id": {
+            "type": "string", "pattern": "^([a-f0-9]{32})?$",
+            "description": ("Known measured experiment ID, or empty for a study-wide request. "
+                            "Must be empty for measured_baseline, measured_revision and model_submission."),
+        },
+        "reason": text,
+        "proposed_action": text,
+    })
+    item["description"] = PAIRING_GUIDANCE
+    item["anyOf"] = [
+        object_schema({**item["properties"], "kind": {"enum": [kind]},
+                       "requirement": {"enum": list(requirements)}})
+        for kind, requirements in REQUIREMENTS_BY_KIND.items()
+    ]
     return {
         "type": "array", "maxItems": 12,
         "description": (
@@ -38,17 +81,7 @@ def request_schema():
             "host fact; execution_failure refers to current failures; scientific_concern "
             "may question utility, generalization or split quality despite completed measurements."
         ),
-        "items": object_schema({
-            "kind": {"enum": ["missing_evidence", "execution_failure", "scientific_concern"]},
-            "requirement": {"enum": [*MISSING, "execution_failure", "scientific_value"]},
-            "experiment_id": {
-                "type": "string", "pattern": "^([a-f0-9]{32})?$",
-                "description": ("Known measured experiment ID, or empty for a study-wide request. "
-                                "Must be empty for measured_baseline, measured_revision and model_submission."),
-            },
-            "reason": text,
-            "proposed_action": text,
-        }),
+        "items": item,
     }
 
 
@@ -108,6 +141,9 @@ def validate(review, context):
         if any(not isinstance(request.get(key), str) or not request[key].strip()
                for key in ("reason", "proposed_action")):
             raise StudyReviewInconsistent("Each revision needs a substantive reason and proposed action.")
+        diagnostic = request_pair_diagnostic(request)
+        if diagnostic:
+            raise StudyReviewInconsistent(diagnostic)
         if kind == "scientific_concern" and requirement == "scientific_value":
             continue
         if kind == "execution_failure" and requirement == "execution_failure":

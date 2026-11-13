@@ -34,7 +34,8 @@ def prompt_for_review(context):
             " Return revision_requests under the supplied study_review_policy. "
             "Use missing_evidence only for a specifically absent host fact; scientific_concern "
             "can question utility, generalization or split adequacy despite recorded measurements. "
-            "measurement_state is host-owned and is not a verdict."
+            "measurement_state is host-owned and is not a verdict. "
+            + study_review_state.PAIRING_GUIDANCE
             if acceptance.get("study_review_policy") else "")
     return PROMPT
 
