@@ -6,7 +6,9 @@ def selected_tools(context, tools):
     if context.get("plan",{}).get("deliverable")!="model":
         return []
     stage=context.get("model_development",{}).get("next_action",{}).get("stage","evaluate_baseline")
-    if stage=="evaluate_baseline":
+    if stage=="repair_model":
+        wanted=("train_research_model", "get_research_baseline")
+    elif stage=="evaluate_baseline":
         dataset = context.get("model_development", {}).get("prepared_dataset")
         wanted = ("get_research_baseline", "train_research_model") if dataset else (
             "prepare_research_dataset", "get_research_baseline", "train_research_model")
@@ -20,6 +22,21 @@ def selected_tools(context, tools):
         wanted=()
     available={tool.name for tool in tools}
     return [name for name in wanted if name in available]
+
+def repair_action(action, repair):
+    """Prioritize a caller-verified current source failure without changing science stages."""
+    if (action.get("stage") not in {"evaluate_baseline", "evaluate_revision"}
+            or not isinstance(repair, dict) or not all(key in repair for key in ("path", "sha256", "code", "redacted", "source_check"))):
+        return action
+    tool = "edit_session_file" if repair["redacted"] else "write_session_file"
+    return {**action, "stage": "repair_model", "resume_stage": action["stage"], "tool": tool,
+            "source_file": repair["path"], "expected_sha256": repair["sha256"],
+            "instruction": "Repair the current saved source identified by model_development.repair_source before another fit. "
+                "Use its actual diagnostic and source hash. For local changes use edit_session_file; for structural changes "
+                "a complete unredacted module may use write_session_file with expected_sha256. "
+                "Preserve the planned method, data boundaries, evaluation reference and measured parent. "
+                "Writing source is not a fitted or validated model: call train_research_model after repair, then checkpoint actual evidence."}
+
 
 def admitted_tools(request, mapping):
     names=request.get("research_focus",[])

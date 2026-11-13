@@ -275,12 +275,19 @@ def repair_source_context(workspace, feedback, *, input_fields=(), task=""):
             reference_hint = ("For a sequence-only multilabel comparison, inspect get_research_baseline(task='multilabel'): "
                               "training_prevalence, aac_logistic and terminal_logistic are available fixed controls. "
                               "The parsed row['target'] maps label names directly to 0/1/None; the CSV target-column name is not a nested key. ")
+        replacement_hint = (
+            "For a structural repair, write_session_file(path, content, expected_sha256) can replace the entire unchanged file. "
+            "Provide the complete corrected module and this SHA256; the host will not generate or wrap code for you. "
+            if code == original else
+            "This source preview is redacted: do not use it as complete replacement content. "
+            "Read the relevant current source and make a targeted edit. "
+        )
         result = {"path":path,"sha256":sha256(raw).hexdigest(),"code":code,
                 "redacted":code!=original,"source_check":public_value(checks,workspace),"error":_failure_message(row.get("error","Fitting failed"),workspace),
                 "instruction":"This is the current saved source for an unresolved fitting action. "
                     "Repair the observed failure using edit_session_file(path, old_text, new_text, expected_sha256) for a focused change. "
                     "Use this source SHA256, preserve working code, then fit again. "
-                    + reference_hint + "The file may have changed since the failure; do not replace working code with placeholders."}
+                    + replacement_hint + reference_hint + "The file may have changed since the failure; do not replace working code with placeholders."}
         requests = [item for item in pending if isinstance(item, dict)
                     and item.get("failure_kind") == "request" and item.get("action_key") == row.get("key")]
         if requests:

@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from mcp_tools.tools.capability_policy import guard_operation
-from utils.scoped_files import copy_file, open_file, parts, read_bytes, replace_text, write_bytes
+from utils.scoped_files import atomic_writer, copy_file, open_file, parts, read_bytes, replace_text, write_bytes
 
 from .contracts import digest, file_hash
 from .host import write_json
@@ -125,11 +125,22 @@ class ResearchWorkspace:
         from .workspace_preview import file_preview
         return file_preview(self.workspace,path,offset_bytes=offset_bytes,max_bytes=max_bytes,view=view)
 
-    async def write_research_file(self, path: str, content: str) -> dict:
-        """Create or revise Python code, a report, or a small data file in this workspace."""
-        if len(content.encode())>200000:raise ValueError('File is too large')
-        data=content.encode();write_bytes(self.workspace,path,data)
-        return self.record('write_research_file',{'path':path,'content':content},{'path':path,'sha256':hashlib.sha256(data).hexdigest()})
+    async def write_research_file(self, path: str, content: str,
+            expected_sha256: Annotated[str, Field(description="Optional full-file SHA256 from read_session_file or repair_source. Supply it to replace the entire unchanged file; omit when creating a file. Never use a slice hash.")] = '') -> dict:
+        """Create or revise a workspace file. For whole-file repair, supply complete content and expected_sha256 to reject stale writes. This writes only; it does not train or validate a model."""
+        if (expected_sha256 != '' and (not isinstance(expected_sha256,str)
+                or re.fullmatch(r'[0-9a-f]{64}',expected_sha256) is None)):
+            raise ValueError('Use the full-file SHA256 returned by read_session_file or repair_source')
+        data=content.encode()
+        if len(data)>200000:raise ValueError('File is too large')
+        arguments={'path':path,'content':content}
+        result={'path':path,'sha256':hashlib.sha256(data).hexdigest()}
+        with atomic_writer(self.workspace,path,expected_sha256=expected_sha256 or None,max_bytes=200000) as stream:
+            stream.write(data)
+        if expected_sha256:
+            arguments['expected_sha256']=expected_sha256
+            result['before_sha256']=expected_sha256
+        return self.record('write_research_file',arguments,result)
 
     async def edit_research_file(self, path: str, old_text: str, new_text: str,
             expected_sha256: Annotated[str, Field(description="Required full-file SHA256 from read_session_file (sha256 or file_sha256), never slice_sha256. Read the current file first; use its hash unchanged.")]) -> dict:

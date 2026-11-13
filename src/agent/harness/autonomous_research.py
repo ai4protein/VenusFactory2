@@ -22,7 +22,7 @@ from .native_expert_team import NATIVE_EXPERT_HARNESSES, critic_decision, role_c
 from .research_updates import apply_revisions
 from .research_plan_evidence import VERIFICATION_KINDS, checkpoint_steps
 from .research_verification_contract import canonical_verification
-from .research_focus import selected_tools, instructions as execution_instructions
+from .research_focus import selected_tools, repair_action, instructions as execution_instructions
 from .research_questions import validate_input_questions
 from .research_request_budget import REVIEW_RESERVE, request_ceiling
 from .research_workspace import ResearchWorkspace, publish_proposals, safe_file
@@ -458,7 +458,9 @@ class AutonomousResearch:
                     context['model_development']['next_action']=development_next_action(development.summary(),progress,prepared,materials=context['supplied_materials'])
                     repair = repair_source_context(workspace, progress.get('execution_feedback'),
                         input_fields=(prepared or {}).get('model_interface', {}).get('input_fields', {}), task=(prepared or {}).get('task', ''))
-                    if repair is not None:context['model_development']['repair_source'] = repair
+                    if repair is not None:
+                        context['model_development']['repair_source'] = repair
+                        context['model_development']['next_action'] = repair_action(context['model_development']['next_action'], repair)
                 focus=selected_tools(context,tools)
                 context['model_development']['selected_tools']=focus
                 names=CONTROLS | WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | set(focus)
@@ -498,7 +500,9 @@ class AutonomousResearch:
                     continuation['execution_receipts'] = service.receipts[-6:]
                     repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback'), development=development, episode_index=index),
                         input_fields=(prepared or {}).get('model_interface', {}).get('input_fields', {}), task=(prepared or {}).get('task', ''))
-                    if repair is not None:continuation['model_development']['repair_source'] = repair
+                    if repair is not None:
+                        continuation['model_development']['repair_source'] = repair
+                        continuation['model_development']['next_action'] = repair_action(continuation['model_development']['next_action'], repair)
                     else:continuation['model_development'].pop('repair_source', None)
                     focus = selected_tools(continuation, tools)
                     continuation['model_development']['selected_tools'] = focus
