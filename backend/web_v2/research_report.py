@@ -642,12 +642,10 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
             results = await research_predictions.run_predictions(context, prediction_update, folder)
             for row in results:
                 if row['status'] != 'completed': continue
-                value = {k: row[k] for k in ('task', 'model', 'dataset', 'sequence_sha256', 'values', 'evidence_level')}
-                from mcp_tools.models.factory.prediction.output_scale import output_scale
-                value['output_scale'] = row.get('output_scale') or output_scale()
-                sections.append({'id': 'prediction_' + row['id'], 'title': row['task'] + ' · ' + row['model'], 'data': value})
-                add([{'title': row['task'] + ' · ' + row['model'] + ' · ' + row['dataset'], 'url': '',
-                      'kind': 'prediction', 'task': row['task'], 'evidence_level': 'model_prediction', 'text': json.dumps(value)}])
+                from .research_recovery import prediction_evidence
+                section, source = prediction_evidence(row)
+                sections.append(section)
+                add([source])
             completed = sum(row['status'] == 'completed' for row in results)
             step('ai_predictions', 'completed' if results and completed == len(results) else 'partial' if completed else 'empty', f'{completed}/{len(results)}')
             if results and completed < len(results): state['partial'] = True

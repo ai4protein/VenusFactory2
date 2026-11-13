@@ -186,7 +186,7 @@ def map_prediction_labels(row: pd.Series, task: str) -> str:
                 predictions = json.loads(predictions_str) if isinstance(predictions_str, str) else predictions_str
                 if all(p == 0 for p in predictions):
                     return "No signal"
-                signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
+                signal_labels = LABEL_MAPPING_FUNCTION["Sortingsignal"]
                 active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
                 return "_".join(active_labels) if active_labels else "None"
             except:

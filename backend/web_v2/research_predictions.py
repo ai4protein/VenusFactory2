@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 
+from mcp_tools.models.factory.prediction.label_schema import checkpoint_label_schema, decode_values
 from mcp_tools.models.factory.prediction.output_scale import checkpoint_output_scale, result_output_scale
 from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
 
@@ -53,7 +54,8 @@ def candidates(context, *, root=None):
                     except (ValueError,RuntimeError): continue
                     group.append({'id': identity, 'task': task, 'label_zh': LABELS.get(task, task), 'model': model,
                                   'dataset': dataset, 'tool': tool, 'adapter_path': str(adapter),
-                                  'output_scale': checkpoint_output_scale(adapter)})
+                                  'output_scale': checkpoint_output_scale(adapter),
+                                  'label_schema': checkpoint_label_schema(adapter)})
             if group: groups.append(group)
     # Cover every property first, then add independent backbones/datasets for comparison.
     return [g[i] for i in range(max(map(len, groups), default=0)) for g in groups if i < len(g)]
@@ -100,7 +102,7 @@ async def run_predictions(context, update, folder, *, execute=None):
     folder = Path(folder); folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     fasta = folder / 'query.fasta'; fasta.write_text('>query\n' + sequence + '\n'); fasta.chmod(0o600)
     digest = hashlib.sha256(sequence.encode()).hexdigest()
-    rows = [{k: v for k, v in spec.items() if k != 'adapter_path'} | {'status': 'queued', 'sequence_sha256': digest} for spec in specs]
+    rows = [{k: v for k, v in spec.items() if k not in {'adapter_path', 'label_schema'}} | {'status': 'queued', 'sequence_sha256': digest} for spec in specs]
     update(rows)
     deadline = time.monotonic() + bounded_setting('VENUS_REPORT_PREDICTION_SECONDS', 900, 1800)
     for index, (spec, row) in enumerate(zip(specs, rows)):
@@ -118,7 +120,10 @@ async def run_predictions(context, update, folder, *, execute=None):
             if isinstance(value, str): value = json.loads(value)
             if not isinstance(value, dict) or value.get('status') != 'success': raise ValueError('No prediction result returned')
             scale = result_output_scale(value, spec.get('output_scale'))
-            row.update(status='completed', output_scale=scale, values=read_result(output), evidence_level='model_prediction', output_file=output.name)
+            values = read_result(output)
+            classification = decode_values(values, spec.get('label_schema'), scale)
+            row.update(status='completed', output_scale=scale, values=values, classification=classification,
+                       evidence_level='model_prediction', output_file=output.name)
         except asyncio.TimeoutError:
             row.update(status='deferred', message='Prediction time limit reached')
         except ToolJobError as error:
@@ -146,5 +151,12 @@ def report_appendix(rows, lang='en'):
     def cell(x): return str(x).replace('|', '\\|').replace('\n', ' ')[:1200]
     for row in rows:
         result = json.dumps(row.get('values'), ensure_ascii=False) if row['status'] == 'completed' else ('暂无结果' if zh else 'No result')
+        classification = row.get('classification', {})
+        if row['status'] == 'completed' and classification.get('mapping_status') == 'legacy_dataset_convention':
+            decoded = classification.get('decoded', [])
+            meanings = [meaning for item in decoded for meaning in item.get('predicted_meanings', [])]
+            result = (', '.join(meanings) or 'No listed signal exceeds the model decision threshold.') + ' · ' + result
+        elif classification.get('mapping_status') in {'unavailable', 'output_mismatch'}:
+            result = ('Class labels unavailable; raw output retained. ' if not zh else '类别含义未核实，保留原始输出。') + result
         lines.append(f"| {cell(row.get('label_zh') if zh else row['task'])} | {cell(row['model'])} / {cell(row['dataset'])} | {cell(result)} |")
     return '\n\n'.join(lines[:2]) + '\n\n' + '\n'.join(lines[2:])

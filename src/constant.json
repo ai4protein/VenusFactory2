@@ -368,8 +368,8 @@
         "Soluble"
       ],
       "Subcellular Localization": [
-        "Cytoplasm",
         "Nucleus",
+        "Cytoplasm",
         "Extracellular",
         "Mitochondrion",
         "Cell membrane",
@@ -384,7 +384,6 @@
         "Binding"
       ],
       "Sortingsignal": [
-        "No signal",
         "CH",
         "GPI",
         "MT",

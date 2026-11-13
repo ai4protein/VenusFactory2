@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "datasets": {
+    "DeepLocBinary": {
+      "dataset_ids": [
+        "AI4Protein/DeepLocBinary_ESMFold",
+        "tyang816/DeepLocBinary_ESMFold"
+      ],
+      "task": "Membrane Protein",
+      "problem_type": "single_label_classification",
+      "num_labels": 2,
+      "repo": "AI4Protein/DeepLocBinary_ESMFold",
+      "revision": "e300ff0b3b09b2ce023d5d35efaeb187f657db7e",
+      "sha256": "40069065b03b3c4d01c2074f1d10be146da28e1c06f1cc9e86eaf9786f7028f1",
+      "rows": 5735,
+      "source_codes": [
+        "M",
+        "S"
+      ],
+      "counts": [
+        2345,
+        3390
+      ],
+      "label_order_sha256": "38241f2d9bbe2050c6918789ea0cc8f996e7aca0c64d627b4622c7b2e5b6b81e",
+      "source_file": "train.csv",
+      "source_url": "https://huggingface.co/datasets/AI4Protein/DeepLocBinary_ESMFold/resolve/e300ff0b3b09b2ce023d5d35efaeb187f657db7e/train.csv",
+      "provenance_kind": "audited_legacy_dataset_convention",
+      "checkpoint_revision_recorded": false,
+      "audited_on": "2026-11-13",
+      "conflicts": 0,
+      "audit_method": "All rows: integer labels mapped to the M/S membrane-status codes in the original annotation."
+    },
+    "DeepLocMulti": {
+      "dataset_ids": [
+        "AI4Protein/DeepLocMulti_ESMFold",
+        "tyang816/DeepLocMulti_ESMFold"
+      ],
+      "task": "Subcellular Localization",
+      "problem_type": "single_label_classification",
+      "num_labels": 10,
+      "repo": "AI4Protein/DeepLocMulti_ESMFold",
+      "revision": "271c31bb1332fdb6066de43d61bf54434f3966ac",
+      "sha256": "d839442969c129602569c4aa6f29124f0a9af00bf57b82ad7b8299c730fa246a",
+      "rows": 9324,
+      "single_location_counts": [
+        2714,
+        1694,
+        1292,
+        972,
+        890,
+        587,
+        510,
+        237,
+        211,
+        101
+      ],
+      "multiple_locations": {
+        "0:Cytoplasm,Nucleus": 116
+      },
+      "conflicts": 0,
+      "label_order_sha256": "98c09c3c0ea34b0008a93da187f333ddb54b7818ebf717eae520e47bb94cbe77",
+      "source_file": "train.csv",
+      "source_url": "https://huggingface.co/datasets/AI4Protein/DeepLocMulti_ESMFold/resolve/271c31bb1332fdb6066de43d61bf54434f3966ac/train.csv",
+      "provenance_kind": "audited_legacy_dataset_convention",
+      "checkpoint_revision_recorded": false,
+      "audited_on": "2026-11-13",
+      "audit_method": "Intersection of each class full location annotation set plus single-location anchors; M/S/U membrane-status flags excluded. Multi-location first terms are not used as labels."
+    },
+    "SortingSignal": {
+      "dataset_ids": [
+        "AI4Protein/SortingSignal",
+        "tyang816/SortingSignal"
+      ],
+      "task": "Sortingsignal",
+      "problem_type": "multi_label_classification",
+      "num_labels": 9,
+      "repo": "AI4Protein/SortingSignal",
+      "revision": "bd835e2c3c818dcaef38c067fff7affde85709fc",
+      "sha256": "4c8c123918861b7f9e16a4f91ad0aaaacb75e460b028ffc1d0ceb406f94e7e89",
+      "rows": 1484,
+      "counts": [
+        64,
+        87,
+        201,
+        81,
+        114,
+        100,
+        807,
+        202,
+        33
+      ],
+      "conflicts": 0,
+      "meanings": {
+        "CH": "Chloroplast transit peptide",
+        "GPI": "GPI anchor",
+        "MT": "Mitochondrial transit peptide",
+        "NES": "Nuclear export signal",
+        "NLS": "Nuclear localization signal",
+        "PTS": "Peroxisomal targeting signal",
+        "SP": "Signal peptide",
+        "TM": "First transmembrane domain",
+        "TH": "Thylakoid transit peptide"
+      },
+      "meaning_source": "https://doi.org/10.1093/nar/gkac278",
+      "label_order_sha256": "4b0dd135ba42703d1fcba4dcd28e737a8b3b21fe44cc9cc48c8fb7319642b3da",
+      "source_file": "train.csv",
+      "source_url": "https://huggingface.co/datasets/AI4Protein/SortingSignal/resolve/bd835e2c3c818dcaef38c067fff7affde85709fc/train.csv",
+      "provenance_kind": "audited_legacy_dataset_convention",
+      "checkpoint_revision_recorded": false,
+      "audited_on": "2026-11-13",
+      "audit_method": "All rows: the nine binary label positions matched the complete underscore-separated Types set, without reordering in the training collator."
+    }
+  }
+}

@@ -110,7 +110,7 @@ def build_dossier(report, inputs=None, prediction_files=None):
             for number, prediction in enumerate(report.get("predictions", []), 1):
                 item = {k: prediction.get(k) for k in (
                     "id", "task", "model", "dataset", "tool", "status", "message",
-                    "sequence_sha256", "job_number", "started", "finished", "evidence_level", "output_scale")}
+                    "sequence_sha256", "job_number", "started", "finished", "evidence_level", "output_scale", "classification")}
                 item["analysis_file"] = analysis_files.get("prediction_" + str(prediction.get("id")))
                 artifact = artifacts.get(prediction.get("id"), {})
                 item["artifact"] = {"status": "unverified", "reason": artifact.get("reason", "missing_receipt_binding")}
