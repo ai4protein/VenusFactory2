@@ -49,7 +49,8 @@ async def test_next_iteration_receives_actual_failures_not_only_critic_summary(t
             seen.append(context["progress"].get("execution_feedback"))
             return json.dumps({"summary":"Inspect measurements","steps":[
                 {"id":"inspect","title":"Inspect data","acceptance":"Actual summary"}],"needs_input":[]})
-        if role=="SC":return json.dumps({"decision":"needs_revision","summary":"Unfinished work","issues":["Continue"]})
+        if role=="SC":return json.dumps({"decision":"needs_revision","summary":"Unfinished work",
+            "issues":["Continue"],"evidence_ids":[],"next_actions":["Correct the execution failure"]})
         raise AssertionError(role)
     async def executor(request,service,events):
         events.extend(failure("evaluate_research_model",diagnostic

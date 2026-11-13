@@ -115,8 +115,15 @@ def resolve_attempts(feedback, development):
     completed.sort(key=lambda row:row["created"], reverse=True)
     remaining = []
     for failure in pending:
+        from .research_execution_feedback import detached_request_failure
+
+        request = detached_request_failure(failure, development.root)
+        if request is not None:
+            remaining.append(request)
+            failure = {key: value for key, value in failure.items() if key != "request_failure"}
         identity = failure.get("training_attempt_id")
-        if failure.get("tool", "").rsplit("__", 1)[-1] != "train_research_model" or not identity:
+        if (failure.get("failure_kind") == "request"
+                or failure.get("tool", "").rsplit("__", 1)[-1] != "train_research_model" or not identity):
             remaining.append(failure)
             continue
         try:

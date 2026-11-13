@@ -67,7 +67,10 @@ def schema():
         "issues": {"type": "array", "maxItems": 24, "items": text},
         "claims": {"type": "array", "maxItems": 64, "items": claim},
         "step_assessments": {"type": "array", "maxItems": 24, "items": step},
-        "input_assessments": {"type": "array", "maxItems": 12, "items": inputs},
+        "input_assessments": {"type": "array", "maxItems": 12, "items": inputs,
+                              "description": "Exactly one assessment for each distinct claims[].task_id. "
+                                             "Multiple claims for the same task share one assessment. "
+                                             "Do not add entries only because a task appears in source_task_ids."},
     })
 
 
@@ -121,8 +124,10 @@ def review_targets(context):
         "computation_task_ids": task_ids[:64],
         "computation_task_ids_omitted": max(0, len(task_ids) - 64),
         "instruction": "Assess only completed_step_ids. Claims cite computation_task_ids, not step IDs. "
-                       "These IDs do not establish scientific validity. needs_revision may use empty claims and "
-                       "input_assessments, but must still assess every claimed completed step.",
+                       "input_assessments must match distinct claims.task_id: one entry per task, not per claim; "
+                       "source_task_ids alone need no separate entry. These IDs do not establish scientific validity. "
+                       "needs_revision may leave both claims and input_assessments empty, but must still "
+                       "assess every claimed completed step.",
     }
 
 
@@ -132,12 +137,20 @@ def _step_id_feedback(identities, known):
     return json.dumps(values, ensure_ascii=False) + (f" (+{len(identities)-8} omitted)" if len(identities) > 8 else "")
 
 
+def _task_id_feedback(identities, known):
+    # Only verified host IDs can be echoed; model-authored unknown text is never returned.
+    values = [identity if identity in known else "<unknown task id>" for identity in identities[:2]]
+    return json.dumps(values) + (f" (+{len(identities)-2} omitted)" if len(identities) > 2 else "")
+
+
 def _unique_rows(rows, key, label):
     result = {}
     for row in rows:
         identity = row[key]
         if identity in result:
-            raise ValueError(label + " must use unique IDs.")
+            suffix = (" Multiple claims for the same task share one input assessment."
+                      if label == "Input assessments" else "")
+            raise ValueError(label + " must use unique IDs." + suffix)
         result[identity] = row
     return result
 
@@ -277,7 +290,12 @@ def validate(review, context):
                          "revise unsupported verdicts instead of preserving an invalid review.")
     referenced_tasks = {claim["task_id"] for claim in claims.values()}
     if set(inputs) != referenced_tasks:
-        raise ValueError("Assess the input provenance of each cited task exactly once.")
+        missing = sorted(referenced_tasks - set(inputs))
+        extra = sorted(set(inputs) - referenced_tasks)
+        raise ValueError("input_assessments must match distinct claims.task_id. Missing task_ids: "
+                         + _task_id_feedback(missing, tasks) + "; extra task_ids: "
+                         + _task_id_feedback(extra, tasks)
+                         + ". Multiple claims for one task share one assessment; source_task_ids alone need no entry.")
     for claim in claims.values():
         task = tasks.get(claim["task_id"])
         if task is None:

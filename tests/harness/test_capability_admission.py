@@ -117,7 +117,7 @@ async def test_admission_revision_continues_even_after_research_steps_complete(t
                 assert assessment['criteria']['research_outputs_reviewed']['passed']
                 assert not assessment['criteria']['capability_admission_resolved']['passed']
             return 'Calculate supplied lengths.'
-        if role=='CB':return json.dumps({'summary':'Length tool','steps':[{'id':'calc','title':'Calculate','acceptance':'Run and save outputs'}],'needs_input':[]})
+        if role=='CB':return json.dumps({'summary':'Length tool','deliverable':'tool','steps':[{'id':'calc','title':'Calculate','acceptance':'Run and save outputs'}],'needs_input':[]})
         if role=='SC':return json.dumps({'decision':'ready_for_host_validation','summary':'Research evidence is complete','issues':[]})
         result=await reviewer(context);reviews.append(1)
         if len(reviews)==1:result.update(decision='revise',issues=['Document applicability more clearly'])

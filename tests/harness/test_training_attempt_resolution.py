@@ -243,3 +243,62 @@ async def test_coordinator_reaches_independent_review_after_measured_replacement
     assert state["progress"]["execution_feedback"]["errors"]==[]
     assert state["progress"]["publication_reviews"][0]["status"]=="needs_revision"
     assert state["status"]!="completed" and not state["progress"].get("capabilities")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reject_after_success", [False, True])
+@pytest.mark.parametrize("different_evaluation", [False, True])
+async def test_measured_replacement_never_borrows_scope_to_clear_request(
+        tmp_path, monkeypatch, reject_after_success, different_evaluation):
+    monkeypatch.setenv("VENUS_JOB_QUEUE_ROOT", str(tmp_path / "queue"))
+    service = await service_at(tmp_path)
+    args = {"name": "fit", "source_file": "src/failed.py", "evaluation_file": "evaluation.json",
+            "hypothesis": "Synthetic reference"}
+    def event(output, error, arguments):
+        return [{"kind": "tool_call_start", "tool_call_id": "actual",
+                 "tool_name": "mcp__venusfactory__train_research_model", "args": arguments},
+                {"kind": "tool_result", "tool_call_id": "actual", "is_error": error, "output": output}]
+    with pytest.raises(TrainingAttemptError) as caught:
+        await service.train_research_model(**args)
+    exc = caught.value
+    state = feedback_state(event(str(exc), True, args), service.workspace, development=service.development)
+    rejected = {**args}
+    if different_evaluation:
+        await service.write_research_file("other.json", json.dumps(table(100)))
+        rejected["evaluation_file"] = "other.json"
+    denial = event("DisclosureError: Execution budget reached", True, rejected)
+    if not reject_after_success:
+        state = feedback_state(denial, service.workspace, state, development=service.development)
+    replacement = await service.train_research_model(
+        "repaired", "src/replacement.py", "evaluation.json", "Synthetic numeric reference")
+    state = feedback_state(denial if reject_after_success else [], service.workspace, state,
+                           development=service.development)
+    request, = state["pending"]
+    assert request["failure_kind"] == "request" and "training_attempt_id" not in request
+    assert "Execution budget reached" in state["errors"][0]["error"]
+    assert state["superseded"][0]["failed_attempt_id"] == exc.attempt_id
+    assert state["superseded"][0]["replacement_experiment_id"] == replacement["experiment"]["id"]
+    assert repair_source_context(service.workspace, state) is None
+    assert feedback_state([], service.workspace, state, development=service.development) == state
+    # Only this later matching actual result clears the independently rejected request.
+    await service.write_research_file("src/failed.py", LINEAR)
+    actual = await service.train_research_model(**rejected)
+    current = feedback_state(event(actual, False, rejected), service.workspace, state,
+                             development=service.development)
+    assert current["pending"] == [] and current["errors"] == []
+
+
+@pytest.mark.asyncio
+async def test_direct_resolution_preserves_legacy_attached_request(tmp_path, monkeypatch):
+    monkeypatch.setenv("VENUS_JOB_QUEUE_ROOT", str(tmp_path / "queue"))
+    service = await service_at(tmp_path)
+    exc = await failed_fit(service)
+    state = feedback_state(failed_call(str(exc)), service.workspace)
+    await service.train_research_model("repaired", "src/replacement.py", "evaluation.json", "Synthetic fixture")
+    state["pending"][0]["request_failure"] = {
+        "tool": state["pending"][0]["tool"], "error": "PermissionError: Tool disabled"}
+    current = resolve_attempts(state, service.development)
+    request, = current["pending"]
+    assert request["failure_kind"] == "request" and "training_attempt_id" not in request
+    assert current["errors"] == [{"tool": request["tool"], "error": "PermissionError: Tool disabled"}]
+    assert current["superseded"][0]["failed_attempt_id"] == exc.attempt_id

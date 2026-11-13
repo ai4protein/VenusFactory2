@@ -151,3 +151,49 @@ async def test_actual_consult_single_repair_gets_precise_targets_without_auto_re
     assert ("32-character lowercase hexadecimal" if fault == "task_id" else 'Missing step_ids: ["compute"]') in repair["validation_error"]
     assert [metadata["role_output"] for _, metadata in seen] == ["SC", "SC"]
     assert policy._role_output is None
+
+
+def test_input_coverage_reports_exact_known_missing_and_extra_task_ids(make_case):
+    from test_analysis_report_review import run_capture
+
+    from agent.harness.research_analysis_provenance import build_evidence_index
+
+    service, inputs, context, review = make_case()
+    first = review["claims"][0]["task_id"]
+    second = run_capture(service, {"sequence": "MKWVTFISLLFLFSSAYS"}, {"data": {"other": 1}})
+    context["analysis_evidence"] = build_evidence_index(
+        service.workspace, receipts=service.receipts, inputs=inputs,
+        checkpoint=context["execution"]["checkpoint"])
+    review["input_assessments"][0]["task_id"] = second
+    with pytest.raises(ValueError) as failure:
+        analysis.validate(review, context)
+    message = str(failure.value)
+    assert 'Missing task_ids: ["' + first + '"]' in message
+    assert 'extra task_ids: ["' + second + '"]' in message
+    assert "Multiple claims for one task share one assessment" in message
+    assert len(message) <= 400
+
+
+def test_unknown_input_task_ids_are_never_echoed(make_case):
+    _, _, context, review = make_case()
+    unknown = "deadbeef" * 4
+    review["input_assessments"][0]["task_id"] = unknown
+    with pytest.raises(ValueError) as failure:
+        analysis.validate(review, context)
+    assert unknown not in str(failure.value)
+    assert "<unknown task id>" in str(failure.value)
+    assert review["claims"][0]["task_id"] in str(failure.value)
+
+
+def test_multiple_claims_of_one_task_share_one_input_assessment(make_case):
+    import copy
+
+    _, _, context, review = make_case()
+    additional = copy.deepcopy(review["claims"][0])
+    additional["id"] = "same-task-second-claim"
+    review["claims"].append(additional)
+    review["step_assessments"][0]["claim_ids"].append(additional["id"])
+    assert analysis.validate(review, context) is None
+    review["input_assessments"].append(copy.deepcopy(review["input_assessments"][0]))
+    with pytest.raises(ValueError, match="Multiple claims for the same task share one input assessment"):
+        analysis.validate(review, context)

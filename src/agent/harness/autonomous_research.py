@@ -310,6 +310,8 @@ class AutonomousResearch:
             problem=None
             try:raw=await self.consult(role,current,profile,relay,folder)
             except RoleOutputError as exc:raw=exc.raw;problem=exc
+            from .research_role_outputs import record_response
+            record_response(folder,role,attempt,raw)
             self.activity(folder,role,raw)
             if problem is None:
                 try:return validator(raw)
@@ -325,8 +327,8 @@ class AutonomousResearch:
                 'Return one valid JSON object. Do not execute tools.'
                 if consistency_error else
                 'Reformat the same research content as one valid JSON object with the required fields. Do not invent results, change the objective or execute any tools.')
-            current={**context,'format_repair':{'previous_response':raw[:12000],
-                'validation_error':str(problem)[:400], 'instruction':repair_instruction}}
+            from .research_role_outputs import repair_feedback
+            current={**context,'format_repair':repair_feedback(raw,problem,repair_instruction)}
         raise AssertionError('Bounded structured request')
 
     def activity(self, folder, role, text):
@@ -348,6 +350,9 @@ class AutonomousResearch:
         if protocol.get('scientific_acceptance')!=sc_acceptance.POLICY:
             write_json(protocol_path,{**protocol,'scientific_acceptance':sc_acceptance.POLICY})
         workspace=self.store.root/'workspace';progress=copy.deepcopy(state['progress']);events=[];relay=None;tools=[];service=None
+        if isinstance(progress.get('execution_feedback'), dict):
+            progress['execution_feedback'] = {**progress['execution_feedback'],
+                **feedback_state([], workspace, progress['execution_feedback'], episode_index=index)}
         from .research_data_store import store_for_goal
         data_store=store_for_goal(self.store.root)
         if data_store is not None:
@@ -481,7 +486,7 @@ class AutonomousResearch:
                     else:
                         continuation['model_development'].pop('prepared_dataset', None)
                     continuation['execution_receipts'] = service.receipts[-6:]
-                    repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback'), development=development),
+                    repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback'), development=development, episode_index=index),
                         input_fields=(prepared or {}).get('model_interface', {}).get('input_fields', {}), task=(prepared or {}).get('task', ''))
                     if repair is not None:continuation['model_development']['repair_source'] = repair
                     else:continuation['model_development'].pop('repair_source', None)
@@ -550,7 +555,7 @@ class AutonomousResearch:
                         task_provenance=service.analysis_task_provenance)
                     context['analysis_evidence']['history_issues']=service.analysis_history_issues[:16]
                     context['analysis_evidence']['history_issues_omitted']=max(0,len(service.analysis_history_issues)-16)
-                current_feedback=feedback_state(events,workspace,progress.get('execution_feedback'),development=development)
+                current_feedback=feedback_state(events,workspace,progress.get('execution_feedback'),development=development,episode_index=index)
                 context['execution']['failures']=current_feedback['errors']
                 context['execution']['superseded_attempts']=current_feedback.get('superseded', [])
                 step_checks=checkpoint_steps(plan,checkpoint,workspace=workspace,receipts=evidence_receipts,
@@ -691,7 +696,7 @@ class AutonomousResearch:
             progress['training_progress'] = training_progress(development, training_before, progress.get('training_progress'))
             if service is not None and service.latest_submission:
                 progress['review_submission']=service.latest_submission
-            progress['execution_feedback']={'iteration':index+1, **feedback_state(events,workspace,progress.get('execution_feedback'),development=development)}
+            progress['execution_feedback']={'iteration':index+1, **feedback_state(events,workspace,progress.get('execution_feedback'),development=development,episode_index=index)}
             if model_goal(context['objective']) and not has_delivery(progress.get('deliveries',[]),'model'):
                 progress['delivery_pending']='Continue from measured generations; model review and delivery are not yet complete'
             write_json(folder/'events.json',events)
@@ -721,8 +726,10 @@ class AutonomousResearch:
         progress=state['progress'];plan=progress.get('plan',{});checks={k:{'passed':False} for k in state['definition']['goal']['criteria']}
         if state.get('pending_research_updates'):return {'criteria':checks}
         if not plan.get('steps') or not all(s.get('status')=='completed' for s in plan['steps']) or 'reviewed_episode' not in progress:return {'criteria':checks}
-        if plan.get('deliverable')=='tool' and not progress.get('capabilities'):
-            return {'criteria':checks,'delivery_pending':True}
+        delivery_pending=plan.get('deliverable')=='tool' and not progress.get('capabilities')
+        incomplete={'criteria':checks}
+        if delivery_pending:
+            incomplete['delivery_pending']=True
         protocol=self.store.root/'protocol.json'
         protocol_data=json.loads(protocol.read_text()) if protocol.exists() else {}
         modern_delivery=protocol_data.get('delivery_schema')==DELIVERY_SCHEMA
@@ -731,11 +738,21 @@ class AutonomousResearch:
             return {'criteria':checks,'scientific_acceptance_pending':True}
         if plan.get('deliverable')=='model' or model_goal(state['definition']['goal']['objective']) or (plan.get('deliverable')=='tool' and modern_delivery):
             kind='method' if plan.get('deliverable')=='tool' and not model_goal(state['definition']['goal']['objective']) else 'model'
-            if not has_delivery(progress.get('deliveries',[]),kind):return {'criteria':checks,'delivery_pending':True}
-            for delivery in selected_deliveries(progress['deliveries']):
+            if not has_delivery(progress.get('deliveries',[]),kind):
+                delivery_pending=True
+                incomplete['delivery_pending']=True
+            # A missing delivery does not erase verified research. Existing
+            # deliveries still require intact files and scientific bindings.
+            for delivery in selected_deliveries(progress.get('deliveries',[])):
+                candidate_id, artifacts = delivery.get('candidate_id'), delivery.get('artifacts')
+                if (not isinstance(candidate_id, str) or not candidate_id
+                        or not isinstance(artifacts, list)
+                        or any(not isinstance(item, dict) or not isinstance(item.get('path'), str)
+                               or not isinstance(item.get('sha256'), str) for item in artifacts)):
+                    return {'criteria':checks,'delivery_pending':True}
                 if delivery['candidate_id'] not in {c['id'] for c in progress.get('capabilities',[])}:return {'criteria':checks,'delivery_pending':True}
                 if strict_sc and delivery.get('kind')=='model' and not sc_acceptance.verify_delivery(self.store.root,delivery):
-                    return {'criteria':checks,'scientific_acceptance_pending':True}
+                    return {**incomplete,'scientific_acceptance_pending':True}
                 for artifact in delivery['artifacts']:
                     try:
                         if file_hash(safe_file(self.store.root/'workspace',artifact['path']))!=artifact['sha256']:return {'criteria':checks,'delivery_pending':True}
@@ -743,26 +760,29 @@ class AutonomousResearch:
         for step in plan['steps']:
             for row in step.get('evidence',[]):
                 try:
-                    if file_hash(safe_file(self.store.root/'workspace',row['path']))!=row['sha256']:return {'criteria':checks}
-                except (OSError,ValueError):return {'criteria':checks}
+                    if file_hash(safe_file(self.store.root/'workspace',row['path']))!=row['sha256']:return incomplete
+                except (OSError,ValueError):return incomplete
         index=progress['reviewed_episode'];review=self.store.root/'episodes'/f'cycle_{index:03d}'/'review.json'
-        if not review.exists() or json.loads(review.read_text())['decision']!='ready_for_host_validation':return {'criteria':checks}
+        if not review.exists() or json.loads(review.read_text()).get('decision')!='ready_for_host_validation':return incomplete
         admission=progress.get('publication_reviews',[])
         admission_pending=any(r['status']!='approved' for r in admission)
         for row in admission:
             try:
-                if file_hash(safe_file(self.store.root,row['receipt']))!=row['sha256']:return {'criteria':checks}
-            except (OSError,ValueError):return {'criteria':checks}
+                if file_hash(safe_file(self.store.root,row['receipt']))!=row['sha256']:return incomplete
+            except (OSError,ValueError):return incomplete
         evidence=[{'path':r['receipt'],'sha256':r['sha256']} for r in admission]+[{'path':str(review.relative_to(self.store.root)),'sha256':file_hash(review)}]
         for step in plan['steps']:
             evidence += [{'path':'workspace/'+r['path'],'sha256':r['sha256']} for r in step['evidence']]
         checks={k:{'passed':True,'evidence':evidence} for k in checks}
-        if admission_pending:
+        if admission_pending or delivery_pending:
             # Preserve old immutable goal definitions; new goals carry a distinct
             # admission criterion so completed research remains visibly complete.
             key='capability_admission_resolved' if 'capability_admission_resolved' in checks else 'research_outputs_reviewed'
-            checks[key]={'passed':False,'reason':'Reusable candidates need admission revision'}
-        return {'criteria':checks,'research_completed':True,'admission_pending':admission_pending}
+            checks[key]={'passed':False,'reason':'Reusable candidates need admission revision or a verified delivery'}
+        result={'criteria':checks,'research_completed':True,'admission_pending':admission_pending}
+        if delivery_pending:
+            result['delivery_pending']=True
+        return result
 
     async def run(self):
         return await run_goal(self.store,self.episode,self.evaluate,stop_on_uncheckpointed_failure=True)

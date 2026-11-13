@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import pytest
 
+from agent.harness.research_attempt_resolution import TrainingAttemptError
 from agent.harness.research_execution_feedback import feedback_state, repair_source_context
 
 SOURCE = "def fit(training, seed):\n    pass\ndef predict(model, inputs):\n    return {'value': 0.0}\n"
@@ -16,7 +17,9 @@ def failure(path="src/model.py", failed=True, wrapped=False):
         args={"name":"train_research_model","arguments":args}
     return [{"kind":"tool_call_start","tool_call_id":"test","tool_name":name,"args":args},
             {"kind":"tool_result","tool_call_id":"test","is_error":failed,
-             "output":"ValueError: fit is an unfinished placeholder" if failed else "{}"}]
+             # Synthetic host-attempt identity; actual fit tests below replace it
+             # with the real TrainingAttemptError returned by the workspace.
+             "output":str(TrainingAttemptError("a" * 32, "ValueError: fit is an unfinished placeholder")) if failed else "{}"}]
 
 
 @pytest.mark.parametrize("wrapped",[False,True])
@@ -191,3 +194,16 @@ def test_multilabel_repair_names_compatible_controls_without_modifying_candidate
     assert 'terminal_logistic' in context['instruction']
     assert "row['target'] maps label names directly" in context['instruction']
     assert context['code'] == path.read_text() == SOURCE
+
+
+@pytest.mark.parametrize("message", ["DisclosureError: Execution budget reached", "PermissionError: Tool disabled"])
+def test_unexecuted_request_never_discloses_candidate_source(tmp_path, message):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/model.py").write_text(SOURCE)
+    events = failure()
+    events[-1]["output"] = message
+    state = feedback_state(events, tmp_path, episode_index=0)
+    request, = state["pending"]
+    assert request["failure_kind"] == "request" and "training_attempt_id" not in request
+    assert repair_source_context(tmp_path, state) is None
+    assert state["errors"][0]["error"] == message

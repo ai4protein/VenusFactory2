@@ -47,13 +47,22 @@ async def test_critic_approval_cannot_complete_a_failed_training_checkpoint(tmp_
                     Budget(model_calls=12,tool_calls=8,wall_seconds=60,output_tokens=2048))
     store=ar.create(tmp_path/"goal",profile,"Analyze the supplied observations",
                     dict(max_cycles=1,model_calls=12,tool_calls=8,wall_seconds=90))
+    reviews=[]
     async def consult(role,context):
         if role=="PI": return "Execute the supplied analysis."
         if role=="CB":
             return json.dumps({"summary":"Analyze","steps":[{"id":"compute","title":"Analyze",
                                "acceptance":"Successful computed output"}],"needs_input":[],"deliverable":"analysis"})
         assert context["execution"]["failures"]
-        return json.dumps({"decision":"ready_for_host_validation","summary":"Analysis completed.","issues":[]})
+        assert "training failed" in json.dumps(context["execution"]["failures"])
+        assert context["analysis_review_state"]["stage"]=="interim"
+        reviews.append(context)
+        if len(reviews)==1:
+            return json.dumps({"decision":"ready_for_host_validation","summary":"Analysis completed.","issues":[]})
+        assert "decision=needs_revision" in context["format_repair"]["validation_error"]
+        return json.dumps({"decision":"needs_revision","summary":"Training execution failed.",
+            "issues":["The recorded training attempt failed; no verified report exists."], "evidence_ids":[],
+            "next_actions":["Correct the training exception, rerun the computation and supply the actual report."]})
     async def executor(request,service,events):
         await service.write_research_file("bad.py","raise ValueError('training failed')")
         with pytest.raises(ValueError):
@@ -71,7 +80,12 @@ async def test_critic_approval_cannot_complete_a_failed_training_checkpoint(tmp_
     assert state["progress"]["last_review"]["decision"]=="needs_revision"
     assert "training failed" in state["cycles"][0]["summary"]
     episode=store.root/"episodes/cycle_000"
-    assert json.loads((episode/"review.json").read_text())["decision"]=="ready_for_host_validation"
+    assert len(reviews)==2  # One bounded correction; the misleading approval never becomes a valid review.
+    assert json.loads((episode/"review.json").read_text())["decision"]=="needs_revision"
+    records=[json.loads(path.read_text()) for path in (episode/"role_outputs").glob("sc-*.json")]
+    assert len(records)==2
+    first=next(row for row in records if row["attempt"]==0)
+    assert json.loads((episode/first["path"]).read_text())["decision"]=="ready_for_host_validation"
     assert json.loads((episode/"host_review.json").read_text())["passed"] is False
 
 def test_inspection_only_iteration_does_not_erase_previous_failure(tmp_path):
