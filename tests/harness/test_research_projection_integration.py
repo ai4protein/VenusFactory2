@@ -61,13 +61,13 @@ async def test_native_projection_reads_immutable_references_without_changing_req
     original_read = service.read_research_file
 
     @wraps(original_read)
-    async def read_with_concurrent_replacement(path, offset_bytes=0, max_bytes=20000, view="auto"):
+    async def read_with_concurrent_replacement(path, offset_bytes=0, max_bytes=20000, view="auto", select=None):
         if race["path"] == path:
             # The native handler has already checked the reference hash. Replace
             # bytes immediately before the real descriptor-backed reader opens it.
             (workspace / path).write_bytes(b"race-replacement-must-not-reach-model")
             race.update(path=None, triggered=True)
-        return await original_read(path, offset_bytes, max_bytes, view)
+        return await original_read(path, offset_bytes, max_bytes, view, select=select)
 
     monkeypatch.setattr(service, "read_research_file", read_with_concurrent_replacement)
     profile = Profile("science_agent", "kimi-code", ModelBinding("fixture", "unused", "http://127.0.0.1:1"),
