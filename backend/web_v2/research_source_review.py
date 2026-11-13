@@ -13,7 +13,7 @@ from .research_evidence_passages import chunks, digest, selected_passages, sourc
 from .research_review_binding import ReviewerBindingUnavailable
 from .research_source_validation import partial_assessments, validate_assessments
 
-VERSION = "source_review.v2.4"
+VERSION = "source_review.v3"
 MAX_PACKET_CHARS = 28000
 MAX_UNITS = 8
 MAX_RECOVERY_ROUNDS = 2
@@ -30,14 +30,15 @@ A protein name in a source cannot support claims about its function, stability, 
 A source value of 1.8 does not support a claimed value of 1.7; matching the protein name is insufficient.
 For "Protein X is stable at 80 C" with only "Protein X" in the source, return uncertain,
 issues=[{"claim":"Protein X is stable at 80 C","reason":"No temperature or stability observation is supplied."}],
-evidence=[]. Never manufacture a source quote from the draft. Copy quoted evidence exactly.
+evidence=[]. Select only the IDs of supplied source passages. The host resolves their original text; do not copy or invent quotes.
 An excerpt's silence is not evidence of absence. Mixed factual/proposed blocks are factual.
 Return JSON only: {"assessments":[{"unit_id":"...","classification":"factual" or "proposal",
 "verdict":"supported" or "unsupported" or "uncertain",
 "issues":[{"claim":"exact substring of the unit","reason":"brief source-specific explanation"}],
-"evidence":[{"source_id":"S1","passage_id":"S1:...","quote":"short exact source passage substring"}]}]}.
-Cover each unit exactly once. For a supported factual unit, provide source quotes that jointly
-support ALL its factual assertions. Quotes must come from cited, supplied passages, not the draft.
+"evidence":[{"passage_id":"S1:..."}]}]}.
+Cover each unit exactly once. For a supported factual unit, select passages that jointly support ALL its factual assertions.
+A passage ID is a locator, not proof by itself. Read its content and reject unsupported assertions.
+Return only passage IDs in evidence; source identities and exact text are resolved by the host.
 Use proposal only for an explicitly proposed future action containing no claimed observations.
 If any assertion lacks support, mark the unit unsupported or uncertain and identify that assertion.
 A correction field contains validator feedback on the previous attempt. Correct only the supplied
@@ -107,7 +108,7 @@ def recovery_packet(selected, sources, attempt):
     """Return bounded validator feedback without removing any source evidence."""
     request = packet(selected, sources)
     if attempt.get("truncated"):
-        message = "The previous response was truncated. Return complete JSON with short exact source quotes."
+        message = "The previous response was truncated. Return complete JSON with only supplied passage IDs in evidence."
     elif attempt.get("error") in {"TimeoutError", "ReadTimeout", "ConnectTimeout", "WriteTimeout", "PoolTimeout"}:
         message = "The previous request timed out. Review only the supplied units and return complete JSON."
     else:

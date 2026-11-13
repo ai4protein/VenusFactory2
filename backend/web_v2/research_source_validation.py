@@ -132,9 +132,17 @@ def _validate_assessment_rows(rows, request, sources):
             raise ValueError("Invalid evidence list")
         evidence = []
         for item in row["evidence"]:
-            if not isinstance(item, dict) or set(item) != {"source_id", "passage_id", "quote"}:
+            if (not isinstance(item, dict)
+                    or set(item) not in ({"passage_id"}, {"source_id", "passage_id", "quote"})
+                    or not isinstance(item["passage_id"], str)):
                 raise ValueError("Invalid source anchor")
             passage = passages.get(item["passage_id"])
+            if set(item) == {"passage_id"}:
+                if not passage:
+                    raise ValueError("Quote is not in the cited original source passage")
+                item = {"passage_id": item["passage_id"], "source_id": passage["source_id"], "quote": passage["text"]}
+            # Resolve compact locators, then apply every existing evidence check.
+            # Explicit quotes are never repaired or replaced with another passage.
             source = originals.get(item["source_id"])
             quote = item["quote"]
             if (not passage or not source or item["source_id"] not in unit["citations"]

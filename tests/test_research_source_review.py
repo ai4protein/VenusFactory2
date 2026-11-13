@@ -1,9 +1,11 @@
 import copy
 import json
+
 import pytest
-from backend.web_v2.research_evidence_passages import selected_passages, resolve_passage, source_digest
+
 from backend.web_v2 import research_source_review as sr
 from backend.web_v2 import research_source_validation as validation
+from backend.web_v2.research_evidence_passages import resolve_passage, selected_passages, source_digest
 
 SOURCE = {"id":"S1","kind":"database","title":"Reference annotation",
           "text":json.dumps({"features":[{"type":"Initiator methionine","description":"Removed",
@@ -220,3 +222,79 @@ async def test_quantity_policy_upgrade_invalidates_old_receipts(monkeypatch):
         )
         assert sr.document_ready(DOCUMENT, current["sources"], receipts["identity"])
     assert not sr.document_ready(DOCUMENT, current["sources"], receipts["identity"])
+
+
+def compact_assessment(request):
+    response = json.loads(assessment(request))
+    for row in response["assessments"]:
+        row["evidence"] = [{"passage_id": item["passage_id"]} for item in row["evidence"]]
+    return json.dumps(response)
+
+
+def test_compact_evidence_resolves_exact_original_text_and_keeps_receipt_shape():
+    request = sr.packet(sr.units(DOCUMENT, [SOURCE]), [SOURCE])
+    result = sr.validate_assessments(compact_assessment(request), request, [SOURCE])
+    full = sr.validate_assessments(assessment(request), request, [SOURCE])
+    assert result == full
+    anchor = result[0]["evidence"][0]
+    assert anchor["quote"] == resolve_passage(SOURCE, anchor["location"])
+    assert anchor["source_sha256"] == source_digest(SOURCE)
+
+
+@pytest.mark.parametrize("change", ["fabricated", "uncited", "altered_packet", "altered_original", "extra_field"])
+def test_compact_evidence_cannot_expand_or_replace_its_cited_sources(change):
+    extra = {**SOURCE, "id": "S2"}
+    sources = [copy.deepcopy(SOURCE), extra]
+    request = sr.packet(sr.units(DOCUMENT, sources), sources)
+    response = json.loads(compact_assessment(request))
+    anchor = response["assessments"][0]["evidence"][0]
+    if change == "fabricated":
+        anchor["passage_id"] = "S1:invented"
+    elif change == "uncited":
+        selected = selected_passages(extra, "methionine", 800)
+        request["sources"].append(selected)
+        anchor["passage_id"] = selected["passages"][0]["id"]
+    elif change == "altered_packet":
+        request["sources"][0]["passages"][0]["text"] = "Invented signal peptide cleavage."
+    elif change == "altered_original":
+        sources[0]["text"] = "Different annotation."
+    else:
+        anchor["quote"] = "Signal peptide removed"
+    with pytest.raises((ValueError, KeyError, TypeError)):
+        sr.validate_assessments(json.dumps(response), request, sources)
+
+
+def test_compact_evidence_keeps_measured_value_and_unit_checks():
+    source = {**SOURCE, "text": "The melting temperature was 45 C."}
+    document = {**DOCUMENT, "text": "The melting temperature was 80 C. [S1]"}
+    request = sr.packet(sr.units(document, [source]), [source])
+    with pytest.raises(ValueError, match="measured value and unit"):
+        sr.validate_assessments(compact_assessment(request), request, [source])
+
+
+def test_old_policy_receipt_is_not_accepted_for_compact_review():
+    receipt = {"policy": "source_review.v2.1", "status": "completed", "units": 1, "passed": 1,
+               "input_sha256": sr.document_signature(DOCUMENT, [SOURCE])}
+    assert not sr.document_ready(DOCUMENT, [SOURCE], receipt)
+
+
+def test_compact_evidence_partial_recovery_uses_the_same_source_contract():
+    request = sr.packet(sr.units(DOCUMENT, [SOURCE]), [SOURCE])
+    response = compact_assessment(request)
+    complete = validation.validate_assessments(response, request, [SOURCE])
+    checked, invalid = validation.partial_assessments(response, request, [SOURCE])
+    assert checked == complete and invalid == {}
+    corrupted = json.loads(response)
+    corrupted["assessments"][0]["evidence"][0]["passage_id"] = "S1:invented"
+    checked, invalid = validation.partial_assessments(json.dumps(corrupted), request, [SOURCE])
+    assert checked == []
+    assert request["units"][0]["id"] in invalid
+
+
+@pytest.mark.parametrize("identity", [None, 7, [], {}])
+def test_compact_evidence_requires_an_explicit_string_identity(identity):
+    request = sr.packet(sr.units(DOCUMENT, [SOURCE]), [SOURCE])
+    response = json.loads(compact_assessment(request))
+    response["assessments"][0]["evidence"][0]["passage_id"] = identity
+    with pytest.raises(ValueError, match="source anchor"):
+        validation.validate_assessments(json.dumps(response), request, [SOURCE])
