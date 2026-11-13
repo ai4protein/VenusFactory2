@@ -24,9 +24,13 @@ def bounded_setting(name, default, maximum):
     except ValueError: return default
 
 
-def candidates(context, *, root=ROOT):
+def candidates(context, *, root=None):
     """No immunogenicity or substrate-dependent kinetics inferred from sequence alone."""
-    cfg = json.loads((root / 'src/constant.json').read_text())['web_ui']
+    from src.ckpt_hub import ckpt_root
+
+    source_root = ROOT if root is None else Path(root)
+    weights_root = ckpt_root() if root is None else source_root / 'ckpt'
+    cfg = json.loads((source_root / 'src/constant.json').read_text())['web_ui']
     entry = context.get('entry') or {}
     enzyme = any(c.get('commentType') == 'CATALYTIC ACTIVITY' for c in entry.get('comments', []))
     tasks = GENERAL | (ENZYME if enzyme else set())
@@ -41,7 +45,7 @@ def candidates(context, *, root=ROOT):
             for dataset in datasets:
                 for model, key in cfg[models].items():
                     if tool == 'predict_residue_function' and key != 'esm2': continue
-                    adapter = root / 'ckpt' / dataset / cfg['model_adapter_mapping_function'][key]
+                    adapter = weights_root / dataset / cfg['model_adapter_mapping_function'][key]
                     # Missing weights do not trigger large automatic downloads from a report.
                     if not (adapter / 'lr5e-4_bt12k_ga8.pt').is_file() or not (adapter / 'lr5e-4_bt12k_ga8.json').is_file(): continue
                     identity = hashlib.sha256(f'{tool}:{task}:{dataset}:{model}'.encode()).hexdigest()[:16]
