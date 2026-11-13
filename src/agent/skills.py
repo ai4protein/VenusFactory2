@@ -12,7 +12,7 @@ registered as ``sas_<dirname>`` so the full upstream library stays addressable.
 from __future__ import annotations
 
 import functools
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, List, Optional, Tuple
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +28,7 @@ if _research_resources is not None:
 _SKILLS_DIR = _VF_SKILLS_DIR
 
 _SAS_PREFIX = "sas_"
+_MAX_SKILL_BYTES = 1024 * 1024
 
 # Agent Skills top-level frontmatter keys (closed set). VF2 extras go under metadata.
 _ALLOWED_TOP_LEVEL = {
@@ -159,7 +160,9 @@ def _skill_id_to_root() -> Dict[str, Path]:
         for path in sorted(root.iterdir()):
             if not path.is_dir() or path.name.startswith("_"):
                 continue
-            if not (path / "SKILL.md").is_file():
+            package = path.resolve()
+            if (not package.is_relative_to(root) or package == root
+                    or _contained_file(package, package / "SKILL.md") is None):
                 continue
             dirname = path.name
             if source == "venusfactory":
@@ -171,60 +174,87 @@ def _skill_id_to_root() -> Dict[str, Path]:
             # Never overwrite a VF2 (or earlier) claim.
             if skill_id in mapping:
                 continue
-            mapping[skill_id] = path.resolve()
+            mapping[skill_id] = package
             claimed.add(dirname)
             claimed.add(skill_id)
     return mapping
 
 
-def resolve_skill_path(skill_id: str, relative_path: Optional[str] = None) -> Optional[Path]:
-    """Resolve a path inside a skill package (or whitelisted shared roots).
+def _contained_file(root: Path, path: Path) -> Path | None:
+    try:
+        resolved = path.resolve(strict=True)
+        return resolved if resolved.is_relative_to(root) and resolved.is_file() else None
+    except (OSError, RuntimeError, ValueError):
+        return None
 
-    Blocks arbitrary ``..`` traversal. Allows ``../_shared/...`` and
-    ``_shared_nature/...`` only when they resolve under VF2 ``skills/_shared_nature/``.
-    """
-    if not skill_id or skill_id.startswith("_") or "/" in skill_id or "\\" in skill_id:
+
+def _package_root(skill_id: str) -> Path | None:
+    if not isinstance(skill_id, str) or not skill_id or skill_id.startswith("_") or "/" in skill_id or "\\" in skill_id:
         return None
     root = _skill_id_to_root().get(skill_id)
-    if root is None or not root.is_dir():
+    if root is None:
         return None
+    try:
+        # Cached paths must not acquire a new symlink target after discovery.
+        if root.resolve(strict=True) != root or not root.is_dir():
+            return None
+    except (OSError, RuntimeError):
+        return None
+    if not any(root != base and root.is_relative_to(base) for _, base in _skill_roots()):
+        return None
+    return root
 
+
+def resolve_skill_path(skill_id: str, relative_path: Optional[str] = None) -> Optional[Path]:
+    """Resolve only a package resource or an explicitly allowed shared fragment."""
+    root = _package_root(skill_id)
+    if root is None:
+        return None
     if relative_path is None or relative_path in ("", "SKILL.md"):
-        path = root / "SKILL.md"
-        return path if path.is_file() else None
-
-    rel_str = relative_path.replace("\\", "/").lstrip("./")
-    # Shared-nature whitelist only applies to VF2 packages.
+        return _contained_file(root, root / "SKILL.md")
+    if not isinstance(relative_path, str) or "\0" in relative_path:
+        return None
+    raw = relative_path.replace("\\", "/")
+    if Path(raw).is_absolute() or PureWindowsPath(raw).drive:
+        return None
+    while raw.startswith("./"):
+        raw = raw[2:]
     vf_root = _VF_SKILLS_DIR.resolve()
     if root.parent == vf_root:
-        for prefix, mapped in _SHARED_PATH_ALIASES:
-            if rel_str.startswith(prefix) or relative_path.replace("\\", "/").startswith(prefix):
-                raw = relative_path.replace("\\", "/")
-                for pfx, _ in _SHARED_PATH_ALIASES:
-                    if raw.startswith(pfx):
-                        raw = mapped + raw[len(pfx):]
-                        break
-                shared = (vf_root / raw).resolve()
-                shared_root = (vf_root / "_shared_nature").resolve()
-                if str(shared).startswith(str(shared_root)) and shared.is_file():
-                    return shared
+        for prefix, _ in _SHARED_PATH_ALIASES:
+            if not raw.startswith(prefix):
+                continue
+            suffix = Path(raw[len(prefix):])
+            if suffix.is_absolute() or ".." in suffix.parts:
                 return None
+            shared_root = (vf_root / "_shared_nature").resolve()
+            if shared_root == vf_root or not shared_root.is_relative_to(vf_root):
+                return None
+            return _contained_file(shared_root, shared_root / suffix)
+    relative = Path(raw)
+    if relative.is_absolute() or ".." in relative.parts:
+        return None
+    return _contained_file(root, root / relative)
 
-    rel = Path(rel_str)
-    if rel.is_absolute() or ".." in rel.parts:
-        return None
-    path = (root / rel).resolve()
-    if not path.is_relative_to(root):
-        return None
-    return path if path.is_file() else None
+
+def _read_skill_file(path: Path) -> str | None:
+    # Anchor the actual read to a configured root. A package/resource swapped
+    # for a symlink after resolution is rejected by openat(O_NOFOLLOW), not read.
+    from utils.scoped_files import read_bytes
+
+    for _, root in _skill_roots():
+        if path.is_relative_to(root):
+            try:
+                return read_bytes(root, path.relative_to(root).as_posix(), max_bytes=_MAX_SKILL_BYTES).decode("utf-8")
+            except (OSError, ValueError, RuntimeError, UnicodeError):
+                return None
+    return None
 
 
 def get_skill_root(skill_id: str) -> Optional[str]:
-    """Return absolute skill package root for MLS file loading."""
-    if not skill_id or skill_id.startswith("_"):
-        return None
-    root = _skill_id_to_root().get(skill_id)
-    if root is not None and root.is_dir() and (root / "SKILL.md").is_file():
+    """Return the authorized package root for host-side resource loading only."""
+    root = _package_root(skill_id)
+    if root is not None and _contained_file(root, root / "SKILL.md") is not None:
         return str(root)
     return None
 
@@ -253,9 +283,9 @@ def get_skills_metadata() -> List[Dict[str, Any]]:
 
     for skill_id, pkg in sorted(id_map.items(), key=lambda kv: kv[0]):
         skill_md = pkg / "SKILL.md"
-        try:
-            raw = skill_md.read_text(encoding="utf-8")
-        except Exception:
+        path = resolve_skill_path(skill_id)
+        raw = _read_skill_file(path) if path is not None else None
+        if raw is None:
             continue
         meta = _parse_frontmatter(raw)
         nested = meta.get("metadata") if isinstance(meta.get("metadata"), dict) else {}
@@ -345,10 +375,7 @@ def get_skill_content(skill_id: str, relative_path: Optional[str] = None) -> Opt
     path = resolve_skill_path(skill_id, relative_path)
     if path is None:
         return None
-    try:
-        return path.read_text(encoding="utf-8")
-    except Exception:
-        return None
+    return _read_skill_file(path)
 
 
 def list_skill_ids() -> List[str]:
@@ -361,37 +388,30 @@ def build_read_skill_response(
     relative_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Shared JSON envelope for Expert (LangChain) and Agent (MCP) read_skill."""
-    available = list_skill_ids()
-    if not skill_id or skill_id not in available:
-        # Keep error payload smaller when hundreds of ids exist.
-        preview = available[:40]
-        more = len(available) - len(preview)
-        avail_msg = preview + ([f"...(+{more} more)"] if more > 0 else [])
+    root = _package_root(skill_id)
+    if root is None:
         return {
             "success": False,
-            "error": f"Unknown skill_id. Available (sample): {avail_msg}",
-            "available_ids": available,
+            "error": "Unknown or unavailable skill_id.",
+            "next_step": "Search list_skills(query=task, limit=10), then read the selected skill_id.",
         }
     content = get_skill_content(skill_id, relative_path)
     rel = relative_path or "SKILL.md"
     if content is None:
         return {
             "success": False,
-            "error": f"Could not read skill file: {skill_id}/{rel}",
+            "error": "Could not read the requested skill resource.",
             "skill_id": skill_id,
-            "skill_root": get_skill_root(skill_id),
             "relative_path": rel,
-            "available_ids": available,
+            "next_step": "Use a relative resource path from the selected guide, or search list_skills.",
         }
-    meta = next((m for m in get_skills_metadata() if m["skill_id"] == skill_id), {})
+    sas = _scientific_skills_dir()
     return {
         "success": True,
         "skill_id": skill_id,
-        "skill_root": get_skill_root(skill_id),
         "relative_path": rel,
         "content": content,
-        "source": meta.get("source", "venusfactory"),
-        "available_ids": available,
+        "source": "scientific" if sas is not None and root.is_relative_to(sas) else "venusfactory",
     }
 
 

@@ -54,7 +54,7 @@ def test_read_skill_envelope_identical_across_adapters():
 
     assert expert == core
     assert agent == core
-    for key in ("success", "skill_id", "skill_root", "relative_path", "content", "available_ids"):
+    for key in ("success", "skill_id", "relative_path", "content", "source"):
         assert key in expert
 
     unknown_core = build_read_skill_response("not_a_real_skill_xyz")
@@ -62,7 +62,7 @@ def test_read_skill_envelope_identical_across_adapters():
     unknown_agent = json.loads(mcp_read_skill("not_a_real_skill_xyz"))
     assert unknown_expert == unknown_core == unknown_agent
     assert unknown_core["success"] is False
-    assert "available_ids" in unknown_core
+    assert "available_ids" not in unknown_core and "list_skills" in unknown_core["next_step"]
 
     listed = json.loads(mcp_list_skills())
     assert listed == build_list_skills_response()

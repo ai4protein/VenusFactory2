@@ -17,7 +17,6 @@ except ImportError:
         return {
             "success": False,
             "error": "Skills middleware unavailable",
-            "available_ids": [],
         }
 
 
@@ -45,7 +44,7 @@ def read_skill_tool(skill_id: str, relative_path: Optional[str] = None) -> str:
     skill_id must match Available skills. Upstream collisions use sas_<id>.
     For progressive disclosure (nature_figure / nature_writing / nature_polishing, or thick database skills),
     call again with relative_path to load manifest.yaml, static/, or references/ files.
-    Returns JSON: success, skill_id, skill_root, relative_path, content, available_ids.
+    Returns JSON: success, skill_id, relative_path, content, source. Use list_skills for discovery.
     """
     return json.dumps(
         build_read_skill_response(skill_id, relative_path),

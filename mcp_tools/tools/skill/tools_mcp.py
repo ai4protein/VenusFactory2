@@ -28,7 +28,7 @@ def mcp_read_skill(skill_id: str, relative_path: Optional[str] = None) -> str:
     ``manifest.yaml``, ``references/legacy_guide.md``, or
     ``_shared_nature/core/ethics.md``.
 
-    Returns JSON: success, skill_id, skill_root, relative_path, content, available_ids.
+    Returns JSON: success, skill_id, relative_path, content, source. Use list_skills for discovery.
     """
     return json.dumps(
         build_read_skill_response(skill_id, relative_path),

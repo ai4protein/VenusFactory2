@@ -73,7 +73,7 @@ def test_read_skill_tool_json():
     raw = read_skill_tool.invoke({"skill_id": "nature_figure", "relative_path": "manifest.yaml"})
     data = json.loads(raw)
     assert data["success"] is True
-    assert data["skill_root"]
+    assert "skill_root" not in data and "available_ids" not in data
     assert data["relative_path"] == "manifest.yaml"
 
 

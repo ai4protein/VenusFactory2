@@ -14,7 +14,7 @@ metadata:
 
 - `skill_id` for `read_skill` is **`nature_figure`** (directory name).
 - Load fragments with `read_skill(skill_id="nature_figure", relative_path="manifest.yaml")` then the paths listed under `always_load` / backend maps (e.g. `static/core/contract.md`).
-- Response includes `skill_root` for debugging; prefer `relative_path` over inventing absolute paths.
+- Load referenced resources with the same `skill_id` and a `relative_path`; use `list_skills` to discover another guide.
 - Exploratory (non-publication) plots may use `matplotlib` / `seaborn` skills instead.
 
 This skill is split into two layers:
