@@ -133,7 +133,7 @@ async def test_native_harness_uses_scoped_card_but_queues_the_original_tool(publ
     import httpx
 
     from agent.harness import web_native_worker as worker
-    from agent.harness.contracts import Budget, ModelBinding, Profile
+    from agent.harness.contracts import Budget, ModelBinding, Profile, digest
     from mcp_tools.scheduler import catalog as scheduler
     from mcp_tools.scheduler import client as queue_client
     _, _, verified, entry, seen = published
@@ -144,8 +144,10 @@ async def test_native_harness_uses_scoped_card_but_queues_the_original_tool(publ
         queued.append((tool_name, arguments, host))
         return service.dispatch("predict", **arguments, session_id=host["session_id"])
     monkeypatch.setattr(queue_client,"invoke",invoke)
-    workspace=tmp_path/"work";workspace.mkdir()
-    control=tmp_path/"control";control.mkdir()
+    workspace=tmp_path/"work"
+    workspace.mkdir()
+    control=tmp_path/"control"
+    control.mkdir()
     async def adapter(ctx):
         connection=json.loads((ctx.task.capability/"connection.json").read_text())
         async with httpx.AsyncClient(trust_env=False) as client:
@@ -163,6 +165,9 @@ async def test_native_harness_uses_scoped_card_but_queues_the_original_tool(publ
             assert "input contract" in rejected and not queued
             result=await call("call_tool",{"name":name,"arguments":{"inputs":[{"id":"x","sequence":"AA"}]}})
             assert result["success"] and result["predictions"][0]["prediction"]==0.25
+            assert result["scope"] == verified["key"]["scope"]
+            assert "sequence length: 2" in result["applicability_summary"]
+            assert result["receipt"]["scope_sha256"] == digest(result["scope"])
             return {"status":"completed","text":"Prediction: 0.25."}
     monkeypatch.setattr(worker,"builtin_registry",lambda:SimpleNamespace(resolve=lambda *args:(SimpleNamespace(run=adapter),None)))
     profile=Profile("science_agent",harness,ModelBinding("fixture","model","http://127.0.0.1:1/v1"),Budget(tool_calls=8))

@@ -421,6 +421,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                         from mcp_tools.models.evolved.result_delivery import deliver_prediction
                         card = deliver_prediction(workspace, value, args, session_id=request.get("session_id"))
                         value = json.loads(value) if isinstance(value, str) else dict(value)
+                        value["applicability_summary"] = card["applicability_summary"]
                         value["result_files"] = card["files"]
                         if card.get("file_error"):
                             value["file_export_error"] = "Prediction completed, but result files could not be saved."
