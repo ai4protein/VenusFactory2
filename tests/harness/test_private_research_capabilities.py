@@ -457,3 +457,45 @@ async def verify_native_private_reuse(state, goal, identity, monkeypatch):
         tool == "run_generated_capability" and args == {"capability_id": identity, "inputs": {"x": "3"}}
         for tool, args, host in queued
     )
+
+
+@pytest.mark.parametrize("tool_name", [
+    "search_generated_capabilities", "describe_generated_capability", "run_generated_capability",
+])
+def test_cached_catalog_rechecks_current_guard_after_initial_import(private_environment, monkeypatch, tool_name):
+    import importlib.util
+
+    from mcp_tools.tools import runtime_tool_policy
+    from mcp_tools.tools.discovery import scoped
+    from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
+
+    state = private_environment
+    lease(state, monkeypatch, "owner-a", "agent-a")
+    mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
+    # Reproduce a first import while an embedding host temporarily supplies a
+    # guard. Restoring the authoritative guard must also affect this adapter.
+    spec = importlib.util.spec_from_file_location(
+        "mcp_tools.tools.discovery._scoped_guard_fixture", scoped.__file__,
+    )
+    module = importlib.util.module_from_spec(spec)
+    with monkeypatch.context() as startup:
+        startup.setattr(runtime_tool_policy, "assert_tool_allowed", lambda name: None)
+        spec.loader.exec_module(module)
+        adapter = module.ScopedScientistCatalog(mapping, lambda tool: True)
+    assert adapter.generated_page("", 3, 0)["total"] == 1
+
+    name = adapter.prefix + "a" * 64
+    adapter.bindings[name] = {"type": "object"}  # An old binding cannot override revocation.
+    monkeypatch.setattr(adapter.legacy, "search", lambda *args: None)
+    revision = state.switches.set("tool:" + tool_name, False, 0, {}, "test")
+    assert not adapter.generated_available()
+    assert adapter.generated_page("", 3, 0) is None
+    assert adapter.search("", 3, 0) is None
+    with pytest.raises(ValueError, match="unavailable"):
+        adapter.describe(name)
+    with pytest.raises(ValueError, match="enabled model"):
+        adapter.resolve(name, {"inputs": {}})
+
+    state.switches.set("tool:" + tool_name, True, revision, {}, "test")
+    assert adapter.generated_available()
+    assert adapter.generated_page("", 3, 0)["total"] == 1

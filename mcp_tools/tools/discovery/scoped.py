@@ -6,7 +6,7 @@ import re
 from copy import deepcopy
 
 from mcp_tools.models.evolved.discovery import ScopedModelCatalog
-from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
+from mcp_tools.tools import runtime_tool_policy
 
 from .matching import query_groups, relevance
 
@@ -33,7 +33,9 @@ class ScopedScientistCatalog:
             for name in self.required_tools:
                 if name not in self.tools or not self.allowed(self.tools[name][1]):
                     return False
-                assert_tool_allowed(name)
+                # Resolve the current guard on every request; never retain a
+                # temporary startup/test policy function in a cached catalog.
+                runtime_tool_policy.assert_tool_allowed(name)
         except (ValueError, RuntimeError):
             return False
         return True
