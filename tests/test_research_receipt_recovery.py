@@ -1,5 +1,4 @@
 """Owned real-SQLite receipt replay; protocol doubles never train or infer biology."""
-
 import copy
 import hashlib
 import json
@@ -14,6 +13,7 @@ from backend.web_v2.research_recovery import invalidate_chapter, recover_evidenc
 from mcp_tools.scheduler import client
 from mcp_tools.scheduler import jobs as scheduler
 from mcp_tools.scheduler.receipt_binding import value_digest
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 
 
 @pytest.fixture
@@ -423,6 +423,9 @@ async def test_resume_rewrites_and_reaudits_only_chapter_with_new_topic_evidence
         "evidence_review_required": VERSION,
         "tool_receipts": {"chapter:biophysics_production:literature": link},
     }
+    from backend.web_v2.research_review_binding import bind_payload
+    reviewer = bind_payload({"model_id": "fixture"})["reviewer_binding"]
+    checkpoint["reviewer_binding"] = reviewer
     cached = {}
     for identity, title, *_ in lf.CHAPTERS:
         chapter = {
@@ -441,14 +444,18 @@ async def test_resume_rewrites_and_reaudits_only_chapter_with_new_topic_evidence
                 "unit_id": unit["id"],
                 "document_id": identity,
                 "input_sha256": unit["input_sha256"],
+                "reviewer_binding_sha256": reviewer["sha256"],
                 "passed": True,
             }
-        chapter["source_review"] = document_receipt(doc, [source], cached)
+        chapter["reviewer_binding_sha256"] = reviewer["sha256"]
+        chapter["source_review"] = document_receipt(doc, [source], cached, reviewer["sha256"])
         if identity == "biophysics_production":
             chapter.update(literature_query=query, retrieval=[{"tool": "literature", "status": "unavailable"}])
         checkpoint["chapters"].append(chapter)
     checkpoint["source_review"] = {
         "policy": VERSION,
+        "reviewer_binding_sha256": reviewer["sha256"],
+        "reviewer_binding": reviewer,
         "units": cached,
         "attempts": [],
         "documents": {c["id"]: c["source_review"] for c in checkpoint["chapters"]},
@@ -463,7 +470,7 @@ async def test_resume_rewrites_and_reaudits_only_chapter_with_new_topic_evidence
     writes = []
 
     @with_source_review
-    async def writer(model, messages, tokens):
+    async def writer(model, messages, tokens, **_review_metadata):
         if "assigned chapter" in messages[0]["content"]:
             writes.append(json.loads(messages[1]["content"])["chapter"])
             return "Measured evidence " * 260 + " [S1] [S2]", False

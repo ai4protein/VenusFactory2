@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 from research_source_review_fixture import with_source_review
 import copy
 import json
@@ -27,7 +28,7 @@ async def test_retry_writes_only_unfinished_chapters_and_preserves_call_accounti
     async def forbidden_collection(*args, **kwargs):
         raise AssertionError("Completed collection repeated")
     @with_source_review
-    async def complete(model, messages, tokens):
+    async def complete(model, messages, tokens, **_review_metadata):
         calls.append(messages)
         return "Measured evidence " * 260 + "[S1]", False
     monkeypatch.setattr(lf.research, "run_research", forbidden_collection)

@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 from research_source_review_fixture import with_source_review
 """Citation-format compatibility must not invent sources or validate code samples."""
 import pytest
@@ -44,7 +45,7 @@ async def test_actual_writer_pipeline_normalizes_only_declared_sources():
         update(state)
         return state
     @with_source_review
-    async def complete(model, messages, tokens):
+    async def complete(model, messages, tokens, **_review_metadata):
         calls.append(messages)
         return ("Observed protein evidence " * 160 + "(A study, S1).", False)
     with patch.object(lf.research, "run_research", side_effect=collect), patch.object(lf.research, "complete", side_effect=complete):

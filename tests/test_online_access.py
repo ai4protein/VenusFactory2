@@ -282,7 +282,7 @@ def test_real_mode_routes_share_admission_and_retries(tmp_path,store,monkeypatch
     client=TestClient(app)
     assert client.post('/api/chat/sessions/agent-one/messages/stream',json={'text':'Explain this protein'}).status_code==200
     assert client.post('/api/chat/sessions/science-one/science-goals',json={'request_id':'goal-12345','objective':'Analyze my protein','budget':online_access.SCIENCE_LIMITS}).status_code==200
-    report={'request_id':'report-12345','model_id':'free','accession':'P69905','analyses':['properties']}
+    report={'request_id':'report-12345','model_id':'free','reviewer_model_id':'dmx-glm4-free','accession':'P69905','analyses':['properties']}
     created=client.post('/api/report/jobs',json=report)
     assert created.status_code==202,created.text
     again=client.post('/api/report/generate',json=report)

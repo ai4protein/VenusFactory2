@@ -13,6 +13,7 @@ from backend.web_v2 import research_report as research
 from backend.web_v2.job_queue import JobQueue
 from backend.web_v2.research_dossier import build_dossier
 from backend.web_v2.research_jobs import ResearchJobs, write
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 from research_source_review_fixture import with_source_review
 
 PROSE = "The reference records the measured observation under the stated assay conditions. " * 40 + "[S1]"

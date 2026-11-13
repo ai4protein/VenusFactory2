@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 import io
 import json
 import tempfile
@@ -148,7 +149,7 @@ class PdbKeggTests(unittest.IsolatedAsyncioTestCase):
         async def collect(*args, **kwargs):
             return {'protein': {'name': 'ZAP70'}, 'sources': [source], 'steps': [], 'sections': [], 'partial': False}
         bundles = []
-        async def complete(model, messages, tokens):
+        async def complete(model, messages, tokens, **_review_metadata):
             bundle = json.loads(messages[1]['content']); bundles.append(bundle)
             return ('Measured evidence remains distinct from reference annotation. '*100 + '[S1]', False)
         with patch.object(report, 'run_research', side_effect=collect), patch.object(report, 'complete', side_effect=complete):

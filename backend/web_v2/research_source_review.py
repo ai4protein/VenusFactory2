@@ -10,6 +10,7 @@ from collections import deque
 import httpx
 
 from .research_evidence_passages import chunks, digest, selected_passages, source_digest
+from .research_review_binding import ReviewerBindingUnavailable
 from .research_source_validation import partial_assessments, validate_assessments
 
 VERSION = "source_review.v2.3"
@@ -133,20 +134,23 @@ def document_signature(document, sources):
                    "sources": source_scope(document["text"], sources)})
 
 
-def document_ready(document, sources, receipt):
+def document_ready(document, sources, receipt, reviewer_sha256=None):
     return bool(isinstance(receipt, dict) and receipt.get("policy") == VERSION
                 and receipt.get("status") == "completed" and receipt.get("units", 0) > 0
                 and receipt.get("passed") == receipt.get("units")
-                and receipt.get("input_sha256") == document_signature(document, sources))
+                and receipt.get("input_sha256") == document_signature(document, sources)
+                and (reviewer_sha256 is None or receipt.get("reviewer_binding_sha256") == reviewer_sha256))
 
 
-def document_receipt(document, sources, cached):
+def document_receipt(document, sources, cached, reviewer_sha256=None):
     expected = units(document, sources)
     current = [cached.get(row["id"], {}) for row in expected]
     current = [saved for saved, row in zip(current, expected)
-               if saved.get("input_sha256") == row["input_sha256"]]
+               if saved.get("input_sha256") == row["input_sha256"]
+               and (reviewer_sha256 is None or saved.get("reviewer_binding_sha256") == reviewer_sha256)]
     passed = sum(row.get("passed") is True for row in current)
     return {"policy": VERSION, "input_sha256": document_signature(document, sources),
+            **({"reviewer_binding_sha256": reviewer_sha256} if reviewer_sha256 is not None else {}),
             "status": "completed" if expected and passed == len(expected) else "partial",
             "units": len(expected), "assessed": len(current), "passed": passed,
             "unresolved": [row["unit_id"] for row in current if not row.get("passed")]}
@@ -172,21 +176,32 @@ def revision_input(state, document):
 
 async def review_documents(state, payload, documents, model_call, publish):
     """Audit fresh units only; all calls share the report's existing call budget."""
+    binding = state.get("reviewer_binding")
+    reviewer_sha = None
+    if binding is not None:
+        from .research_review_binding import align_review_state, binding_digest
+        reviewer_sha = binding_digest(binding)
+        align_review_state(state, binding)
+    reviewer_id = binding["route"]["option_id"] if binding else payload["model_id"]
     review = state.setdefault("source_review", {"policy": VERSION, "units": {}, "attempts": []})
     if review.get("policy") != VERSION:
         state.setdefault("source_review_history", []).append(review)
         review = state["source_review"] = {"policy": VERSION, "units": {}, "attempts": []}
+    if reviewer_sha is not None:
+        review.update(reviewer_binding_sha256=reviewer_sha, reviewer_binding=binding)
     sources = state.get("sources", [])
     cached = review["units"]
     required = [unit for document in documents for unit in units(document, sources)]
-    pending = [unit for unit in required
-               if cached.get(unit["id"], {}).get("input_sha256") != unit["input_sha256"]]
+    def current(unit):
+        row = cached.get(unit["id"], {})
+        return (row.get("input_sha256") == unit["input_sha256"]
+                and (reviewer_sha is None or row.get("reviewer_binding_sha256") == reviewer_sha))
+    pending = [unit for unit in required if not current(unit)]
     review.update(status="checking" if pending else "completed", pending=len(pending))
     def checkpoint():
-        receipts = {document["id"]: document_receipt(document, sources, cached) for document in documents}
+        receipts = {document["id"]: document_receipt(document, sources, cached, reviewer_sha) for document in documents}
         review.setdefault("documents", {}).update(receipts)
-        review["pending"] = sum(cached.get(unit["id"], {}).get("input_sha256") != unit["input_sha256"]
-                                for unit in required)
+        review["pending"] = sum(not current(unit) for unit in required)
         return receipts
 
     checkpoint()
@@ -197,7 +212,9 @@ async def review_documents(state, payload, documents, model_call, publish):
         if state.get("execution_blocker") or state.get("model_calls", 0) >= state["model_call_limit"]:
             break
         attempt = {"started": time.time(), "request": request, "status": "running",
-                   "model_id": payload["model_id"], "recovery_round": recovery_round}
+                   "model_id": reviewer_id, "role": "source_reviewer", "recovery_round": recovery_round}
+        if binding is not None:
+            attempt["reviewer_binding_sha256"] = reviewer_sha
         if parent_attempt is not None:
             attempt["parent_attempt"] = parent_attempt
         review["attempts"].append(attempt)
@@ -210,9 +227,15 @@ async def review_documents(state, payload, documents, model_call, publish):
         publish()
         recoverable = False
         try:
-            text, truncated = await model_call(payload["model_id"], [
+            call_options = {}
+            if binding is not None:
+                def observed(metadata, attempt=attempt):
+                    attempt.update(metadata)
+                    publish()  # Persist the actual usage event link before awaiting the provider.
+                call_options = {"review_binding": binding, "on_observation": observed}
+            text, truncated = await model_call(reviewer_id, [
                 {"role": "system", "content": SYSTEM},
-                {"role": "user", "content": json.dumps(request, ensure_ascii=False)}], 6000)
+                {"role": "user", "content": json.dumps(request, ensure_ascii=False)}], 6000, **call_options)
             attempt.update(response=text, truncated=bool(truncated))
             if truncated:
                 raise ValueError("Source review response was truncated")
@@ -226,6 +249,8 @@ async def review_documents(state, payload, documents, model_call, publish):
                 if not checked:
                     raise exc
             for row in checked:
+                if reviewer_sha is not None:
+                    row["reviewer_binding_sha256"] = reviewer_sha
                 cached[row["unit_id"]] = row
             attempt.update(status="partial" if invalid else "completed", accepted_units=len(checked))
             if invalid:
@@ -240,7 +265,7 @@ async def review_documents(state, payload, documents, model_call, publish):
         except Exception as exc:
             attempt.update(status="unavailable" if state.get("execution_blocker") else "invalid",
                            error=type(exc).__name__)
-            recoverable = isinstance(exc, (TimeoutError, httpx.TimeoutException, ValueError, KeyError, TypeError))
+            recoverable = not isinstance(exc, ReviewerBindingUnavailable) and isinstance(exc, (TimeoutError, httpx.TimeoutException, ValueError, KeyError, TypeError))
             if isinstance(exc, (ValueError, KeyError, TypeError)):
                 attempt["validation_error"] = str(exc)[:500]
         finally:
@@ -251,8 +276,7 @@ async def review_documents(state, payload, documents, model_call, publish):
             if state.get("execution_blocker") or not recoverable:
                 break
             if recovery_round < MAX_RECOVERY_ROUNDS:
-                selected = [unit for unit in request["units"]
-                            if cached.get(unit["id"], {}).get("input_sha256") != unit["input_sha256"]]
+                selected = [unit for unit in request["units"] if not current(unit)]
                 midpoint = max(1, len(selected) // 2)
                 # Leave independent packets ahead of recovery work. A difficult
                 # chapter must not prevent every other chapter from being checked.

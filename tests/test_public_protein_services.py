@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 import asyncio
 from contextlib import asynccontextmanager
 import json
@@ -114,7 +115,7 @@ class PublicProteinTests(unittest.IsolatedAsyncioTestCase):
             value={'protein':{'name':'Test'},'sources':[source],'remote_services':[row],'steps':[],'sections':[],'partial':False}
             update(value);return value
         calls=[]
-        async def complete(model,messages,tokens):
+        async def complete(model,messages,tokens, **_review_metadata):
             calls.append(messages)
             return ('protein evidence '*220+'[S1]',False)
         with patch.object(r,'run_research',side_effect=collect),patch.object(r,'complete',side_effect=complete):

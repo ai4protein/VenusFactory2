@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 from research_source_review_fixture import with_source_review
 import copy
 import hashlib

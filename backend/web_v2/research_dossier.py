@@ -54,6 +54,7 @@ def build_dossier(report, inputs=None, prediction_files=None):
                 data("drafts/editor/index.json", review_attempts)
             metadata = {k: report.get(k) for k in (
                 "id", "job_number", "title", "created", "protein", "focus", "model_id",
+                "reviewer_model_id", "reviewer_binding",
                 "status", "partial", "completed_chapters", "minimum_met", "analyses",
                 "model_calls", "model_call_limit", "queries", "literature_queries", "input_snapshot", "evidence_review_required")}
             metadata["steps"] = [
@@ -87,6 +88,8 @@ def build_dossier(report, inputs=None, prediction_files=None):
                 data("verification/claims.json", list(report["source_review"].get("units", {}).values()))
             if report.get("source_review_history"):
                 data("verification/previous-reviews.json", report["source_review_history"])
+            if report.get("review_source_review_history"):
+                data("verification/previous-editor-reviews.json", report["review_source_review_history"])
 
             references = []
             for i, source in enumerate(report.get("sources", []), 1):

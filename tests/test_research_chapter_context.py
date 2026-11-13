@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 import copy
 import json
 import pytest
@@ -70,7 +71,7 @@ async def test_all_specialists_get_bounded_citable_context_and_dossier_stays_com
                  "steps": [], "predictions": [], "partial": False}
         update(value)
         return value
-    async def complete(model, messages, tokens):
+    async def complete(model, messages, tokens, **_review_metadata):
         bundle = json.loads(messages[1]["content"])
         if "chapter" in bundle:
             calls.append(bundle)

@@ -6,7 +6,7 @@ from backend.web_v2.research_source_review import SYSTEM
 
 def with_source_review(writer):
     @functools.wraps(writer)
-    async def complete(model, messages, tokens):
+    async def complete(model, messages, tokens, **_review_metadata):
         if messages[0]["content"] != SYSTEM:
             return await writer(model, messages, tokens)
         request=json.loads(messages[1]["content"])

@@ -9,6 +9,7 @@ from backend.web_v2 import research_longform as longform
 from backend.web_v2 import research_report as research
 from backend.web_v2.research_dossier import build_dossier
 from mcp_tools.tools.database.rcsb import research_target
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 
 
 def reference():
@@ -55,7 +56,7 @@ async def test_specialists_use_reference_identity_without_replacing_construct(mo
         return [{"title": "Fixture reference study", "url": "https://europepmc.org/article/MED/123456",
                  "kind": "literature", "evidence_level": "abstract", "text": "Fixture reference annotation."}]
 
-    async def complete(model, messages, tokens):
+    async def complete(model, messages, tokens, **_review_metadata):
         bundle = json.loads(messages[1]["content"])
         if "chapter" in bundle:
             bundles.append(bundle)

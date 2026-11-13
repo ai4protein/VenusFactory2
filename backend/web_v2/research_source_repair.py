@@ -84,7 +84,7 @@ async def review_editor(state, payload, model_call, publish):
         publish()
         receipts = await review_documents(state, payload, [document], model_call, publish)
         state["review_source_review"] = receipts["editor"]
-        state["review_status"] = "completed" if document_ready(document, state["sources"], receipts["editor"]) else "partial"
+        state["review_status"] = "completed" if document_ready(document, state["sources"], receipts["editor"], (state.get("reviewer_binding") or {}).get("sha256")) else "partial"
         publish()
         if state["review_status"] == "completed" or not feedback(state, document):
             return

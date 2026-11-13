@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 from research_source_review_fixture import with_source_review
 import copy
 import hashlib
@@ -36,7 +37,7 @@ async def run(state, complete):
 async def test_uncited_editor_revised_once_and_original_kept_in_dossier():
     calls=[]
     @with_source_review
-    async def complete(model,messages,tokens):
+    async def complete(model,messages,tokens, **_review_metadata):
         calls.append(messages)
         bundle=json.loads(messages[1]["content"])
         assert bundle["evidence_excerpts"][0]["text"].startswith("An experimentally")
@@ -62,7 +63,7 @@ async def test_resume_repairs_existing_editor_without_rewriting_specialists():
     state=checkpoint();state.update(model_calls=14,review=prose(False),review_status="partial")
     chapters=copy.deepcopy(state["chapters"]);calls=[]
     @with_source_review
-    async def complete(model,messages,tokens):
+    async def complete(model,messages,tokens, **_review_metadata):
         calls.append(messages)
         assert len(messages)==3 and prose(False) in messages[-1]["content"]
         return prose(),False
@@ -114,7 +115,7 @@ async def test_changed_evidence_invalidates_completed_editor_cache():
     changed["sources"][0]["text"]="A corrected assay with a different measurement."
     calls=[]
     @with_source_review
-    async def revise(model,messages,tokens):
+    async def revise(model,messages,tokens, **_review_metadata):
         calls.append(messages)
         assert "corrected assay" in messages[1]["content"]
         return prose(),False

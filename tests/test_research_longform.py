@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 from research_source_review_fixture import with_source_review
 import asyncio
 from contextlib import asynccontextmanager
@@ -22,7 +23,7 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
         async def collect(payload, update, **kwargs):
             value = evidence(); update(value); return value
         @with_source_review
-        async def complete(model, messages, tokens):
+        async def complete(model, messages, tokens, **_review_metadata):
             nonlocal active, maximum
             active += 1; maximum = max(maximum, active)
             calls.append(messages)
@@ -44,7 +45,7 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
         async def collect(payload, update, **kwargs):
             value = evidence(); update(value); return value
         @with_source_review
-        async def complete(model, messages, tokens):
+        async def complete(model, messages, tokens, **_review_metadata):
             if any(spec[3] in messages[0]['content'] for spec in lf.CHAPTERS[:4]):
                 raise ValueError('Unavailable')
             return ('protein evidence ' * 230 + '[S1]', False)
@@ -87,7 +88,7 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
         async def collect(payload, update, **kwargs):
             value = evidence(); update(value); return value
         @with_source_review
-        async def complete(model, messages, tokens):
+        async def complete(model, messages, tokens, **_review_metadata):
             if len(messages) > 2:
                 raise ValueError('Temporary provider failure')
             return ('Retained first draft [S1]', True)

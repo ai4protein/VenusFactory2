@@ -383,12 +383,17 @@ def reference_entry(sources, accession):
     return {}
 
 
-async def complete(model_id, messages, output_tokens=3000):
+async def complete(model_id, messages, output_tokens=3000, *, review_binding=None, on_observation=None):
     from agent.harness.free_catalog import free_routes
     from agent.rsi.engine.model_access import authorize_model
     from agent.rsi.engine.openrouter_policy import is_openrouter, enforce_free_request, verify_free_response
     from backend.web_v2.job_queue import resource_slot
-    option, key = model_option(model_id)
+    effective_binding = None
+    if review_binding is not None:
+        from .research_review_binding import resolve_reviewer
+        option, key, effective_binding = resolve_reviewer(model_id, review_binding)
+    else:
+        option, key = model_option(model_id)
     b = option.binding
     ceiling = option.max_output_tokens or next(r['max_output_tokens'] for r in free_routes()[0] if (r['model'], r['base_url'], r['protocol']) == (b.model, b.base_url.rstrip('/'), b.protocol))
     output_tokens = min(output_tokens, ceiling)
@@ -406,6 +411,8 @@ async def complete(model_id, messages, output_tokens=3000):
     payload = adapt_request(payload, b.base_url, b.protocol)
     from backend.web_v2.usage_store import Observation
     with Observation('model', b.model, provider=urlsplit(b.base_url).hostname) as observation:
+        if on_observation is not None:
+            on_observation({'usage_event_id': observation.id, 'effective_binding': effective_binding})
         async with resource_slot('api:' + urlsplit(b.base_url).hostname, kind='research-report-model'):
             async with httpx.AsyncClient(timeout=120, follow_redirects=False) as client:
                 async with client.stream('POST', b.base_url.rstrip('/') + '/chat/completions', json=payload,

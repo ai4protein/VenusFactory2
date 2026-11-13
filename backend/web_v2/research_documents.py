@@ -60,7 +60,7 @@ def chapter_ready(chapter, sources=None):
         from .research_source_review import document_ready
         if sources is None or not chapter.get("id") or not chapter.get("title"):
             return False
-        return document_ready(chapter_document(chapter), sources, chapter.get("source_review"))
+        return document_ready(chapter_document(chapter), sources, chapter.get("source_review"), chapter.get("reviewer_binding_sha256"))
     return True
 
 
@@ -83,7 +83,10 @@ def refresh_review_progress(state):
         document = chapter_document(chapter)
         if receipt.get("input_sha256") != document_signature(document, sources):
             continue
-        status = ("completed" if document_ready(document, sources, receipt)
+        expected = chapter.get("reviewer_binding_sha256")
+        if expected is not None and receipt.get("reviewer_binding_sha256") != expected:
+            continue
+        status = ("completed" if document_ready(document, sources, receipt, expected)
                   else "reviewing" if review.get("status") == "checking" else "partial")
         changed |= chapter.get("source_review") != receipt or chapter.get("status") != status
         chapter.update(source_review=copy.deepcopy(receipt), status=status)
@@ -169,7 +172,7 @@ def review_ready(state, lang):
     if source_review_required(state):
         from .research_source_review import document_ready
         document = {"id": "editor", "title": "Integrated assessment", "text": state["review"]}
-        if (not document_ready(document, sources, state.get("review_source_review"))
+        if (not document_ready(document, sources, state.get("review_source_review"), (state.get("reviewer_binding") or {}).get("sha256"))
                 or state.get("review_chapters_sha256") != chapter_signature(state)):
             return False
     return not incomplete_review(audit, state.get("review_truncated", False), bool(sources))
@@ -212,6 +215,8 @@ def report_view(state, lang):
         for chapter in chapters:
             if value.get("evidence_review_required"):
                 chapter["evidence_review_required"] = value["evidence_review_required"]
+            if value.get("reviewer_binding"):
+                chapter["reviewer_binding_sha256"] = value["reviewer_binding"]["sha256"]
             accepted = chapter_ready(chapter, sources)
             completed += accepted
             if chapter.get("status") == "completed" and not accepted:

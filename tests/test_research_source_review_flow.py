@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 import asyncio
 import copy
 import hashlib
@@ -32,7 +33,7 @@ class FixtureModel:
     def __init__(self, bad_chapter=False, bad_editor=False, unavailable=False):
         self.calls=[];self.bad_chapter=bad_chapter;self.bad_editor=bad_editor;self.unavailable=unavailable
         self.writers=0;self.editors=0
-    async def __call__(self, model, messages, tokens):
+    async def __call__(self, model, messages, tokens, **_review_metadata):
         self.calls.append(messages);system=messages[0]["content"]
         if system==sr.SYSTEM:
             if self.unavailable:raise RuntimeError("fixture source-review interruption")
@@ -143,7 +144,7 @@ async def test_completed_chapters_are_checkpointed_before_later_review_is_cancel
             super().__init__()
             self.review_batches = 0
 
-        async def __call__(self, model, messages, tokens):
+        async def __call__(self, model, messages, tokens, **_review_metadata):
             if messages[0]["content"] == sr.SYSTEM:
                 self.review_batches += 1
                 if self.review_batches == 2:

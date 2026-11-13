@@ -56,6 +56,7 @@ class ResearchJobs:
         request_id = payload.pop("request_id", None) or uuid.uuid4().hex
         payload=dict(payload)
         payload.pop('material_sources',None)  # Only owner-checked server snapshots can supply evidence.
+        payload.pop('reviewer_binding', None)  # Never accept a caller-supplied route attestation.
         submitted = dict(payload)
         self.validate(payload)
         identity = hashlib.sha256((owner + ":" + request_id).encode()).hexdigest()[:32]
@@ -67,6 +68,8 @@ class ResearchJobs:
                 if old.get("submitted_payload", old["payload"]) != submitted:
                     raise ValueError("Request identity belongs to a different report")
                 return self.get(owner, identity)
+            from backend.web_v2.research_review_binding import bind_payload
+            payload = bind_payload(payload, new=True)
             from backend.web_v2.research_materials import sources
             payload['material_sources']=sources(self.root,owner,payload.get('material_ids',[]),identity)
             return self._start(owner, payload, identity, submitted, admit=admit)
@@ -161,6 +164,8 @@ class ResearchJobs:
         return {**state, 'resumable': resumable, 'stop_reason': reason, 'id': identity, 'title': row['title'], 'created': row['created'], 'status': status,
                 'job_number': self.records.register('report', identity, owner, 'research', row['title'], row['created'])['job_number'],
                 'queue': queue, 'model_id': row['payload']['model_id'], 'analyses': row['payload']['analyses'],
+                'reviewer_model_id': row['payload'].get('reviewer_model_id'),
+                'reviewer_binding': row['payload'].get('reviewer_binding'),
                 'focus': row['payload'].get('focus', ''),
                 'materials':[{k:r[k] for k in ('id','name','bytes','extraction','url')} for r in row['payload'].get('material_sources',[])]}
 
@@ -196,6 +201,8 @@ class ResearchJobs:
             if current['status'] in {'queued', 'running'}: return current
             if not current['resumable']: raise ValueError('This research cannot resume within its run budget')
             self.validate(dict(row['payload']))  # same free route and current online policy
+            from backend.web_v2.research_review_binding import bind_payload
+            row['payload'] = bind_payload(row['payload'])
             if admit: admit(identity)
             # Keep the exact previous state before a new writer changes drafts.
             previous = folder / 'state.json'

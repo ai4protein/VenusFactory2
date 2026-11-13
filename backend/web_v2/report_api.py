@@ -23,6 +23,7 @@ def owner(request: Request, response: Response):
 class ResearchRequest(BaseModel):
     request_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{8,80}$")
     model_id: str = Field(max_length=80)
+    reviewer_model_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
     protein: str = Field(default='', max_length=180)
     pdb_id: str = Field(default='', max_length=12)
     accession: str = Field(default='', max_length=20)

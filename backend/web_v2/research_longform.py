@@ -132,6 +132,8 @@ async def structure_evidence(entry):
 
 
 async def run_long_report(payload, update, *, service_cache=None, checkpoint=None, input_store=None):
+    from .research_review_binding import ReviewerBindingUnavailable, align_review_state, bind_payload
+    payload = bind_payload(payload, new=checkpoint is None and not payload.get('reviewer_binding'))
     lang = payload.get('lang', 'en')
     state = {'workflow': 'specialist_research_v2', 'phase': 'collecting', 'chapters': [], 'sources': [], 'steps': [], 'report': '',
              'model_calls': 0, 'model_call_limit': report_model_call_limit(), 'minimum_chapters': MINIMUM_CHAPTERS, 'partial': False}
@@ -145,6 +147,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         state['model_call_limit'] = report_model_call_limit(checkpoint)
         # Legacy checkpoints cannot distinguish collection and writer failures.
         state.setdefault('collection_partial', bool(state.get('partial')))
+    align_review_state(state, payload['reviewer_binding'])
     from .research_source_review import VERSION, review_documents
     state["evidence_review_required"] = VERSION
     for chapter in state["chapters"]:
@@ -172,10 +175,10 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         publish()
         try:
             return await research.complete(*args, **kwargs)
-        except ModelServiceUnavailable as exc:
+        except (ModelServiceUnavailable, ReviewerBindingUnavailable) as exc:
             service_error = exc
             state['execution_blocker'] = dict(exc.diagnostic)
-            state['stop_reason'] = 'model_service'
+            state['stop_reason'] = 'reviewer_configuration' if isinstance(exc, ReviewerBindingUnavailable) else 'model_service'
             publish()
             raise
     def collect_update(value):

@@ -1,3 +1,4 @@
+from research_reviewer_fixture import reviewer_catalog as _reviewer_catalog  # noqa: F401
 from research_source_review_fixture import with_source_review
 import io
 import json
@@ -51,7 +52,7 @@ async def test_materials_reach_specialists_and_cited_report_without_entering_web
         return {'sources':[source],'protein':{'name':'fixture'},'steps':[],'sections':[],'remote_services':[]}
     observed=[]
     @with_source_review
-    async def complete(model,messages,*args):
+    async def complete(model,messages,*args, **_review_metadata):
         bundle=json.loads(messages[-1]['content'])
         if 'chapter' in bundle:
             observed.append(bundle)
