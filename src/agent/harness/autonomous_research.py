@@ -530,9 +530,29 @@ class AutonomousResearch:
                     if self.executor_override:
                         await self.executor_override(followup,service,events)
                     else:
-                        from .research_handoff import native_phase
-                        with native_phase(policy,relay=relay,reserve_calls=REVIEW_RESERVE) as handoff:
-                            await run({**followup,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
+                        from .research_handoff import NativeTurnFailure, native_phase
+                        previous = next((e for e in reversed(events) if e.get('kind') == 'completed'), {})
+                        attempts = previous.get('scientific_tool_attempts', [])
+                        try:
+                            with native_phase(policy,relay=relay,reserve_calls=REVIEW_RESERVE) as handoff:
+                                await run({**followup,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
+                        except NativeTurnFailure as exc:
+                            if (not (previous.get('event_audit') or {}).get('passed')
+                                or not attempts or not exc.interruption
+                                or not exc.interruption.get('cleanup_complete')
+                                or profile.budget.model_calls-relay.calls < REVIEW_RESERVE
+                                or service.checkpoint is not None
+                                or any(e.get('kind') == 'interaction' for e in events)):
+                                raise
+                            # Both records originate in the host worker, not the
+                            # model's output. Retain the failed followup trace and
+                            # earlier attempts; neither is a successful checkpoint.
+                            interrupted_event = {**copy.deepcopy(exc.interruption),
+                                'failure_origin': 'execution_followup',
+                                'previous_execution_audit': copy.deepcopy(previous['event_audit']),
+                                'scientific_tool_attempts': copy.deepcopy(attempts)}
+                            write_json(retry_folder/'execution_failure_interruption.json', interrupted_event)
+                            event_sink(interrupted_event)
                 awaiting=next((e for e in events if e.get('kind')=='interaction'),None)
                 if awaiting:
                     from .interactions import Interaction
@@ -562,7 +582,8 @@ class AutonomousResearch:
                 context['execution']={'report':execution_report,'checkpoint':checkpoint,'receipts':service.receipts,'tool_results':[e for e in events if e.get('kind')=='tool_result'][-20:]}
                 if interrupted:
                     context['execution']['interruption']={key:copy.deepcopy(execution[key]) for key in
-                        ('reason','research_complete','event_audit','native_termination','native_error_type','scientific_tool_attempts') if key in execution}
+                        ('reason','research_complete','event_audit','native_termination','native_error_type','scientific_tool_attempts',
+                         'failure_origin','previous_execution_audit','cleanup_complete','native_error_code') if key in execution}
                 previews=[]
                 for row in (checkpoint or {}).get('artifacts',[]):
                     p=safe_file(workspace,row['path']);preview={'path':row['path'],'sha256':row['sha256']}

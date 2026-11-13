@@ -18,6 +18,7 @@ from .contracts import Profile, Task
 from .events import emit
 from .host import RuntimeContext
 from .registry import builtin_registry
+from .research_handoff import NativeTurnFailure
 from .session_boundary import (
     SECURITY_INSTRUCTIONS,
     UNSAFE_TOOLS,
@@ -554,6 +555,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
 
     pending = asyncio.create_task(adapter.run(ctx))
     interruption = None
+    deferred_failure = None
     try:
         while not pending.done():
             forward()
@@ -606,15 +608,32 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                             "native_termination": termination, "research_complete": False}
         else:
             result = None
+            native_result_failure = None
             try:
                 result = await pending
                 if result.get("status") != "completed":
+                    known_failure = (
+                        result.get("status") == "runtime_error" and result.get("error_type") in (None, "runtime_error")
+                    ) or (result.get("status") == "failed" and result.get("error_type") == "runtime_error")
+                    error_code = result.get("error_code")
+                    # Kimi also uses runtime_error for setup/authentication
+                    # failures. Unknown classifications and unclassified caught
+                    # exceptions remain failures, never partial-research evidence.
+                    known_failure = known_failure and (
+                        error_code == "provider_empty_response"
+                        or (error_code is None and not result.get("error"))
+                    )
+                    if checkpoint_handoff is not None and known_failure:
+                        native_result_failure = NativeTurnFailure()
+                        raise native_result_failure
                     raise RuntimeError(result.get("error_type") or result.get("status", "Native turn failed"))
                 text = result.get("final_text") or result.get("text") or result.get("final_message") or ""
                 if not text.strip():
                     raise ValueError("Empty native answer")
             except Exception as exc:
                 if checkpoint_handoff is None or not any(row['status'] != 'rejected' for row in scientific_attempts):
+                    if exc is native_result_failure:
+                        deferred_failure = exc
                     raise
                 native_status = diagnostic_code(result.get('status'), 'unknown') if isinstance(result, dict) else 'exception'
                 error_type = diagnostic_code(result.get('error_type'), type(exc).__name__) if isinstance(result, dict) else type(exc).__name__
@@ -637,7 +656,11 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                     {"role": "user", "content": request["text"]},
                     {"role": "assistant", "content": text},
                 ]
-                send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
+                completed = {"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit}
+                if checkpoint_handoff is not None:
+                    completed['scientific_tool_attempts'] = [dict(row) for row in scientific_attempts
+                        if row['status'] in {'completed', 'failed', 'cancelled'}]
+                send(completed)
     finally:
         async def shutdown():
             nonlocal closing
@@ -656,6 +679,27 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         from .session_sandbox import _settle
 
         await _settle(asyncio.create_task(shutdown()), propagate=True)
+        if deferred_failure is not None:
+            # A later native turn may fail after an earlier turn did real work.
+            # Preserve this failed phase only after cleanup, without declaring it
+            # completed or asserting that this phase made scientific attempts.
+            from .events import audit_trace
+
+            forward()
+            audit = audit_trace(trace, disclosure.names, transport_limit)
+            failure = {
+                'kind': 'research_interrupted', 'reason': 'native_execution_failed',
+                'research_complete': False, 'native_status': result['status'],
+                'native_termination': result['status'] + ':runtime_error',
+                'native_error_type': 'runtime_error', 'native_exception_type': 'RuntimeError',
+                'tool_calls': executions, 'discovery_calls': lookups,
+                'checkpoint_calls': checkpoint_calls, 'event_audit': audit,
+                'cleanup_complete': True,
+            }
+            if result.get('error_code') is not None:
+                failure['native_error_code'] = result['error_code']
+            (control / 'native_failure.json').write_text(json.dumps(failure, ensure_ascii=False, indent=2))
+            deferred_failure.interruption = failure
     if interruption is not None:
         # Report partial evidence only after every admitted tool has stopped.
         # Missing/unpaired/failed traces remain evidence against completion.

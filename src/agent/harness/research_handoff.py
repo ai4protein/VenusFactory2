@@ -12,6 +12,14 @@ from .contracts import digest
 from .events import audit_trace
 
 
+class NativeTurnFailure(RuntimeError):
+    """Known native runtime termination; only the host may bind cleanup evidence."""
+
+    def __init__(self):
+        super().__init__("runtime_error")
+        self.interruption = None
+
+
 class ResearchHandoff:
     def __init__(self):
         self.checkpoint = None
