@@ -5,6 +5,7 @@ import json
 
 from .research_evidence import evidence_excerpt
 from .research_evidence_passages import selected_passages
+from .research_query_scope import query_result_scope
 
 MAX_CONTEXT_CHARS = 24000
 
@@ -59,6 +60,9 @@ def _source_metadata(source):
     limits = {"title": 256, "kind": 64, "evidence_level": 120, "year": 32,
               "sha256": 64, "sequence_sha256": 64, "query_tool": 80}
     row = {"id": source["id"]}
+    coverage = query_result_scope(source)
+    if coverage:
+        row["query_result_scope"] = coverage
     for key, maximum in limits.items():
         if key in source:
             value = source[key]

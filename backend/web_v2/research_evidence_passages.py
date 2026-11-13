@@ -5,6 +5,8 @@ import hashlib
 import json
 import re
 
+from .research_query_scope import query_result_scope
+
 MAX_PASSAGE = 1600
 STOP_WORDS = set((
     "the and for with that this from have has are was were which their into than "
@@ -124,6 +126,7 @@ def selected_passages(source, query, budget):
     return {**{key: source.get(key) for key in ("service", "query_tool", "query_arguments", "sequence_sha256")},
             "id":source["id"], "title":source.get("title"), "kind":source.get("kind"),
             "evidence_level":source.get("evidence_level"), "source_sha256":source_digest(source),
+            **({"query_result_scope": coverage} if (coverage := query_result_scope(source)) else {}),
             "passages":selected, "scope":"Selected excerpts; absence here is not evidence of absence."}
 
 
