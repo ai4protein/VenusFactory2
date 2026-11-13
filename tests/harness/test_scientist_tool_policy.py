@@ -1,6 +1,7 @@
 """New strategy reaches real request paths; all model responses are fixtures."""
 
 import json
+from json import dumps
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,7 +12,7 @@ from agent.harness import gateway as gateway_module
 from agent.harness import native_expert_team as team
 from agent.harness.host import execute, write_json
 from agent.harness.native_expert_audit import audit_native_expert
-from agent.harness.scientist_policy import load_policy, request_policy_witness, role_instruction
+from agent.harness.scientist_policy import load_policy, request_policy_witness
 
 
 @pytest.fixture(params=["expert-kimi-code", "expert-deepseek-harness", "expert-codex"])
@@ -91,11 +92,11 @@ async def strategy_completed(tmp_path, monkeypatch, request):
             expected_endpoint = "/responses" if profile.model.protocol == "responses" else "/chat/completions"
             assert url.endswith(expected_endpoint)
             instruction = json["instructions"] if "instructions" in json else json["messages"][0]["content"]
-            name = next(k for k in ("PI", "CB", "SC") if role_instruction(policy, k) == instruction)
+            name = next(k for k in ("PI", "CB", "SC") if team.role_system_instruction(policy, k) == instruction)
             content = (
                 '{"decision":"ready_for_host_validation","summary":"Observed evidence reviewed","issues":[]}'
                 if name == "SC"
-                else name + " bounded plan"
+                else dumps({"direction" if name == "PI" else "steps": ["Bounded proposal"], "constraints": [], "unknowns": []})
             )
             if profile.model.protocol == "responses":
                 return SimpleNamespace(

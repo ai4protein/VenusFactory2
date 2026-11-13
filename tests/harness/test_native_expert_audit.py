@@ -2,6 +2,7 @@
 
 import importlib
 import json
+from json import dumps
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,11 +50,23 @@ async def completed(
         # Historical tests must not relabel current-policy requests as old ones.
         from agent.harness import host
 
-        coordinator = importlib.import_module("agent.harness." + historical_revision + ".harness.native_expert_team")
+        if historical_revision == "pre_isolation_v4":
+            from types import ModuleType
+            fixture = Path(__file__).parent / "fixtures/native_expert_team_v4.py"
+            coordinator = ModuleType("agent.harness._v4_replay")
+            coordinator.__package__ = "agent.harness"
+            coordinator.__file__ = str(fixture)
+            exec(compile(fixture.read_text(), str(fixture), "exec"), coordinator.__dict__)
+        else:
+            coordinator = importlib.import_module("agent.harness." + historical_revision + ".harness.native_expert_team")
         source_root = Path(coordinator.__file__).parent
         original_hash = host.file_hash
 
         def recorded_source(path):
+            if historical_revision == "pre_isolation_v4" and path.parent == Path(host.__file__).parent:
+                from agent.harness.native_expert_audit import LEGACY_V4_SOURCES
+                if path.name in LEGACY_V4_SOURCES:
+                    return LEGACY_V4_SOURCES[path.name]
             candidate = source_root / path.name
             if path.parent == Path(host.__file__).parent and candidate.is_file():
                 return original_hash(candidate)
@@ -129,6 +142,13 @@ async def completed(
             pass
 
         async def post(self, url, *, headers, json):
+            if not historical_revision:
+                assert not {"conversation", "previous_response_id", "session_id"}.intersection(json)
+                if "messages" in json:
+                    assert [item["role"] for item in json["messages"]] == ["system", "user"]
+                else:
+                    assert [item["role"] for item in json["input"]] == ["user"]
+                    assert json["store"] is False
             relay.request(json)
             expected_endpoint = "/responses" if profile.model.protocol == "responses" else "/chat/completions"
             assert url.endswith(expected_endpoint)
@@ -139,6 +159,11 @@ async def completed(
                 if name == "SC"
                 else name + " bounded plan"
             )
+            if name != "SC" and not historical_revision:
+                content = dumps({
+                    "direction" if name == "PI" else "steps": ["Bounded proposal"],
+                    "constraints": [], "unknowns": [],
+                })
             if name == "SC":
                 if supplied_critic_outputs is not None:
                     assert supplied_critic_outputs, "No unbudgeted third critic response is available"
@@ -525,3 +550,62 @@ async def test_pre_claude_records_remain_readable_without_relaxing_verification(
     else:
         audited = audit_native_expert(task.output, task.workspace, task.capability, result=result)
         assert audited["passed"] and audited["roles"] == ["PI", "CB", "MLS", "SC"] and audited["model_calls"] == 4
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("historical_revision", ["pre_isolation_v4"], indirect=True)
+@pytest.mark.parametrize("attack", [None, "policy", "source", "artifact"])
+async def test_explicit_v4_replay_keeps_original_semantics(completed, attack):
+    from agent.harness.contracts import digest, file_hash
+    from agent.harness.native_expert_audit import LEGACY_V4_SOURCES
+    task, result = completed
+    assert file_hash(Path(__file__).parent / "fixtures/native_expert_team_v4.py") == LEGACY_V4_SOURCES["native_expert_team.py"]
+    assert result["status"] == "completed", result
+    assert result["coordination_policy"] == "four_roles_native_execution.v4"
+    if attack == "policy":
+        result["coordination_policy"] = team.POLICY
+    elif attack == "artifact":
+        write_json(task.workspace / "probe.json", {"length": 999})
+    elif attack == "source":
+        path = task.output / "profile.lock.json"
+        lock = json.loads(path.read_text())
+        lock["adapter_source"]["native_expert_audit.py"] = "0" * 64
+        lock["sha256"] = digest({k: v for k, v in lock.items() if k != "sha256"})
+        write_json(path, lock)
+        result["profile_sha256"] = lock["sha256"]
+    if attack:
+        with pytest.raises(ValueError):
+            audit_native_expert(task.output, task.workspace, task.capability, result=result)
+    else:
+        assert audit_native_expert(task.output, task.workspace, task.capability)["passed"]
+
+
+@pytest.mark.asyncio
+async def test_v5_contexts_and_sessions_are_independent(completed):
+    task, result = completed
+    assert result["status"] == "completed"
+    contexts = {role: json.loads((task.output / "roles" / role / "context.json").read_text())
+                for role in ["PI", "CB", "MLS", "SC"]}
+    assert "handoffs" not in contexts["PI"]
+    assert set(contexts["CB"]["handoffs"]) == {"PI"}
+    assert set(contexts["MLS"]["handoffs"]) == {"PI", "CB"}
+    critic = contexts["SC"]
+    assert "handoffs" not in critic and not any(k in critic for k in ["PI", "CB", "MLS"])
+    assert "text" not in critic["execution_evidence"]["native_result"]
+    assert critic["episode_review_contract"] == contexts["PI"]["episode_review_contract"]
+    sessions = [json.loads((task.output / "roles" / r / "request_binding.json").read_text())["session_id"]
+                for r in ["PI", "CB", "SC"]]
+    assert len(set(sessions)) == 3
+    assert (task.output / "roles/MLS/native_result.json").read_text().find("Measured length 10") >= 0
+
+
+@pytest.mark.asyncio
+async def test_v5_audit_rejects_reused_role_session(completed):
+    task, result = completed
+    pi = json.loads((task.output / "roles/PI/request_binding.json").read_text())
+    path = task.output / "roles/SC/request_binding.json"
+    sc = json.loads(path.read_text())
+    sc["session_id"] = pi["session_id"]
+    write_json(path, sc)
+    with pytest.raises(ValueError, match="Reused role session"):
+        audit_native_expert(task.output, task.workspace, task.capability)

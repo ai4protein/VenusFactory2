@@ -20,13 +20,18 @@ from .native_expert_team import (
     CRITIC_REPAIR_POLICY,
     NATIVE_EXPERT_HARNESSES,
     POLICY,
-    ROLE_INSTRUCTIONS,
+    LEGACY_ROLE_INSTRUCTIONS,
+    role_system_instruction,
     critic_decision,
     critic_repair_context,
     episode_review_contract,
 )
 from .scientist_policy import load_policy, policy_binding, role_instruction, verify_request_policy
+from .role_context import POLICY as CONTEXT_POLICY, build_role_context, planning_handoff
 
+
+LEGACY_V4_POLICY = "four_roles_native_execution.v4"
+LEGACY_V4_SOURCES = {'native_expert_team.py': '2db5e122c723eaf64dbb1e25ac0d354cc1035184cdaedc9bf599366737ae0a83', 'native_expert_audit.py': '487894548cc6937a306e3190126908ed46f2b015c6468f0453692efc5dc71e7c', 'events.py': '26b8db515e9640092686a898a7a794193bd10b2db53c81984a2e6a8188255c2a', 'contracts.py': 'a0f2929cbd0842ff14941c43b825721df61f1b5d2e072f299f4afbfdbf6ae920', 'responses_gateway.py': '9ec995b3065e9d3ca896cdd802b5f46393f00beb353c242d0970c81af3514966', 'codex_adapter.py': 'a22a3777697a78d76fdc77aa82ff0fac4123694d5367cce8a7af0f6e51913731'}
 
 def read(path):
     if path.is_symlink() or not path.is_file():
@@ -48,7 +53,7 @@ def require_equal(actual, expected, message):
         raise ValueError(message)
 
 
-def verify_role_exchange(profile, policy, strategy, name, folder, expected_context, request, response_sha256):
+def verify_role_exchange(profile, policy, strategy, name, folder, expected_context, request, response_sha256, *, legacy=False, sessions=None):
     context = read(folder / "context.json")
     require_equal(context, expected_context, "Role handoff or critic evidence differs")
     prompt = (
@@ -58,7 +63,7 @@ def verify_role_exchange(profile, policy, strategy, name, folder, expected_conte
     if CRITIC_REPAIR_FIELD in context:
         require_equal(name, "SC", "Repair assigned to another role")
         prompt += "\n\n" + CRITIC_REPAIR_INSTRUCTION
-    instruction = role_instruction(strategy, name) if strategy else ROLE_INSTRUCTIONS[name]
+    instruction = (role_instruction(strategy, name) if strategy else LEGACY_ROLE_INSTRUCTIONS[name]) if legacy else role_system_instruction(strategy, name)
     payload = {
         "model": profile.model.model,
         "messages": [{"role": "system", "content": instruction}, {"role": "user", "content": prompt}],
@@ -72,11 +77,18 @@ def verify_role_exchange(profile, policy, strategy, name, folder, expected_conte
             "stream": False,
             "store": False,
         }
-    require_equal(
-        read(folder / "request_binding.json"),
-        {"role": name, "payload_sha256": digest(payload), "tools": []},
-        "Role request binding changed",
-    )
+    binding = read(folder / "request_binding.json")
+    expected_binding = {"role": name, "payload_sha256": digest(payload), "tools": []}
+    if not legacy:
+        session_id = binding.get("session_id")
+        if not isinstance(session_id, str) or not session_id.startswith("role_") or len(session_id) != 37:
+            raise ValueError("Missing independent role session")
+        if sessions is not None:
+            if session_id in sessions:
+                raise ValueError("Reused role session")
+            sessions.add(session_id)
+        expected_binding.update(context_policy=CONTEXT_POLICY, session_id=session_id, fresh_session=True)
+    require_equal(binding, expected_binding, "Role request binding changed")
     _, expected = policy.apply(payload)
     if any(request.get(key) != value for key, value in expected.items()):
         raise ValueError("Role request differs from gateway evidence")
@@ -94,14 +106,29 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
     if profile.harness not in NATIVE_EXPERT_HARNESSES or profile.mode != "science_expert":
         raise ValueError("Native Scientist profile required")
     require_equal(lock["gateway_tool_exposure_mode"], "science_agent", "Native tool exposure changed")
-    # A historical audit must use the exact policy and event interpreter that ran.
+    # Only explicitly pinned v4 evidence uses the old handoff semantics. A new
+    # v5 run cannot fall back to v4 after failing isolation/source checks.
+    result = read(execution / "run.json") if result is None else result
     base = Path(__file__).parent
-    identity_files = ("native_expert_team.py", "events.py", "contracts.py")
-    if any(file_hash(base / name) != lock["adapter_source"].get(name) for name in identity_files):
-        from .historical_native_audit import historical_auditor
+    legacy = (
+        result.get("coordination_policy") == LEGACY_V4_POLICY
+        and lock.get("adapter_source", {}).get("native_expert_team.py") == LEGACY_V4_SOURCES["native_expert_team.py"]
+    )
+    if legacy:
+        for name, expected in LEGACY_V4_SOURCES.items():
+            if name in {"responses_gateway.py", "codex_adapter.py"} and profile.model.protocol != "responses":
+                continue
+            require_equal(lock["adapter_source"].get(name), expected, "Unrecognized pre-isolation source")
+        identity_files = ("events.py", "contracts.py")
+    else:
+        identity_files = ("native_expert_team.py", "events.py", "contracts.py", "role_context.py")
+        if any(file_hash(base / name) != lock["adapter_source"].get(name) for name in identity_files):
+            if result.get("coordination_policy") == POLICY:
+                raise ValueError("Isolated expert audit source incompatible")
+            from .historical_native_audit import historical_auditor
 
-        return historical_auditor(lock)(execution, workspace, capability, result=result)
-    for name in ("native_expert_team.py", "events.py", "contracts.py"):
+            return historical_auditor(lock)(execution, workspace, capability, result=result)
+    for name in identity_files:
         require_equal(file_hash(base / name), lock["adapter_source"][name], "Expert audit source incompatible")
     from agent.rsi.layout import source_relative
 
@@ -109,7 +136,7 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
         require_equal(
             file_hash(base.parents[2] / source_relative(Path(name).name)), lock["supporting_source"][name], "Expert audit source incompatible"
         )
-    if profile.model.protocol == "responses":
+    if profile.model.protocol == "responses" and not legacy:
         for name in ("responses_gateway.py", "codex_adapter.py", "native_expert_audit.py"):
             require_equal(file_hash(base / name), lock["adapter_source"][name], "Expert audit source incompatible")
     strategy = load_policy(capability)
@@ -127,7 +154,9 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
     elif "scientist_policy" in result:
         raise ValueError("Unbound Scientist strategy")
     require_equal(result["profile_sha256"], lock["sha256"], "Run profile differs")
-    require_equal(result["coordination_policy"], POLICY, "Expert coordination policy differs")
+    require_equal(result["coordination_policy"], LEGACY_V4_POLICY if legacy else POLICY, "Expert coordination policy differs")
+    if not legacy:
+        require_equal(result.get("context_policy"), CONTEXT_POLICY, "Role context policy differs")
     require_equal(result.get("critic_repair_policy"), CRITIC_REPAIR_POLICY, "Critic repair policy differs")
     require_equal(result["native_executor"], NATIVE_EXPERT_HARNESSES[profile.harness], "Native executor differs")
     if not result["four_role_path_completed"] or not result["finalizer_succeeded"] or not result["binding_intact"]:
@@ -209,19 +238,23 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
         "Native tool trace changed",
     )
     previews = []
-    for event in events:
+    for line_number, event in enumerate(events, 1):
         if event.get("kind") in {"tool_call_start", "tool_result"}:
             encoded = json.dumps(event, ensure_ascii=False)
-            previews.append(
-                {
+            item = {
                     "event_sha256": digest(event),
                     "characters": len(encoded),
                     "preview": encoded[:6000],
                     "truncated": len(encoded) > 6000,
                 }
-            )
+            if not legacy:
+                item["source"] = {
+                    "path": "roles/MLS/events.jsonl", "line": line_number,
+                    "sha256": file_hash(execution / "roles/MLS/events.jsonl"),
+                }
+            previews.append(item)
     execution_evidence = {
-        "native_result": {k: native.get(k) for k in ("status", "session_id", "tool_calls", "text")},
+        "native_result": {k: native.get(k) for k in (("status", "session_id", "tool_calls", "text") if legacy else ("status", "session_id", "tool_calls"))},
         "artifact": artifact,
         "tool_events": previews,
         "completion_feedback": None,
@@ -241,7 +274,12 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
     )
     if any(k in base_context for k in ("PI", "CB", "SC", "execution_evidence", CRITIC_REPAIR_FIELD)):
         raise ValueError("Initial context contains later-role evidence")
+    if not legacy:
+        require_equal(base_context.pop("role_context", None),
+                      {"policy": CONTEXT_POLICY, "role": "PI", "fresh_session": True},
+                      "Initial role isolation binding differs")
     answers, last = {}, 0
+    handoffs, sessions = {}, set()
     recorded_repair = None
     for role in history:
         if (
@@ -257,6 +295,15 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
             for call in range(role["calls_before"] + 1, role["calls_after"] + 1):
                 verify_request_policy(requests[call], strategy, name)
         if name == "MLS":
+            if not legacy:
+                require_equal(
+                    read(execution / "roles/MLS/context.json"),
+                    build_role_context("MLS", base_context, handoffs=handoffs),
+                    "Native executor handoff differs",
+                )
+                if native["session_id"] in sessions:
+                    raise ValueError("Native session reused a planning role session")
+                sessions.add(native["session_id"])
             require_equal(role["native_result_sha256"], digest(native), "Native result binding differs")
             require_equal(role["native_session_id"], native["session_id"], "Native session binding differs")
             require_equal(role["event_audit"], event_audit, "Native event audit differs")
@@ -267,9 +314,15 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
         if role["calls_after"] - role["calls_before"] != (2 if repair is not None else 1):
             raise ValueError("Unexpected role retries")
         folder = execution / "roles" / name
-        expected_context = {**base_context, **answers}
-        if name == "SC":
-            expected_context["execution_evidence"] = execution_evidence
+        if legacy:
+            expected_context = {**base_context, **answers}
+            if name == "SC":
+                expected_context["execution_evidence"] = execution_evidence
+        else:
+            expected_context = build_role_context(
+                name, base_context, handoffs=handoffs,
+                evidence=execution_evidence if name == "SC" else None,
+            )
         answer = verify_role_exchange(
             profile,
             policy,
@@ -279,6 +332,7 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
             expected_context,
             requests[role["calls_before"] + 1],
             role["response_sha256"],
+            legacy=legacy, sessions=sessions,
         )
         repair = role.get(CRITIC_REPAIR_FIELD)
         repair_paths = {path.name for path in folder.glob("repair_*")}
@@ -299,6 +353,7 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
                 critic_repair_context(expected_context, answer, error_type),
                 requests[last],
                 repair["response_sha256"],
+                legacy=legacy, sessions=sessions,
             )
             critic_decision(repaired)
             expected_repair = {
@@ -315,6 +370,9 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
             recorded_repair = repair
             answer = repaired
         answers[name] = answer
+        if not legacy and name in {"PI", "CB"}:
+            handoffs[name] = planning_handoff(name, answer)
+            require_equal(read(folder / "handoff.json"), handoffs[name], "Planning handoff differs")
     require_equal(last, calls, "Calls outside role intervals")
     require_equal(result.get(CRITIC_REPAIR_FIELD), recorded_repair, "Run critic repair summary differs")
     critic = critic_decision(answers["SC"])
