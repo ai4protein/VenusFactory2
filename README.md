@@ -111,6 +111,7 @@ hardware requirements, component selection and health checks, and the
 [service guide](docs/architecture/services.md) for online or multi-process deployment.
 
 For PBS clusters, see [online/local deployment](docs/deployment-pbs.md). The job supervises both services, keeps their data separate and cleans up its processes on exit.
+Submit GPU research separately with the [Scientist PBS runner](docs/scientist-model-development.md#submit-a-complete-scientist-goal-to-pbs).
 
 ### Online or local?
 
