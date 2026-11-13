@@ -351,12 +351,12 @@ def test_untrusted_extra_field_diagnostic_is_bounded_and_not_instruction_text():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("repair_succeeds", [True, False])
-async def test_exact_plan_error_reaches_one_bounded_repair(monkeypatch, tmp_path, repair_succeeds):
+async def test_nonempty_plan_question_reaches_one_bounded_repair(monkeypatch, tmp_path, repair_succeeds):
     original = httpx.AsyncClient
     policy = policy_for("chat_completions")
     spec = specification("CB", "chat_completions")
     body = body_for("CB")
-    body["steps"][0]["needs_input"] = []
+    body["steps"][0]["needs_input"] = ["Confirm the assay unit"]
     raw = json.dumps(body)
     relay = SimpleNamespace(base_url="http://fixture", token="fixture", calls=0, policy=policy)
     sent_requests = []

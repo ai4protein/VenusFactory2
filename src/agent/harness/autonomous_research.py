@@ -323,7 +323,14 @@ class AutonomousResearch:
             try:raw=await self.consult(role,current,profile,relay,folder)
             except RoleOutputError as exc:raw=exc.raw;problem=exc
             from .research_role_outputs import record_response
-            record_response(folder,role,attempt,raw)
+            original_receipt = record_response(folder,role,attempt,raw)
+            if role == 'CB' and isinstance(problem, RoleOutputError):
+                from .research_plan_format import record_adjustment, remove_empty_step_inputs
+                adjustment = remove_empty_step_inputs(raw, profile.model.protocol)
+                if adjustment is not None:
+                    record_adjustment(folder, original_receipt, adjustment)
+                    raw = adjustment['text']
+                    problem = None
             self.activity(folder,role,raw)
             if problem is None:
                 try:return validator(raw)

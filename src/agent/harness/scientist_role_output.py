@@ -175,10 +175,14 @@ def output_content(value, spec, model):
 
 
 class RoleOutputError(ValueError):
-    """A public role response can be repaired without weakening the contract."""
+    """Keep admitted text intact; oversized output is not a repairable response."""
+    MAX_CHARACTERS = 128000
+
     def __init__(self, message, raw):
+        if isinstance(raw, str) and len(raw) > self.MAX_CHARACTERS:
+            raise ValueError("Scientific role output exceeds 128000 characters")
         super().__init__(message)
-        self.raw = raw[:12000] if isinstance(raw,str) else ""
+        self.raw = raw if isinstance(raw, str) else ""
 
 def _schema_field_names(schema):
     """Names trusted by the output contract, including fields in nested objects."""
@@ -195,6 +199,8 @@ def _schema_field_names(schema):
 
 
 def validate_output(raw, spec):
+    if isinstance(raw, str) and len(raw) > RoleOutputError.MAX_CHARACTERS:
+        raise ValueError("Scientific role output exceeds 128000 characters")
     try:
         parsed = json.loads(raw, object_pairs_hook=_unique, parse_constant=_finite)
     except (ValueError, TypeError) as exc:
