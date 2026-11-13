@@ -47,7 +47,7 @@ def record(tmp_path, source_copy):
     value = {"source": {"root": str(source_copy)}, "settings": settings,
              "record_path": str(attempt / "submission.json"),
              "execution": {"python": sys.executable, "environment": {}, "extra_python_paths": []},
-             "resources": {"ncpus": 2, "memory_gb": 16},
+             "resources": {"ncpus": 2, "ngpus": 1, "memory_gb": 16},
              "tool_settings": freeze_settings(settings, attempt)}
     path = attempt / "submission.json"
     path.write_text(json.dumps(value))
@@ -113,6 +113,7 @@ def test_pbs_library_cannot_be_replaced_by_parent_environment_or_config(record, 
     foreign = tmp_path / "not-the-job-library"
     monkeypatch.setenv("VENUS_RESEARCH_CAPABILITY_ROOT", str(foreign))
     environment = _environment(path, value)
+    assert environment["VENUS_QUEUE_GPU_SLOTS"] == "1"
     assert environment["VENUS_RESEARCH_CAPABILITY_ROOT"] == str(path.parent / "runtime/research_capabilities")
     assert not foreign.exists()
     altered = copy.deepcopy(value)
@@ -146,3 +147,11 @@ else:
                   "VENUS_RESEARCH_CAPABILITY_ROOT": "relative-library"})
     assert result == {"rejected": True}
     assert tree_hashes(source_copy) == before
+
+
+def test_pbs_worker_environment_rejects_missing_gpu_allocation(record):
+    path, value = record
+    malformed = copy.deepcopy(value)
+    del malformed["resources"]["ngpus"]
+    with pytest.raises(KeyError, match="ngpus"):
+        _environment(path, malformed)

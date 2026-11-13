@@ -52,6 +52,7 @@ jobs:
           python -m pip install -c requirements/service-security.txt
           "pytest>=8,<10" "pytest-asyncio>=1" "httpx>=0.28.1"
           "aiohttp>=3.14.5" "python-dotenv>=1.1.1"
+          "pydantic>=2,<3" "langchain-core>=1.7.4" "jsonschema>=4.26,<5"
       - name: Verify native protocols, tool boundaries and usage
         env:
           PYTHONPATH: src
@@ -63,19 +64,77 @@ jobs:
           tests/harness/test_messages_bridge.py tests/harness/test_responses_gateway.py
           tests/harness/test_codex_adapter.py tests/harness/test_web_live_text.py
           tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
-          tests/harness/test_scientific_acceptance.py
-          tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py tests/harness/test_multilabel_evaluation.py tests/harness/test_multilabel_training.py tests/harness/test_multilabel_references.py
+          tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py
           tests/test_research_review_recovery.py tests/test_research_measurements.py
           tests/harness/test_research_algorithm_checks.py tests/harness/test_focused_repair.py tests/harness/test_outbound_strings.py
+          tests/harness/test_role_context.py tests/harness/test_web_research_role_context.py tests/harness/test_study_review_state.py
+          tests/harness/test_native_expert_team.py tests/harness/test_native_expert_audit.py
+          tests/harness/test_scientist_tool_policy.py
 
-      - name: Verify training-only input descriptions
-        env:
-          PYTHONPATH: src
-          PYTHON_DOTENV_DISABLED: '1'
+
+  cluster-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
+      PYTHON_DOTENV_DISABLED: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      WEBUI_V2_MODE: local
+      VENUS_SCIENTIST_ONLINE: '0'
+      VENUS_MODEL_CONFIG: model-config.yaml.example
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install and verify the CPU sandbox
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap apparmor-profiles apparmor-utils patchelf
+          sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          bwrap --unshare-all --die-with-parent --ro-bind / / -- /usr/bin/true
+          # setup-python's loader must also work at the sandbox's relocated prefix.
+          runtime_python=$(python -c 'import os,sys; print(os.path.realpath(sys.executable))')
+          sudo patchelf --set-rpath '$ORIGIN/../lib' "$runtime_python"
+      - name: Install offline cluster test dependencies
         run: >-
-          python -m pytest -q tests/harness/test_research_input_profile.py
-          -k 'not real_training'
-
+          python -m pip install -c requirements/service-security.txt
+          "pytest>=8,<10" "pytest-asyncio>=1" "python-dotenv>=1.1.1" "PyYAML>=6.0.2"
+          "httpx>=0.28.1" "aiohttp>=3.14.5" "fastapi>=0.162.0" "fastmcp>=3.4.11"
+          "uvicorn>=0.41.0" "psutil>=6" "jsonschema>=4.26,<5"
+          "numpy>=2,<3" "pandas>=2.2,<3" "biopython>=1.88" "langchain-core>=1.7.4"
+          "langgraph>=1.2.19" "huggingface_hub>=1.5.0" "biotite>=1.4.0"
+          "langchain-community>=0.4.1" "matplotlib>=3.10.3" "networkx>=3"
+          "fake-useragent>=2.1.0" "beautifulsoup4>=4.13.4" "zeep>=4.3.3"
+      - name: Test scheduler contracts and real local process boundaries
+        id: cluster-tests
+        # Scheduler/GPU fixtures are offline; only local CPU processes and bwrap run.
+        # Globs automatically admit new cluster/PBS regression modules.
+        run: >-
+          python -B -m pytest -q -p no:cacheprovider --junitxml=cluster-results.xml
+          tests/test_compute_pbs.py tests/test_compute_slurm.py
+          tests/test_cluster_*.py tests/test_pbs_*.py
+          tests/harness/test_cluster_*.py tests/harness/test_pbs_*.py
+          tests/test_job_queue.py tests/test_durable_tasks.py
+      - name: Require executed sandbox coverage without skipped tests
+        id: cluster-results
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("cluster-results.xml").getroot()
+          cases = root.findall(".//testcase")
+          assert cases, "Cluster suite did not produce test cases"
+          bad = [case.attrib for case in cases if any(case.find(tag) is not None for tag in ("skipped", "failure", "error"))]
+          assert not bad, f"Cluster tests did not execute successfully: {bad}"
+          required = "test_cpu_sandbox_still_executes_with_verified_cpu_parent"
+          assert any(case.get("name") == required for case in cases), "Real CPU sandbox test was not executed"
+          print(f"Cluster boundaries: {len(cases)} executed tests, including real CPU sandbox; no live scheduler validation claimed")
+          PY
 
   model-registry:
     runs-on: ubuntu-24.04
@@ -154,6 +213,9 @@ jobs:
           tests/harness/test_research_provided_splits.py tests/harness/test_research_dataset.py
           tests/harness/test_research_advanced_data.py tests/harness/test_research_data_store.py
           tests/harness/test_research_data_memory.py
+          tests/harness/test_scientific_acceptance.py
+          tests/harness/test_multilabel_evaluation.py tests/harness/test_multilabel_training.py tests/harness/test_multilabel_references.py
+          tests/harness/test_research_input_profile.py tests/harness/test_native_expert_responses.py tests/harness/test_research_projection_integration.py tests/harness/test_autonomous_research.py
           tests/harness/test_research_worker_recovery.py
           tests/harness/test_private_research_capabilities.py
           tests/harness/test_training_stagnation.py

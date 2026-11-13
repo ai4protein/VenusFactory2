@@ -98,3 +98,15 @@ scheduler's exit code. Failed attempts and partial results remain available.
 The adapters do not receive prompts or arbitrary shell scripts. They launch a
 fixed worker with host-selected paths. Existing task records remain readable;
 there is no second research queue or copied task state machine.
+## Continuous integration
+
+The `cluster-runtime` CI job runs PBS and Slurm adapter, goal-worker, queue and
+ownership regressions in a clean Python environment. Cluster/PBS test globs include
+new regression modules automatically. A real local CPU bubblewrap execution is
+required; skipped tests or a missing sandbox test fail the job.
+
+Scheduler responses and GPU allocations use offline fixtures. CI does not submit
+jobs to a live PBS/Slurm service or verify a site's GPU/cgroup configuration.
+Deployment-specific validation is still required. Harness CI separately exercises
+role-context isolation, native protocol auditing and Web Scientist handoffs without
+external model requests.

@@ -198,7 +198,10 @@ async def test_researcher_uses_shared_queue_owner_and_parent(monkeypatch):
     with patch('mcp_tools.tools.runtime_tool_policy.assert_tool_call_allowed') as gate, patch('mcp_tools.scheduler.client.invoke', new=AsyncMock(return_value=value)) as invoke:
         assert await knowledge_tool('query_europepmc', {'query': 'enzyme'}) == value
     gate.assert_called_once()
-    assert invoke.call_args.kwargs == {'owner': 'report:owner', 'parent_job': 'parent-report'}
+    invoke.assert_awaited_once_with(
+        'query_europepmc', {'query': 'enzyme'}, owner='report:owner',
+        parent_job='parent-report', on_status=None,
+    )
 
 
 @pytest.mark.asyncio
