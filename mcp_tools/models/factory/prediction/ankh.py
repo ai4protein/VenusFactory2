@@ -1,3 +1,4 @@
+import copy
 import sys
 import os
 from pathlib import Path
@@ -47,6 +48,7 @@ def load_model_and_tokenizer(args):
     """
     Loads the pre-trained PLM, tokenizer, and the trained AdapterModel.
     """
+    args._inference_checkpoint_config = {}
     print("---------- Loading Model and Tokenizer ----------")
     device = torch.device("cuda" if torch.cuda.is_available(
     ) else "mps" if torch.backends.mps.is_available() else "cpu")
@@ -65,6 +67,7 @@ def load_model_and_tokenizer(args):
             print(f"Loaded configuration from {config_path}")
             for key, value in config.items():
                 setattr(args, key, value)
+            args._inference_checkpoint_config = copy.deepcopy(config)
             args.structure_seq = ""
     except FileNotFoundError:
         print(

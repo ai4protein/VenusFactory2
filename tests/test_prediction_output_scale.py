@@ -74,9 +74,13 @@ def test_factory_response_marks_standardized_output_without_changing_csv(tmp_pat
     fasta = tmp_path / "query.fasta"
     fasta.write_text(">query\nMKTAYIAKQRQISFVK\n")
     path = tmp_path / "result.csv"
+    def load(args):
+        args._inference_checkpoint_config = dict(config or {})
+        return None, None, None, "cpu"
+
     module = SimpleNamespace(
         parse_fasta=lambda _: [("query", "MKTAYIAKQRQISFVK")],
-        load_model_and_tokenizer=lambda args: (None, None, None, "cpu"),
+        load_model_and_tokenizer=load,
         predict=lambda *args: {"prediction": -0.9709106683731079},
     )
     monkeypatch.setattr(
@@ -159,9 +163,13 @@ async def test_residue_tool_response_reaches_researcher_without_changing_config_
     scale = checkpoint_output_scale(adapter)
     sequence = "MKTAYIAKQRQISFVK"
     predicted = {"predicted_class": [1] * len(sequence), "probabilities": [[0.2, 0.8]] * len(sequence)}
+    def load(args):
+        args._inference_checkpoint_config = dict(config or {})
+        return None, None, None, "cpu"
+
     module = SimpleNamespace(
         parse_fasta=lambda _: [("query", sequence)],
-        load_model_and_tokenizer=lambda args: (None, None, None, "cpu"),
+        load_model_and_tokenizer=load,
         predict=lambda *args: predicted,
     )
     monkeypatch.setattr(

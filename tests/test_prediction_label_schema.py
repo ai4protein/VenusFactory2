@@ -152,8 +152,12 @@ async def test_actual_factory_csv_semantics_reach_writer_report_and_zip_without_
     (adapter / "lr5e-4_bt12k_ga8.json").write_text(json.dumps(cfg))
     predicted = {"predicted_class": 1, "probabilities": [0.1, 0.9] if case != "shape_mismatch" else [0.9]}
     sequence = "MKTAYIAKQRQISFVK"
+    def load(args):
+        args._inference_checkpoint_config = dict(cfg)
+        return None, None, None, "cpu"
+
     module = SimpleNamespace(parse_fasta=lambda _: [("query", sequence)],
-                             load_model_and_tokenizer=lambda args: (None, None, None, "cpu"),
+                             load_model_and_tokenizer=load,
                              predict=lambda *args: predicted)
     monkeypatch.setattr(operations, "_get_module", lambda _: (module, lambda *args: {"input_ids": [], "attention_mask": []}))
     scale = output_scale(cfg)

@@ -422,9 +422,13 @@ def test_real_factory_wrappers_bind_long_original_csv_not_truncated_preview(tmp_
     fasta.write_text(">query\n" + sequence + "\n")
     path = tmp_path / "prediction.csv"
     predicted = {"predicted_class": [1] * len(sequence), "probabilities": [[0.2, 0.8]] * len(sequence)}
+    def load(args):
+        args._inference_checkpoint_config = dict(config)
+        return None, None, None, "cpu"
+
     module = SimpleNamespace(
         parse_fasta=lambda _: [("query", sequence)],
-        load_model_and_tokenizer=lambda args: (None, None, None, "cpu"),
+        load_model_and_tokenizer=load,
         predict=lambda *args: predicted,
     )
     monkeypatch.setattr(

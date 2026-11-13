@@ -222,6 +222,25 @@ def _download_success_response(
     return json.dumps(out, ensure_ascii=False)
 
 
+def _prediction_interpretation(args, rows):
+    """Bind semantics to the loader's actual config, with a bounded row preview."""
+    from mcp_tools.models.factory.prediction.label_schema import decode_values, schema_for_config
+    from mcp_tools.models.factory.prediction.output_scale import output_scale
+
+    config = getattr(args, "_inference_checkpoint_config", None)
+    scale = output_scale(config)
+    classification = decode_values(rows[:8], schema_for_config(config), scale)
+    if config is None:
+        classification["reason"] = "inference_config_not_recorded"
+    decoded = classification.get("decoded", [])
+    for index, (result, row) in enumerate(zip(decoded, rows)):
+        result["row_index"] = index
+        result["header_sha256"] = hashlib.sha256(str(row.get("header", "")).encode()).hexdigest()
+    classification["preview"] = {"total_rows": len(rows), "decoded_rows": len(decoded),
+                                 "limit": 8, "truncated": len(rows) > 8, "row_index_base": 0}
+    return scale, classification
+
+
 def _get_module(model_key: str):
     """Import parse_fasta, load_model_and_tokenizer, predict and tokenizer input style for the given model key (protbert/prott5/ankh/esm2)."""
     model_key = model_key.lower().strip()
@@ -317,7 +336,7 @@ def predict_protein_function(
             all_results.append(output_row)
 
         content_str = json.dumps(all_results, ensure_ascii=False, indent=2)
-        from mcp_tools.models.factory.prediction.output_scale import output_scale
+        scale, classification = _prediction_interpretation(args, all_results)
         meta: Dict[str, Any] = {
             "fasta_file": fasta_file,
             "task": task,
@@ -325,7 +344,8 @@ def predict_protein_function(
             "adapter_path": resolved_adapter,
             "model_name": model_name,
             "sequence_count": len(all_results),
-            "output_scale": output_scale(config),
+            "output_scale": scale,
+            "classification": classification,
         }
 
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -432,7 +452,7 @@ def predict_residue_function(
             all_results.append(output_row)
 
         content_str = json.dumps(all_results, ensure_ascii=False, indent=2)
-        from mcp_tools.models.factory.prediction.output_scale import output_scale
+        scale, classification = _prediction_interpretation(args, all_results)
         meta: Dict[str, Any] = {
             "fasta_file": fasta_file,
             "task": task,
@@ -440,7 +460,8 @@ def predict_residue_function(
             "adapter_path": resolved_adapter,
             "model_name": model_name,
             "sequence_count": len(all_results),
-            "output_scale": output_scale(config),
+            "output_scale": scale,
+            "classification": classification,
         }
 
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
