@@ -134,6 +134,8 @@ independent SC acceptance and technical Review.
 
 ## Submit a complete Scientist goal to PBS
 
+For local Slurm execution and the shared cluster commands, see [local clusters](local-clusters.md).
+
 The command-line PBS runner places the complete research loop on one allocated
 node, including its isolated training and prediction processes. It is separate
 from the web service allocation. This initial resource profile requires one GPU;

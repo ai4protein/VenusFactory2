@@ -186,6 +186,8 @@ ckpt/**
 script_dev/
 .gradio/
 /configs/model_runtimes.json
+# Operator-local scheduler paths and credential references.
+/configs/*-goals.local.json
 /configs/**/*.lock
 result/
 

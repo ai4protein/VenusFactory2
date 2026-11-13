@@ -1,0 +1,40 @@
+{
+  "schema": "venusfactory.cluster-config.v1",
+  "repository": "..",
+  "control_root": "../runtime/local/cluster-goals",
+  "python": "../.venv/bin/python",
+  "runtime_root": "..",
+  "goal_roots": [
+    "../runtime/local",
+    "../runtime/verification",
+    "../research_runs"
+  ],
+  "env_file": "../.env",
+  "extra_python_paths": [],
+  "environment": {
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "profiles": {
+    "cpu": {
+      "queue": "your-partition",
+      "ncpus": 2,
+      "ngpus": 0,
+      "memory_gb": 16,
+      "wall_seconds": 1800
+    }
+  },
+  "capability_db": null,
+  "model_runtimes": null,
+  "execution_catalog": null,
+  "tool_credential_refs": [],
+  "checkpoint_root": null,
+  "huggingface_cache": null,
+  "scheduler": {
+    "backend": "slurm",
+    "cluster": "your-cluster",
+    "bin_directory": "/usr/bin"
+  }
+}

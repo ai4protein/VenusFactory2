@@ -88,7 +88,7 @@ python3 initialize.py install --tools proteinmpnn,ligandmpnn
 多进程启动见[服务指南](docs/architecture/services.md)。
 
 PBS 集群部署见[online/local 启动指南](docs/deployment-pbs.md)：统一管理两种模式的服务，分别保存数据，并在作业退出时清理进程。
-GPU 研究任务可通过 [Scientist PBS 入口](docs/scientist-model-development.md#submit-a-complete-scientist-goal-to-pbs) 单独提交。
+本地研究可通过 Scientist CLI 接入 [PBS 或 Slurm 集群](docs/local-clusters.md)，线上模式不提供集群操作。
 
 ### 在线使用，还是本地运行？
 
