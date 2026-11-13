@@ -120,6 +120,22 @@ def measurements(text, *, strict=False):
     return found
 
 
+# These exact keys are emitted by the platform ProtParam calculation. A key's
+# suffix is not a general unit inference rule for arbitrary external JSON.
+_PLATFORM_QUANTITIES = {"molecular_weight_Da": "Da", "length_aa": "aa"}
+
+
+def _platform_quantity(key, value):
+    if type(value) not in (int, float, Decimal):
+        return None
+    item = _quantity(value, value, _PLATFORM_QUANTITIES[key])
+    if item is None or item[1] <= 0:
+        return None
+    if key == "length_aa" and item[1] != item[1].to_integral_value():
+        return None
+    return item
+
+
 def _structured_measurements(value):
     found = set()
     if isinstance(value, str):
@@ -136,6 +152,11 @@ def _structured_measurements(value):
                     if item is not None:
                         found.add(item)
         for key, child in value.items():
+            if key in _PLATFORM_QUANTITIES:
+                item = _platform_quantity(key, child)
+                if item is not None:
+                    found.add(item)
+                continue
             if key in {"sequence_length", "residue_count", "amino_acid_count"}:
                 item = _quantity(child, child, "aa")
                 if item is not None:
@@ -145,7 +166,7 @@ def _structured_measurements(value):
 
 
 def _quoted_measurements(quote):
-    found = measurements(quote)
+    found = set()
     # A short exact quote may omit its outer braces but contain complete records.
     # Decode each complete object once; numbers and units must share that object.
     consumed = 0
@@ -153,13 +174,16 @@ def _quoted_measurements(quote):
         if start.start() < consumed:
             continue
         try:
-            value, consumed = _JSON.raw_decode(quote, start.start())
+            value, end = _JSON.raw_decode(quote, start.start())
         except (ValueError, RecursionError):
             continue
+        found.update(measurements(quote[consumed:start.start()]))
+        consumed = end
         try:
             found.update(_structured_measurements(value))
         except RecursionError:
             continue
+    found.update(measurements(quote[consumed:]))
     return found
 
 
