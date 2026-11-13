@@ -80,9 +80,18 @@ def large_owned_catalog(tmp_path, monkeypatch):
 
 
 def search_entrypoint(surface):
-    if surface == "native":
+    if surface in {"native", "native-guarded"}:
+        # The production hub guards shared tool objects in place. Isolate this
+        # invocation so test order cannot silently add an authorization read.
+        function = search_generated_capabilities.func
+        while getattr(function, "_availability_guard", False):
+            function = function.__wrapped__
+        selected = search_generated_capabilities.model_copy(update={"func": function})
+        if surface == "native-guarded":
+            capability_policy.guard_tool(selected)
+
         def page(offset=0):
-            value = json.loads(search_generated_capabilities.invoke({"query": "synthetic", "limit": 3, "offset": offset}))
+            value = json.loads(selected.invoke({"query": "synthetic", "limit": 3, "offset": offset}))
             return value["total"], [item["id"] for item in value["items"]], value
         return page
     mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
@@ -94,7 +103,9 @@ def search_entrypoint(surface):
     return page
 
 
-@pytest.mark.parametrize("surface,maximum_reads", [("native", 3), ("scoped", 7)])
+# Guarded execution adds one live entry authorization read. Inventory reads
+# remain constant for 10,000 records; neither path may materialize full catalogs.
+@pytest.mark.parametrize("surface,maximum_reads", [("native", 3), ("native-guarded", 4), ("scoped", 7)])
 def test_one_policy_read_per_inventory_in_both_private_discovery_paths(large_owned_catalog, surface, maximum_reads):
     state = large_owned_catalog
     page = search_entrypoint(surface)
@@ -112,7 +123,7 @@ def test_one_policy_read_per_inventory_in_both_private_discovery_paths(large_own
     assert total == 10000 and ids == ["a" * 64]
 
 
-@pytest.mark.parametrize("surface", ["native", "scoped"])
+@pytest.mark.parametrize("surface", ["native", "native-guarded", "scoped"])
 def test_next_request_sees_admin_switch_changes_without_recreating_adapter(large_owned_catalog, surface):
     state = large_owned_catalog
     page = search_entrypoint(surface)
@@ -132,7 +143,7 @@ def test_next_request_sees_admin_switch_changes_without_recreating_adapter(large
         scope.library_for(first)
 
 
-@pytest.mark.parametrize("surface,revocation", [("native", "owner"), ("scoped", "lease")])
+@pytest.mark.parametrize("surface,revocation", [("native", "owner"), ("native-guarded", "owner"), ("scoped", "lease")])
 def test_private_revocation_remains_live_after_large_search(large_owned_catalog, surface, revocation):
     state = large_owned_catalog
     page = search_entrypoint(surface)
