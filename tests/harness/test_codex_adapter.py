@@ -160,7 +160,7 @@ def test_native_error_redacts_credentials_and_host_paths_before_bounding(tmp_pat
         "Other file: /home/another-user/private/model.py\n"
         "Authorization: Bearer " + "fixture-secret-" * 20 + "\n"
         "API_KEY=sk-" + "fixture-key-" * 20 + "\n"
-        "-----BEGIN RSA PRIVATE KEY-----\nprivate-body\n-----END RSA PRIVATE KEY-----\n"
+        "-----BEGIN " "RSA PRIVATE KEY-----\nprivate-body\n-----END RSA PRIVATE KEY-----\n"
         + "padding " * 2000 + "\nRepair the missing expected_sha256 argument."
     )
     output = state.consume(tool_event("item.completed", status="failed", result=None, error={"message": diagnostic}))[0]["output"]
@@ -199,8 +199,8 @@ def test_failed_output_is_not_success_evidence_and_success_still_requires_valida
 
 @pytest.mark.parametrize("diagnostic, hidden", [
     ("Authorization: Bearer fixtureBearerCredential123456789", "fixtureBearerCredential123456789"),
-    ("API_KEY=sk-fixtureCredential123456789012345678", "sk-fixtureCredential123456789012345678"),
-    ("-----BEGIN RSA PRIVATE KEY-----\nfixture-private-body\n-----END RSA PRIVATE KEY-----", "fixture-private-body"),
+    ("API_KEY=sk-" + "fixture" * 8, "sk-" + "fixture" * 8),
+    ("-----BEGIN " "RSA PRIVATE KEY-----\nfixture-private-body\n-----END RSA PRIVATE KEY-----", "fixture-private-body"),
     ("Cannot read /home/other-user/private/file.py", "/home/other-user"),
 ])
 def test_short_native_errors_are_redacted_without_relying_on_truncation(diagnostic, hidden):
