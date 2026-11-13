@@ -303,6 +303,12 @@ def test_fixed_bootstrap_ignores_foreign_pythonpath_and_sanitizes_exception(tmp_
     scripts = frozen / "scripts/rsi"
     scripts.mkdir(parents=True)
     shutil.copyfile(ROOT / "scripts/rsi/pbs_goal_worker.py", scripts / "pbs_goal_worker.py")
+    # The fixed bootstrap now admits local execution before reading the record.
+    access = frozen / "backend/compute"
+    access.mkdir(parents=True)
+    shutil.copyfile(ROOT / "backend/__init__.py", access.parent / "__init__.py")
+    (access / "__init__.py").write_text("")
+    shutil.copyfile(ROOT / "backend/compute/access.py", access / "access.py")
     package = frozen / "src/agent/harness"
     package.mkdir(parents=True)
     (package.parent / "__init__.py").write_text("")

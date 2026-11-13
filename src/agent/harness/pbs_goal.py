@@ -20,6 +20,7 @@ from pathlib import Path
 
 from agent.rsi.engine.storage import atomic_json, file_lock
 from agent.science_goal import GoalStore
+from backend.compute.access import require_local_execution
 
 from .pbs_goal_config import configuration, validate_observed_resources
 from .pbs_goal_transport import bounded_run
@@ -29,10 +30,6 @@ ASSIGNMENT = ".pbs-assignment.json"
 NONCE_ENV = "VENUS_PBS_GOAL_ATTEMPT"
 TERMINAL = {"finished", "cancelled", "preparation_failed"}
 JOB_ID = re.compile(r"[0-9]+\.[A-Za-z0-9_.-]+")
-
-
-def _online():
-    return os.getenv("WEBUI_V2_MODE") == "online" or os.getenv("VENUS_SCIENTIST_ONLINE") == "1"
 
 
 def _private(path):
@@ -85,6 +82,7 @@ def _public(record):
 
 class Controller:
     def __init__(self, settings, runner=None):
+        require_local_execution()
         self.settings = configuration(settings)
         self.runner = runner or bounded_run
         self.root = Path(self.settings["control_root"])
@@ -95,6 +93,7 @@ class Controller:
 
     @classmethod
     def from_file(cls, path):
+        require_local_execution()
         path = Path(path).absolute()
         return cls(configuration(json.loads(path.read_text()), path.parent))
 
@@ -129,6 +128,7 @@ class Controller:
         return _record(folder / nonce / "submission.json")
 
     def _invoke(self, command, arguments, record):
+        require_local_execution()
         user = pwd.getpwuid(os.getuid())
         env = {"HOME": user.pw_dir, "USER": user.pw_name, "LOGNAME": user.pw_name,
                "PATH": record["settings"]["pbs_bin"] + ":/usr/bin:/bin", "LANG": "C.UTF-8"}
@@ -194,6 +194,7 @@ class Controller:
             record["release_pending"] = True
 
     def _poll(self, record, *, release=False):
+        require_local_execution()
         if record["state"] == "preparation_failed":
             return record
         if record["state"] in {"finished", "cancelled"}:
@@ -235,7 +236,7 @@ class Controller:
                 except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                     record["error_type"] = type(exc).__name__
                 _save(record)
-        elif (release and not _online() and not record.get("release_confirmed")
+        elif (release and not record.get("release_confirmed")
               and phase == "H" and "u" in str(row.get("Hold_Types", ""))):
             validate_observed_resources(row, record["resources"])
             if time.time() - record.get("release_sent_at", 0) >= 30:
@@ -250,8 +251,7 @@ class Controller:
         return record
 
     def submit(self, goal, profile="gpu", resume=False, new_attempt=False):
-        if _online():
-            raise ValueError("Authored PBS GPU research is available only for local execution")
+        require_local_execution()
         goal = self._goal(goal)
         folder = self._folder(goal)
         with file_lock(folder / ".controller.lock"):
@@ -330,6 +330,7 @@ class Controller:
             return _public(self._poll(record, release=True))
 
     def status(self, goal):
+        require_local_execution()
         goal = self._goal(goal)
         folder = self._folder(goal)
         with file_lock(folder / ".controller.lock"):
@@ -339,6 +340,7 @@ class Controller:
             return _public(self._poll(record, release=True))
 
     def cancel(self, goal):
+        require_local_execution()
         goal = self._goal(goal)
         folder = self._folder(goal)
         with file_lock(folder / ".controller.lock"):
@@ -354,6 +356,7 @@ class Controller:
 
 
 def worker_claim(record_path):
+    require_local_execution()
     record = _record(record_path)
     controller = Controller(record["settings"])
     goal = controller._goal(record["goal"])

@@ -348,8 +348,12 @@ def test_online_policy_blocks_submitting_and_releasing_pending_jobs(prepared, mo
     server.configure(query_error=False)
     monkeypatch.setenv("WEBUI_V2_MODE", "online" if policy == "online" else "local")
     monkeypatch.setenv("VENUS_SCIENTIST_ONLINE", "1" if policy == "scientist_online" else "0")
-    recoverable_call(lambda: Controller(settings, runner=server).submit(store.root))
-    recoverable_call(lambda: Controller(settings, runner=server).status(store.root))
+    before = server.read()["calls"]
+    with pytest.raises(PermissionError, match="only in local"):
+        Controller(settings, runner=server).submit(store.root)
+    with pytest.raises(PermissionError, match="only in local"):
+        Controller(settings, runner=server).status(store.root)
+    assert server.read()["calls"] == before
     assert server.count("qsub") == 1 and server.count("qrls") == 0
     assert store.read()["usage"]["model_calls"] == 0
 

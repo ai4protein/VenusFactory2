@@ -6,6 +6,8 @@ import os
 import re
 from pathlib import Path
 
+from backend.compute.access import require_local_execution
+
 SCHEMA = "venusfactory.pbs-config.v1"
 ENVIRONMENT = frozenset({
     "VENUS_KIMI_BIN", "VENUS_CODEX_BIN", "VENUS_CLAUDE_BIN", "VENUS_DSH_BIN", "VENUS_DSH_SITE",
@@ -15,6 +17,7 @@ ENVIRONMENT = frozenset({
 
 
 def configuration(value, base=None):
+    require_local_execution()
     if not isinstance(value, dict) or value.get("schema") != SCHEMA:
         raise ValueError("Invalid PBS configuration schema")
     allowed = {"schema", "repository", "control_root", "goal_roots", "python", "runtime_root", "pbs_bin",

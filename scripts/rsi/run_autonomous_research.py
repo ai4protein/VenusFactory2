@@ -45,6 +45,9 @@ def main(argv=None):
     if args.action != "submit-pbs" and (args.new_attempt or args.resume_goal):
         parser.error("--new-attempt and --resume-goal apply only to submit-pbs")
     if pbs_action:
+        from backend.compute.access import require_local_execution
+
+        require_local_execution()
         from agent.harness.pbs_goal import Controller
 
         controller = Controller.from_file(args.pbs_config)

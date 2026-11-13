@@ -8,6 +8,8 @@ import sys
 import tomllib
 from pathlib import Path
 
+from backend.compute.access import require_local_execution
+
 
 def _protected_text(path):
     path = Path(path)
@@ -113,6 +115,7 @@ def _source_bindings(source):
 
 def run_record(record_path):
     """Claim once, validate allocation, then run the original active GoalStore."""
+    require_local_execution()
     from . import pbs_goal
     record_path = Path(record_path).resolve()
     record = pbs_goal.worker_claim(record_path)

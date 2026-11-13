@@ -18,6 +18,9 @@ def main():
     os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
     os.environ["PYTHON_DOTENV_DISABLED"] = "1"
     root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root))
+    from backend.compute.access import require_local_execution
+    require_local_execution()
     if args.record.is_symlink():
         raise ValueError("PBS worker record must not be a symlink")
     path = args.record.resolve()
