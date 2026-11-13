@@ -13,7 +13,7 @@ from .research_evidence_passages import chunks, digest, selected_passages, sourc
 from .research_review_binding import ReviewerBindingUnavailable
 from .research_source_validation import partial_assessments, validate_assessments
 
-VERSION = "source_review.v2.3"
+VERSION = "source_review.v2.4"
 MAX_PACKET_CHARS = 28000
 MAX_UNITS = 8
 MAX_RECOVERY_ROUNDS = 2
