@@ -44,7 +44,7 @@ async def exercise(tmp_path, monkeypatch, *, harness="kimi-code", exit_kind="err
 
     class Client:
         async def run(self, ctx):
-            trace = ctx.task.output / ("control/events.jsonl" if harness == "deepseek-harness" else "events.jsonl")
+            trace = ctx.task.output / "events.jsonl"
             trace.parent.mkdir(parents=True, exist_ok=True)
             trace.touch()
             connection = json.loads((ctx.task.capability / "connection.json").read_text())

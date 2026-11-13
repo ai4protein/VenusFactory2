@@ -142,7 +142,7 @@ async def test_native_checkpoint_handoff_stops_the_worker_with_paired_receipts(
 
     class Client:
         async def run(self, context):
-            trace = context.task.output / ("control/events.jsonl" if harness == "deepseek-harness" else "events.jsonl")
+            trace = context.task.output / "events.jsonl"
             rows = []
             connection = json.loads((context.task.capability / "connection.json").read_text())
             try:
@@ -377,7 +377,7 @@ async def test_write_already_waiting_for_workspace_lock_cannot_change_saved_chec
                 receipt, denied = await asyncio.gather(saved, write)
                 assert not receipt["isError"] and denied["isError"]
                 assert "Checkpoint saved" in denied["content"][0]["text"]
-                write_trace(context.task.output / "control/events.jsonl", rows)
+                write_trace(context.task.output / "events.jsonl", rows)
             return {"status": "completed", "text": "Checkpoint saved"}
 
     monkeypatch.setattr(

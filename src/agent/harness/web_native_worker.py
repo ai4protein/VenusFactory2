@@ -11,10 +11,9 @@ import secrets
 import shutil
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
 
 from .capability_boundary import CURRENT_CAPABILITY_FACTS
-from .contracts import Profile, Task
+from .contracts import Profile, Task, digest
 from .events import emit
 from .host import RuntimeContext
 from .registry import builtin_registry
@@ -70,7 +69,23 @@ def web_tool_name(name, harness):
     return name[:limit] + "_" + suffix
 
 
-async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, analysis_recorder=None):
+class _ObservedRelay:
+    """Credentials and a host-only live counter; absent observation is unknown."""
+    def __init__(self, base_url, token, counter):
+        self.base_url, self.token, self._counter = base_url, token, counter
+
+    @property
+    def calls(self):
+        if self._counter is None:
+            return None
+        value = self._counter()
+        if type(value) is not int or value < 0:
+            raise ValueError("Invalid host gateway call counter")
+        return value
+
+
+async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, analysis_recorder=None,
+              gateway_calls=None, native_observer=None):
     send = event_sink or emit
     from aiohttp import web
 
@@ -555,10 +570,10 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
     )
     adapter, _ = builtin_registry().resolve(runtime_profile, request["runtimes"])
     ctx = RuntimeContext(
-        runtime_profile, task, SimpleNamespace(base_url=request["base_url"], token=request["token"]), request["runtimes"]
+        runtime_profile, task, _ObservedRelay(request["base_url"], request["token"], gateway_calls), request["runtimes"]
     )
     observed = 0
-    trace = output / ("control/events.jsonl" if profile.harness == "deepseek-harness" else "events.jsonl")
+    trace = output / "events.jsonl"
 
     def forward():
         nonlocal observed
@@ -575,6 +590,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                 if row.get("kind") in {"tool_call_start", "tool_result"}:
                     send(row)
 
+    native_calls_before = ctx.relay.calls
+    result = None
     pending = asyncio.create_task(adapter.run(ctx))
     interruption = None
     deferred_failure = None
@@ -701,6 +718,21 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         from .session_sandbox import _settle
 
         await _settle(asyncio.create_task(shutdown()), propagate=True)
+        if isinstance(result, dict):
+            # These are host observations of this exact native phase, never
+            # model-supplied claims or counters inferred from event text.
+            snapshot = json.loads(json.dumps(result, allow_nan=False))
+            from .host import write_json
+            write_json(output / "native_result.json", snapshot)
+            binding = {"schema": "web_native_phase.v1", "harness": runtime_profile.harness,
+                       "session_id": snapshot.get("session_id"),
+                       "native_result_sha256": digest(snapshot),
+                       "tools": sorted(task.tools), "tool_limit": transport_limit,
+                       "calls_before": native_calls_before, "calls_after": ctx.relay.calls}
+            binding["tools_sha256"] = digest(binding["tools"])
+            write_json(output / "native_binding.json", binding)
+            if native_observer is not None:
+                native_observer(json.loads(json.dumps(binding)))
         if deferred_failure is not None:
             # A later native turn may fail after an earlier turn did real work.
             # Preserve this failed phase only after cleanup, without declaring it

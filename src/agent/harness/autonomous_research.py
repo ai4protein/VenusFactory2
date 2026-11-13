@@ -437,6 +437,35 @@ class AutonomousResearch:
         class AwaitUser(Exception):
             pass
         result={'status':'failed' ,'summary':'Research episode did not complete','progress':progress}
+        native_contexts=[]
+        def request_audit():
+            path=folder/'model_requests.jsonl'
+            return (audit_requests(path,native_context=native_contexts) if native_contexts
+                    else audit_requests(path))
+        def native_observer(control, expected_harness, calls_before):
+            def observe(binding):
+                from .native_context_recovery import native_context_for_run
+                root=Path(control)/'native/run'
+                native_result=json.loads((root/'native_result.json').read_text())
+                if (binding.get('schema')!='web_native_phase.v1'
+                    or binding.get('harness')!=expected_harness
+                    or binding.get('calls_before')!=calls_before
+                    or binding.get('calls_after')!=relay.calls
+                    or binding.get('native_result_sha256')!=digest(native_result)
+                    or binding.get('session_id')!=native_result.get('session_id')
+                    or binding.get('tools_sha256')!=digest(binding.get('tools'))):
+                    raise ValueError('Native phase binding changed')
+                # An unstarted/unsupported native session cannot prove recovery.
+                # Retain its binding on disk and let the request audit stay strict.
+                if (not isinstance(binding.get('session_id'),str) or not binding['session_id']
+                    or type(binding.get('calls_after')) is not int or binding['calls_after']<=calls_before):
+                    return
+                native_context=native_context_for_run(root,native_result,expected_harness,
+                    frozenset(binding['tools']),binding['tool_limit'],binding['calls_after'])
+                native_context['calls_before']=calls_before
+                native_contexts.append(native_context)
+            return observe
+
         from .research_timeline import ResearchTimeline, ensure_project_readme
         timeline = ResearchTimeline(folder, index+1, workspace)
         def event_sink(event):
@@ -504,7 +533,9 @@ class AutonomousResearch:
                     request['audit_required']=True
                     from .research_handoff import native_phase
                     with native_phase(policy,relay=relay,reserve_calls=REVIEW_RESERVE) as handoff:
-                        await run({**request,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
+                        await run({**request,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis,
+                            gateway_calls=lambda:relay.calls,
+                            native_observer=native_observer(request['control'],native.harness,relay.calls))
                 from .execution_followup import execution_followup, execution_usage
                 followup = execution_followup(
                     request, native, events, checkpoint=service.checkpoint,
@@ -553,7 +584,9 @@ class AutonomousResearch:
                         attempts = previous.get('scientific_tool_attempts', [])
                         try:
                             with native_phase(policy,relay=relay,reserve_calls=REVIEW_RESERVE) as handoff:
-                                await run({**followup,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
+                                await run({**followup,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis,
+                                    gateway_calls=lambda:relay.calls,
+                                    native_observer=native_observer(followup['control'],native.harness,relay.calls))
                         except NativeTurnFailure as exc:
                             if (not (previous.get('event_audit') or {}).get('passed')
                                 or not attempts or not exc.interruption
@@ -657,7 +690,7 @@ class AutonomousResearch:
                 elif acceptance['approved_models'] or not progress.get('sc_revision',{}).get('requests'):
                     progress.pop('sc_revision',None)
                 checkpoint_valid=verified_checkpoint(workspace,checkpoint,evidence_receipts,require_completed_steps=False)
-                request_valid=audit_requests(folder/'model_requests.jsonl')['passed']
+                request_valid=request_audit()['passed']
                 host_issues=[row['error'] for row in context['execution']['failures']]
                 if interrupted:host_issues.append('Execution stopped without a valid final checkpoint; inspect partial work and submit verified evidence in a later episode.')
                 if not checkpoint_valid:host_issues.append('Submit a checkpoint with unchanged artifacts and execution receipts.')
@@ -701,7 +734,7 @@ class AutonomousResearch:
                         if (bundle/'submission.json').is_file():
                             row['proposal_file']=json.loads((bundle/'submission.json').read_text()).get('proposal_file')
                         row['review_stage']='independent' if receipt.get('independent') is not None else 'automatic'
-                        if receipt['status']=='approved' and audit_requests(folder/'model_requests.jsonl')['passed']:
+                        if receipt['status']=='approved' and request_audit()['passed']:
                             try:
                                 delivery=None
                                 scientific_binding=sc_acceptance.bind_delivery(bundle,acceptance)
@@ -766,7 +799,8 @@ class AutonomousResearch:
             if model_goal(context['objective']) and not has_delivery(progress.get('deliveries',[]),'model'):
                 progress['delivery_pending']='Continue from measured generations; model review and delivery are not yet complete'
             write_json(folder/'events.json',events)
-        calls=audit_requests(folder/'model_requests.jsonl') if (folder/'model_requests.jsonl').exists() else {'model_calls':0,'passed':False}
+        calls=request_audit() if (folder/'model_requests.jsonl').exists() else {'model_calls':0,'passed':False}
+        write_json(folder/'request_audit.json',calls)
         if result['status']=='completed' and not calls['passed']:
             result.update(status='failed',summary='Model response audit did not complete')
             progress.pop('reviewed_episode',None)
