@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 SCHEMA = "native-research-context.v1"
 MAX_FRAGMENT_BYTES = 20_000
@@ -22,6 +22,7 @@ MAX_FRAGMENT_BYTES = 20_000
 class ResearchContextProjection:
     context: dict
     reference_payloads: dict[str, str]
+    instruction_replacements: dict[str, dict] = field(default_factory=dict)
 
 
 def _encode(value):
@@ -45,6 +46,7 @@ def _fragments(raw, limit):
 def project_research_context(
     context: Mapping, *, current_step_id: str | None = None,
     reference_prefix: str = "context/research", max_fragment_bytes: int = 16_000,
+    inline_discovery_guidance: str | None = None,
 ) -> ResearchContextProjection:
     """Retain execution contracts; return optional lossless reference payloads.
 
@@ -56,6 +58,9 @@ def project_research_context(
     Without an explicit unique current step, every approach remains inline.
     Unknown fields, scientific evidence and unresolved feedback are preserved.
     If references cost more context than they save, return an unchanged copy.
+    The caller may identify discovery guidance already included verbatim in the
+    native instructions. Only that exact duplicate is removed; its byte hash and
+    replacement location remain in the private projection audit.
     """
     if not isinstance(context, Mapping) or not isinstance(context.get("objective"), str):
         raise ValueError("Expected public research context with an objective")
@@ -66,10 +71,20 @@ def project_research_context(
     if (not isinstance(reference_prefix, str)
             or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*", reference_prefix) is None):
         raise ValueError("Reference prefix must be a safe workspace-relative path")
+    if inline_discovery_guidance is not None and not isinstance(inline_discovery_guidance, str):
+        raise ValueError("Inline discovery guidance must be text already present in native instructions")
     original = copy.deepcopy(dict(context))
     original_bytes = _encode(original)  # Reject non-JSON and nonfinite input; never stringify objects.
     projected = copy.deepcopy(original)
     documents, payloads, duplicate_fields = [], {}, {}
+    instruction_replacements = {}
+    available = projected.get("available_tools")
+    if (inline_discovery_guidance and isinstance(available, dict)
+            and available.get("discovery") == inline_discovery_guidance):
+        raw = available.pop("discovery").encode("utf-8")
+        instruction_replacements["/available_tools/discovery"] = {
+            "sha256": _sha(raw), "bytes": len(raw), "replacement": "task.instructions",
+        }
 
     def reference(name, value, source_paths, *, inline_scope):
         raw = _encode(value)
@@ -140,4 +155,4 @@ def project_research_context(
         }
     if len(_encode(projected)) >= len(original_bytes):
         return ResearchContextProjection(original, {})
-    return ResearchContextProjection(projected, payloads)
+    return ResearchContextProjection(projected, payloads, instruction_replacements)

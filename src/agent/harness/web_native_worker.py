@@ -481,8 +481,9 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
             context_value = None
         if isinstance(context_value, dict) and "objective" in context_value:
             projection = project_research_context(
-                public_value(context_value, workspace), reference_prefix="context/research-" + call_scope)
-            if projection.reference_payloads:
+                public_value(context_value, workspace), reference_prefix="context/research-" + call_scope,
+                inline_discovery_guidance=GUIDANCE)
+            if projection.reference_payloads or projection.instruction_replacements:
                 # Persist all referenced bytes before exposing any shortened prompt.
                 for path, content in projection.reference_payloads.items():
                     data = content.encode("utf-8")
@@ -494,6 +495,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                     "original_sha256": hashlib.sha256(request["text"].encode()).hexdigest(),
                     "projected_sha256": hashlib.sha256(projected_text.encode()).hexdigest(),
                     "reference_files": reference_hashes,
+                    "instruction_replacements": projection.instruction_replacements,
                 })
 
     app = web.Application(client_max_size=16_000_000)
