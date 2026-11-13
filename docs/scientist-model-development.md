@@ -42,6 +42,14 @@ and records `review_evidence_inconsistent` without model acceptance. PI receives
 verified state and revision categories separately from reviewer commentary.
 Historical reviews retain their original policy and receipts.
 
+SC receives a bounded table of receipt-bound validation metrics before authored
+reports. Each value identifies its evaluation, metric, direction and aggregation:
+pooled query scores and equally weighted task scores remain separate. Compatible
+model/control and child/parent comparisons are calculated by the host. These
+relations describe numerical differences, not statistical significance or scientific
+usefulness. Reference tables supplied as research materials retain their own
+provenance and are not converted into host-measured controls.
+
 A negative verdict or missing evidence prevents technical Review and registration,
 persists an actionable request for PI, and continues the research loop. Accepted
 verdicts are bound to the selected experiment, runtime, evaluation and manifest
