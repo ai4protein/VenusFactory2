@@ -42,6 +42,9 @@ def test_config_uses_only_host_admitted_tools_and_gateway():
     assert cfg["model"] == p.model.model
     assert cfg["model_providers"]["venus_research"]["base_url"] == ctx.relay.base_url
     assert cfg["model_providers"]["venus_research"]["stream_max_retries"] == 0
+    assert cfg["model_providers"]["venus_research"]["capabilities"]["remote_compaction"] == "unsupported"
+    assert cfg["model_context_window"] == p.model.context_tokens
+    assert "model_auto_compact_token_limit" not in cfg  # Preserve native thresholds.
     assert cfg["features"]["multi_agent"] is False and cfg["features"]["shell_tool"] is False
     assert cfg["mcp_servers"]["venusfactory"]["enabled_tools"] == ["inspect_task"]
     assert cfg["mcp_servers"]["venusfactory"]["tools"]["inspect_task"]["approval_mode"] == "approve"
@@ -210,3 +213,52 @@ def test_short_native_errors_are_redacted_without_relying_on_truncation(diagnost
     assert hidden not in output
     assert "trace shortened" not in output
     assert output
+
+
+def test_native_compaction_advisory_preserves_thread_and_tool_continuation():
+    import hashlib
+    import json
+    from agent.harness.codex_adapter import COMPACTION_NOTICE
+
+    state = initialized(limit=2)
+    state.consume(tool_event())
+    state.consume(tool_event("item.completed"))
+    raw = {"type": "item.completed", "item": {"id": "compact-notice", "type": "error", "message": COMPACTION_NOTICE}}
+    row = state.consume(raw)[0]
+    encoded = json.dumps(raw, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    assert row == {"kind": "context_compaction", "phase": "notice",
+                   "native_type": "item.error.compaction_notice", "session_id": "fixture-thread",
+                   "native_event_path": "native_events.jsonl",
+                   "native_event_sha256": hashlib.sha256(encoded.encode()).hexdigest()}
+    start = state.consume(tool_event(id="after-compaction"))[0]
+    end = state.consume(tool_event("item.completed", id="after-compaction"))[0]
+    assert start["session_id"] == end["session_id"] == row["session_id"]
+    state.consume({"type": "turn.completed"})
+    assert state.turn_completed and not state.failed and state.compaction_notices == 1
+
+
+@pytest.mark.parametrize("variant", ["prefix", "suffix", "real_error", "started"])
+def test_only_exact_completed_native_compaction_advisory_is_nonfatal(variant):
+    from agent.harness.codex_adapter import COMPACTION_NOTICE
+
+    state = initialized()
+    message = {"prefix": "Error: " + COMPACTION_NOTICE, "suffix": COMPACTION_NOTICE + " failed",
+               "real_error": "Context compaction failed", "started": COMPACTION_NOTICE}[variant]
+    state.consume({"type": "item.started" if variant == "started" else "item.completed",
+                   "item": {"type": "error", "message": message}})
+    assert state.failed and state.compaction_notices == 0
+    with pytest.raises(ValueError, match="Tool outside"):
+        state.consume(tool_event())
+
+
+@pytest.mark.parametrize("phase", ["before", "after", "failed"])
+def test_native_compaction_advisory_requires_active_turn(phase):
+    from agent.harness.codex_adapter import COMPACTION_NOTICE
+
+    state = CodexEvents({"inspect_task"}, 1) if phase == "before" else initialized()
+    if phase == "after":
+        state.consume({"type": "turn.completed"})
+    elif phase == "failed":
+        state.consume({"type": "turn.failed"})
+    with pytest.raises(ValueError, match="outside active"):
+        state.consume({"type": "item.completed", "item": {"type": "error", "message": COMPACTION_NOTICE}})

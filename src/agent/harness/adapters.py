@@ -164,6 +164,40 @@ def dsh_command(ctx, controls):
     return cmd
 
 
+async def _worker_lines(stream):
+    """Read complete worker records without truncating native event payloads."""
+    pending = bytearray()
+    while chunk := await stream.read(65536):
+        pending.extend(chunk)
+        while (end := pending.find(b"\n")) >= 0:
+            yield bytes(pending[:end])
+            del pending[:end + 1]
+    if pending:
+        yield bytes(pending)
+
+
+def _dsh_observation(event, session_id, gateway_calls, notification=None):
+    from .events import native_compaction, normalize_dsh
+
+    reference = native_compaction(event, phase="completed", native_type=event.get("type"),
+                                  session_id=session_id, path="runtime_events.jsonl")
+    rows = normalize_dsh(event, session_id=session_id)
+    if (event.get("type") == "turn/end"
+            and event.get("data", {}).get("reason", {}).get("kind") == "completed"):
+        rows.append({**reference, "kind": "native_terminal"})
+    for row in rows:
+        row.update(gateway_calls=gateway_calls, native_event_path=reference["native_event_path"],
+                   native_event_sha256=reference["native_event_sha256"])
+        if notification is not None:
+            if notification.get("sessionId") != session_id or notification.get("event") != event:
+                raise ValueError("Native notification session or event mismatch")
+            envelope = native_compaction(notification, phase="completed", native_type=event.get("type"),
+                session_id=session_id, path="runtime_notifications.jsonl")
+            row.update(native_notification_path=envelope["native_event_path"],
+                       native_notification_sha256=envelope["native_event_sha256"])
+    return rows
+
+
 class DeepSeekAdapter:
     def __init__(self, runtimes):
         self.runtimes = runtimes
@@ -195,16 +229,29 @@ class DeepSeekAdapter:
             start_new_session=True,
         )
         result = {"status": "runtime_error", "tool_calls": 0}
+        stderr_reader = None
         try:
+            stderr_reader = asyncio.create_task(proc.stderr.read())
             async with asyncio.timeout(p.budget.wall_seconds + 35):
-                stdout, stderr = await proc.communicate(json.dumps(request).encode())
+                proc.stdin.write(json.dumps(request).encode())
+                await proc.stdin.drain()
+                proc.stdin.close()
+                with (t.output / "events.jsonl").open("x") as trace:
+                    async for line in _worker_lines(proc.stdout):
+                        record = json.loads(line)
+                        if "native_event" in record:
+                            for row in _dsh_observation(record["native_event"], record["session_id"],
+                                                       ctx.relay.calls, record.get("native_notification")):
+                                trace.write(json.dumps(row, ensure_ascii=False, allow_nan=False) + "\n")
+                                trace.flush()
+                        else:
+                            result = record
+                await proc.wait()
+            stderr = await stderr_reader
             # Redact the ephemeral token even in retained boot diagnostics.
             (t.output / "runtime.log").write_text(
                 stderr.decode(errors="replace").replace(ctx.relay.token, "[redacted]")
             )
-            lines = stdout.decode(errors="replace").splitlines()
-            if lines:
-                result = json.loads(lines[-1])
             if proc.returncode != 0:
                 result.update(status="runtime_error", exit_code=proc.returncode)
         except TimeoutError:
@@ -217,7 +264,11 @@ class DeepSeekAdapter:
                 except TimeoutError:
                     os.killpg(proc.pid, signal.SIGKILL)
                     await proc.wait()
-            for name in ["events.jsonl", "runtime_events.jsonl", "composition.patch.yml"]:
+            if stderr_reader is not None:
+                stderr = await stderr_reader
+                (t.output / "runtime.log").write_text(
+                    stderr.decode(errors="replace").replace(ctx.relay.token, "[redacted]"))
+            for name in ["runtime_events.jsonl", "runtime_notifications.jsonl", "composition.patch.yml"]:
                 src = controls / name
                 if src.exists():
                     (t.output / name).write_bytes(src.read_bytes())

@@ -133,7 +133,7 @@ def context(tmp_path):
     return RuntimeContext(
         profile(),
         task,
-        SimpleNamespace(base_url="http://127.0.0.1:9/v1", token="ephemeral-fixture"),
+        SimpleNamespace(base_url="http://127.0.0.1:9/v1", token="ephemeral-fixture", calls=0),
         {"python_root": sys.prefix, "claude_bin": "/fixture/claude"},
     )
 
@@ -259,3 +259,23 @@ async def test_host_uses_one_bridge_for_expert_and_native_calls(tmp_path, monkey
     assert result["observed_requests"] == len(calls) == result["audit"]["requests"]["model_calls"] == 2
     lock = json.loads((task.output / "profile.lock.json").read_text())
     assert lock["transport"] == "shared_chat_messages_free_bridge.v1"
+
+
+@pytest.mark.asyncio
+async def test_compaction_boundary_then_tool_result_is_not_protocol_failure(tmp_path, monkeypatch):
+    from test_claude_events import init, compact, call, result, terminal
+
+    ctx = context(tmp_path)
+    monkeypatch.setattr(adapter, "PreparedMcp", PreparedFixture)
+    events = [init(), compact(), call(), result(), terminal()]
+    script = "import json;events=" + repr(events) + ";[print(json.dumps(e),flush=True) for e in events]"
+    monkeypatch.setattr(adapter, "sandbox_command", lambda *args: [sys.executable, "-u", "-c", script])
+    outcome = await adapter.ClaudeAdapter(ctx.runtimes).run(ctx)
+    assert outcome["status"] == "completed" and outcome["tool_calls"] == 1
+    assert outcome["session_id"] == "s1" and outcome["sandbox_stopped"]
+    raw = [json.loads(line) for line in (ctx.task.output / "native_events.jsonl").read_text().splitlines()]
+    assert raw == events
+    rows = [json.loads(line) for line in (ctx.task.output / "events.jsonl").read_text().splitlines()]
+    assert [row["kind"] for row in rows] == ["context_compaction", "tool_call_start", "tool_result", "native_terminal"]
+    assert all(row["session_id"] == "s1" and row["gateway_calls"] == 0 for row in rows)
+    assert rows[-1]["native_type"] == "result" and rows[-1]["phase"] == "completed"

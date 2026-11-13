@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 
@@ -66,8 +67,35 @@ def normalize_tool_arguments(arguments):
         return {"args": None, "arguments_error": error}
 
 
-def normalize_dsh(event):
+def native_compaction(event, *, phase, native_type, session_id, path):
+    """Audit metadata only; native summaries remain in the original event log."""
+    encoded = json.dumps(event, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    return {"kind": "context_compaction", "phase": phase, "native_type": native_type,
+            "session_id": session_id, "native_event_path": path,
+            "native_event_sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest()}
+
+
+def normalize_dsh(event, *, session_id=None):
+    rows = _normalize_dsh(event, session_id=session_id)
+    if session_id is not None:
+        for row in rows:
+            row["session_id"] = session_id
+    return rows
+
+
+def _normalize_dsh(event, *, session_id=None):
     data = event.get("data", {})
+    kind = event.get("type")
+    if kind in {"compaction/start", "compaction/summary", "compaction/end", "compaction/prune"}:
+        phase = {"compaction/start": "started", "compaction/summary": "summary",
+                 "compaction/prune": "pruned", "compaction/end": "completed"}[kind]
+        if kind == "compaction/end" and data.get("error"):
+            phase = "failed"
+        row = native_compaction(event, phase=phase, native_type=kind,
+                                session_id=session_id, path="runtime_events.jsonl")
+        if data.get("compactionId") is not None:
+            row["compaction_id"] = data["compactionId"]
+        return [row]
     if event.get("type") == "tool/call":
         arguments = data["arguments"]
         return [
@@ -128,7 +156,7 @@ def audit_trace(path, allowed_tools, limit):
     }
 
 
-def audit_requests(path):
+def audit_requests(path, *, native_context=None):
     records = [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
     requests = [x for x in records if x["event"] == "request"]
     responses = [x for x in records if x["event"] == "response"]
@@ -153,9 +181,34 @@ def audit_requests(path):
     }
     from .request_recovery import audit_recovery
 
-    recovery = audit_recovery(path, records, requests, responses)
+    from .native_context_recovery import audit_native_context_recovery
+
+    native_recovery = audit_native_context_recovery(native_context, records, requests, responses)
+    recovered = {row["failed_call"] for row in native_recovery["recovered_calls"]} if native_recovery and native_recovery["valid"] else set()
+    # Keep the source log and physical accounting intact. Existing recovery rules
+    # independently audit the remaining calls; neither mechanism can mask errors
+    # or claim the same failed attempt twice.
+    remaining_records = [row for row in records if row.get("call") not in recovered]
+    remaining_requests = [row for row in requests if row["call"] not in recovered]
+    remaining_responses = [row for row in responses if row["call"] not in recovered]
+    recovery = audit_recovery(path, remaining_records, remaining_requests, remaining_responses)
+    paired = bool(ids) and len(ids) == len(set(ids)) and sorted(ids) == sorted(x["call"] for x in responses)
     if recovery is not None:
-        paired = bool(ids) and len(ids) == len(set(ids)) and sorted(ids) == sorted(x["call"] for x in responses)
         result.update(recovery, uninterrupted_passed=bool(passed and not recovery["failed_attempts"]))
         result["passed"] = bool(paired and not errors and recovery["recovery_valid"])
+        if recovered:
+            # Removing a proved recovered attempt from the old recovery view
+            # must not reduce the original physical-budget accounting.
+            lock = json.loads((path.parent / "profile.lock.json").read_text())
+            limit = lock.get("profile", {}).get("budget", {}).get("model_calls")
+            if type(limit) is not int or len(requests) > limit:
+                result["passed"] = False
+    elif recovered:
+        result["passed"] = bool(paired and not errors and all(
+            row.get("status") == 200 and row.get("completed") is True for row in remaining_responses))
+    if native_recovery is not None:
+        result["native_context_recovery"] = native_recovery
+        result["uninterrupted_passed"] = False
+        result["total_failed_attempts"] = sum(row.get("status") != 200 or row.get("completed") is not True for row in responses)
+        result["passed"] = bool(result["passed"] and native_recovery["valid"])
     return result

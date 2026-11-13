@@ -135,9 +135,17 @@ async def execute(profile, task, runtimes, *, registry=None, credential=None):
         all(after["inputs"].get(k) == v for k, v in before["inputs"].items())
         and before["capabilities"] == after["capabilities"]
     )
+    from .native_context_recovery import native_context_for_run
+
+    try:
+        native_context = native_context_for_run(task.output, result, profile.harness,
+            task.tools, profile.budget.tool_calls, relay.calls)
+    except (OSError, ValueError, KeyError, TypeError, UnboundLocalError, AttributeError):
+        # Missing native phase evidence retains strict request auditing.
+        native_context = None
     result["audit"] = {
         "events": audit_trace(task.output / "events.jsonl", task.tools, profile.budget.tool_calls),
-        "requests": audit_requests(task.output / "model_requests.jsonl"),
+        "requests": audit_requests(task.output / "model_requests.jsonl", native_context=native_context),
     }
     result["audit"]["passed"] = (
         result["audit"]["events"]["passed"] and result["audit"]["requests"]["passed"] and result["binding_intact"]

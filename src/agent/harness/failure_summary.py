@@ -4,6 +4,8 @@ import json
 from collections import deque
 from pathlib import Path
 
+from .context_limit_error import is_context_limit
+
 
 def public_failure(path, fallback="runtime_error"):
     code = fallback
@@ -12,7 +14,8 @@ def public_failure(path, fallback="runtime_error"):
             rows = [json.loads(line) for line in deque(log, maxlen=64)]
     except (OSError, ValueError):
         rows = []
-    for row in reversed(rows):
+    for index in range(len(rows) - 1, -1, -1):
+        row = rows[index]
         if row.get("event") == "response":
             if row.get("completed"):
                 shape = row.get("response_completion")
@@ -29,7 +32,14 @@ def public_failure(path, fallback="runtime_error"):
                         code = "model_response_empty"
                 break
             status = row.get("status")
-            if status == 429:
+            call = row.get("call")
+            overflow = type(call) is int and any(
+                prior.get("call") == call and is_context_limit(prior, status)
+                for prior in rows[:index]
+            )
+            if overflow:
+                code = "context_limit"
+            elif status == 429:
                 code = "upstream_rate_limited"
             elif status in {401, 403}:
                 code = f"model_access_{status}"
@@ -47,6 +57,7 @@ def public_failure(path, fallback="runtime_error"):
             code = "model_protocol_incompatible"
             break
     messages = {
+        "context_limit": "The model request exceeded its context window.",
         "model_call_budget_exhausted": "This run reached its model request limit.",
         "upstream_rate_limited": "Model provider returned 429 (rate limited). Please try again later.",
         "upstream_timeout": "Model response timed out. Please retry.",

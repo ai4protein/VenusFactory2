@@ -178,3 +178,48 @@ def test_unbound_tool_progress_is_rejected(change):
     state.consume(init()); state.consume(call())
     with pytest.raises(ValueError):
         state.consume({**heartbeat(), **change})
+
+
+def compact():
+    return {"type": "system", "subtype": "compact_boundary", "session_id": "s1",
+            "compact_metadata": {"trigger": "auto", "pre_tokens": 180000}}
+
+
+def test_native_compaction_keeps_tool_ledger_and_continues(tmp_path):
+    state = ClaudeEvents({"protein_probe"}, 1)
+    state.consume(init())
+    start = state.consume({"type": "system", "subtype": "status",
+                           "session_id": "s1", "status": "compacting"})[0]
+    boundary = compact()
+    before = copy.deepcopy(boundary)
+    rows = state.consume(boundary) + state.consume(call()) + state.consume(result())
+    state.consume(terminal())
+    assert boundary == before
+    assert start["phase"] == "started"
+    assert rows[0]["kind"] == "context_compaction" and rows[0]["phase"] == "completed"
+    assert all(row["session_id"] == "s1" for row in rows)
+    assert state.completed and not state.failed
+    path = tmp_path / "events.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    assert audit_trace(path, {"protein_probe"}, 1)["passed"]
+
+
+@pytest.mark.parametrize("change", [
+    {"session_id": "other"}, {"compact_metadata": {}},
+    {"compact_metadata": {"trigger": "auto", "pre_tokens": -1}},
+    {"compact_metadata": {"trigger": "auto", "pre_tokens": True}},
+])
+def test_compaction_boundary_requires_bound_native_metadata(change):
+    state = ClaudeEvents({"protein_probe"}, 1)
+    state.consume(init())
+    with pytest.raises(ValueError):
+        state.consume({**compact(), **change})
+
+
+def test_compaction_does_not_erase_outstanding_tool_pairing():
+    state = ClaudeEvents({"protein_probe"}, 1)
+    state.consume(init())
+    state.consume(call())
+    state.consume(compact())
+    with pytest.raises(ValueError, match="outstanding"):
+        state.consume(terminal())

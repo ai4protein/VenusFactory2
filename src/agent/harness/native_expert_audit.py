@@ -119,7 +119,12 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
             if name in {"responses_gateway.py", "codex_adapter.py"} and profile.model.protocol != "responses":
                 continue
             require_equal(lock["adapter_source"].get(name), expected, "Unrecognized pre-isolation source")
-        identity_files = ("events.py", "contracts.py")
+        # Replay the byte-identical historical event auditor, never today's
+        # optional native-recovery semantics under an old source identity.
+        from . import _legacy_v4_events
+        require_equal(file_hash(Path(_legacy_v4_events.__file__)), LEGACY_V4_SOURCES["events.py"],
+                      "Historical event auditor changed")
+        identity_files = ("contracts.py",)
     else:
         identity_files = ("native_expert_team.py", "events.py", "contracts.py", "role_context.py")
         if any(file_hash(base / name) != lock["adapter_source"].get(name) for name in identity_files):
@@ -161,8 +166,14 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
     require_equal(result["native_executor"], NATIVE_EXPERT_HARNESSES[profile.harness], "Native executor differs")
     if not result["four_role_path_completed"] or not result["finalizer_succeeded"] or not result["binding_intact"]:
         raise ValueError("Expert completion gates incomplete")
-    request_audit = audit_requests(execution / "model_requests.jsonl")
-    event_audit = audit_trace(execution / "events.jsonl", binding["tools"], profile.budget.tool_calls)
+    from .native_context_recovery import native_context_for_run
+
+    native_context = None if legacy else native_context_for_run(execution, result, profile.harness,
+        binding["tools"], profile.budget.tool_calls, result["llm_calls"])
+    request_audit = (_legacy_v4_events.audit_requests(execution / "model_requests.jsonl") if legacy else
+                     audit_requests(execution / "model_requests.jsonl", native_context=native_context))
+    trace_auditor = _legacy_v4_events.audit_trace if legacy else audit_trace
+    event_audit = trace_auditor(execution / "events.jsonl", binding["tools"], profile.budget.tool_calls)
     for name, value in (("requests", request_audit), ("events", event_audit)):
         require_equal(result["audit"][name], value, "Recorded execution audit differs")
         if not value["passed"]:

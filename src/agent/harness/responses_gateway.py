@@ -16,6 +16,8 @@ import time
 
 import httpx
 from aiohttp import web
+
+from .context_limit_error import context_limit_error
 from .sse_terminal import StreamTerminal
 from .provider_config import request_headers, matches_snapshot
 
@@ -485,10 +487,12 @@ class ResponsesGateway(ModelGateway):
             ):
                 status = response.status_code
                 if status != 200:
-                    await self.record_upstream_rejection(response, call)
+                    rejection = await self.record_upstream_rejection(response, call)
                     client_status = 400 if status == 429 and (self.on_text is not None or self.stop_on_rate_limit) else status
                     self._rate_limited = client_status != status
-                    return web.json_response({"error": "upstream_http_" + str(status)}, status=client_status)
+                    public_error = context_limit_error(rejection, status)
+                    return web.json_response(public_error if public_error is not None else
+                                             {"error": "upstream_http_" + str(status)}, status=client_status)
                 raw = bytearray()
                 preview = PublicTextStream(self.on_text, call, protocol="responses") if self.on_text is not None else None
                 terminal = StreamTerminal('responses') if payload.get('stream') else None

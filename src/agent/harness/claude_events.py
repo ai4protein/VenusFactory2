@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 
+from .events import native_compaction
 from .messages_bridge import PREFIX, _object, _text
 
 
@@ -30,12 +31,25 @@ class ClaudeEvents:
                 if self.session_id is not None or not isinstance(sid, str) or not sid:
                     raise ValueError("Invalid native session initialization")
                 self.session_id = sid
-            elif (
-                event.get("subtype") != "status"
-                or self.session_id is None
-                or event.get("session_id") != self.session_id
-            ):
-                raise ValueError("Unknown native system event")
+            else:
+                if self.session_id is None or event.get("session_id") != self.session_id:
+                    raise ValueError("Native session identity mismatch")
+                subtype = event.get("subtype")
+                if subtype == "compact_boundary":
+                    metadata = _object(event.get("compact_metadata"))
+                    if (metadata.get("trigger") not in {"auto", "manual"}
+                            or type(metadata.get("pre_tokens")) is not int or metadata["pre_tokens"] < 0):
+                        raise ValueError("Invalid native compaction boundary")
+                    row = native_compaction(event, phase="completed",
+                        native_type="system/compact_boundary", session_id=self.session_id,
+                        path="native_events.jsonl")
+                    row.update(trigger=metadata["trigger"], tokens_before=metadata["pre_tokens"])
+                    return [row]
+                if subtype != "status":
+                    raise ValueError("Unknown native system event")
+                if event.get("status") == "compacting":
+                    return [native_compaction(event, phase="started", native_type="system/status",
+                        session_id=self.session_id, path="native_events.jsonl")]
             return []
         if self.session_id is None or event.get("session_id") != self.session_id:
             raise ValueError("Native session identity mismatch")
@@ -118,4 +132,6 @@ class ClaudeEvents:
                 rows.append({"kind": "tool_result", "tool_call_id": cid, "is_error": error, "output": text})
             else:
                 raise ValueError("Unsupported native message block")
+        for row in rows:
+            row["session_id"] = self.session_id
         return rows

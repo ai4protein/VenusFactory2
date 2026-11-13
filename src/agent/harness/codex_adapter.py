@@ -12,6 +12,15 @@ from pathlib import Path
 from .adapters import task_message
 from .mcp_config import codex_mcp_configuration, scientific_server
 from .responses_gateway import ResponsesPolicy
+from .events import native_compaction
+
+
+# Codex 0.163.0 emits this advisory as an error item after native compaction.
+# Match only the pinned advisory; real errors must still fail the turn.
+COMPACTION_NOTICE = (
+    "Heads up: Long threads and multiple compactions can cause the model to be less accurate. "
+    "Start a new thread when possible to keep threads small and targeted."
+)
 
 
 def _failure_text(item, workspace):
@@ -53,6 +62,7 @@ class CodexEvents:
         self.final_text = ""
         self.metadata_fallback = False
         self.tool_errors = 0
+        self.compaction_notices = 0
 
     def consume(self, event):
         if not isinstance(event, dict):
@@ -103,6 +113,7 @@ class CodexEvents:
                             "tool_call_id": identity,
                             "tool_name": "mcp__venusfactory__" + name,
                             "args": item["arguments"],
+                            "session_id": self.thread_id,
                         }
                     ]
                 if self.started.get(identity) != binding or identity in self.finished:
@@ -135,7 +146,8 @@ class CodexEvents:
                         text = json.dumps(data, ensure_ascii=False, allow_nan=False)
                 self.finished.add(identity)
                 self.tool_errors += int(failed)
-                return [{"kind": "tool_result", "tool_call_id": identity, "is_error": failed, "output": text}]
+                return [{"kind": "tool_result", "tool_call_id": identity, "is_error": failed, "output": text,
+                         "session_id": self.thread_id}]
             if item_type == "agent_message" and kind == "item.completed":
                 if not self.turn_started or self.turn_completed or not isinstance(item.get("text"), str):
                     raise ValueError("Unexpected native assistant message")
@@ -148,6 +160,13 @@ class CodexEvents:
                     and "fallback metadata" in message
                 ):
                     self.metadata_fallback = True
+                elif message == COMPACTION_NOTICE and kind == "item.completed":
+                    if not self.turn_started or self.turn_completed or self.failed:
+                        raise ValueError("Compaction notice outside active native turn")
+                    self.compaction_notices += 1
+                    # This is an observed advisory, not an invented start/end pair.
+                    return [native_compaction(event, phase="notice", native_type="item.error.compaction_notice",
+                                              session_id=self.thread_id, path="native_events.jsonl")]
                 else:
                     self.failed = True
             elif item_type not in {"reasoning", "agent_message"}:
@@ -194,6 +213,9 @@ def configuration(ctx):
         'env_key = "VENUS_RELAY_TOKEN"',
         "requires_openai_auth = false",
         "supports_websockets = false",
+        # The gateway exposes ordinary Responses; Codex owns local compaction.
+        # Unsupported remote compaction selects the native local algorithm.
+        'capabilities.remote_compaction = "unsupported"',
         "request_max_retries = 0",
         "stream_max_retries = 0",
         f"stream_idle_timeout_ms = {int((p.budget.request_seconds + 5) * 1000)}",
@@ -335,7 +357,16 @@ class CodexAdapter:
                     while line := await process.stdout.readline():
                         raw.write(line)
                         raw.flush()
-                        for event in state.consume(json.loads(line)):
+                        native = json.loads(line)
+                        rows = state.consume(native)
+                        reference = native_compaction(native, phase="completed", native_type=native.get("type"),
+                                                      session_id=state.thread_id, path="native_events.jsonl")
+                        if native.get("type") == "turn.completed":
+                            rows.append({**reference, "kind": "native_terminal"})
+                        for event in rows:
+                            event.update(gateway_calls=ctx.relay.calls,
+                                         native_event_path=reference["native_event_path"],
+                                         native_event_sha256=reference["native_event_sha256"])
                             trace.write(json.dumps(event, ensure_ascii=False, allow_nan=False) + "\n")
                             trace.flush()
                     await process.wait()
@@ -373,6 +404,7 @@ class CodexAdapter:
             final_text=state.final_text,
             final_message=state.final_text,
             model_metadata_fallback=state.metadata_fallback,
+            native_compaction_notices=state.compaction_notices,
             sandbox_stopped=process is None or process.returncode is not None,
             wall_seconds=round(time.monotonic() - started, 3),
         )

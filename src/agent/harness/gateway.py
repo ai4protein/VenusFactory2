@@ -12,6 +12,8 @@ import time
 
 import httpx
 from aiohttp import web
+
+from .context_limit_error import context_limit_error
 from .sse_terminal import StreamTerminal
 from .provider_config import request_headers
 from .provider_response_diagnostics import response_evidence
@@ -182,7 +184,9 @@ class EvidenceGateway(ModelGateway):
                                     # status in evidence for an explicit later resume.
                                     client_status = 400 if status == 429 and (self.on_text is not None or self.stop_on_rate_limit) else status
                                     self._rate_limited = client_status != status
-                                    return web.json_response({"error": "upstream_http_" + str(status)}, status=client_status)
+                                    public_error = context_limit_error(evidence, status)
+                                    return web.json_response(public_error if public_error is not None else
+                                                             {"error": "upstream_http_" + str(status)}, status=client_status)
                             else:
                                 raw = bytearray()
                                 preview = PublicTextStream(self.on_text, call) if self.on_text is not None else None

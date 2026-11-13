@@ -7,8 +7,21 @@ import sys
 import uuid
 from pathlib import Path
 
-from events import normalize_dsh
 from mcp_config import deepseek_mcp_plugin, scientific_server
+
+
+def compaction_plugins(max_tokens):
+    """Restore official automatic compaction omitted by sdk-minimal.
+
+    This adds no executable tools. Keep the native pressure/retention defaults;
+    its auxiliary requests use the same authorized output cap and gateway budget.
+    The optional output-pruner and interactive slash-command are not required.
+    """
+    return [
+        {"id": "token-meter", "name": "@deepseek-ai/dsh-token-meter"},
+        {"id": "compaction-basic", "name": "@deepseek-ai/dsh-compaction-basic",
+         "config": {"maxTokens": max_tokens}},
+    ]
 
 
 def main():
@@ -22,7 +35,7 @@ def main():
         for name in ["persistent-bash", "persistent-pwsh", "terminal-bash", "terminal-pwsh"]
     ]
     server = scientific_server(entry=request["entry"], tools=request["tools"], clean_pythonpath=True)
-    patch.append({"insert": [deepseek_mcp_plugin(server, request["timeout"]),
+    patch.append({"insert": [*compaction_plugins(request["max_tokens"]), deepseek_mcp_plugin(server, request["timeout"]),
         {"id": "venus-tool-arguments", "name": "/runner/dsh_argument_guard.mjs"}]})
     patch_path = root / "composition.patch.yml"
     patch_path.write_text(json.dumps(patch, indent=2))
@@ -38,9 +51,11 @@ def main():
         event = notification.payload.get("event", {})
         with (root / "runtime_events.jsonl").open("a") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
-        with (root / "events.jsonl").open("a") as f:
-            for row in normalize_dsh(event):
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        with (root / "runtime_notifications.jsonl").open("a") as f:
+            f.write(json.dumps(notification.payload, ensure_ascii=False) + "\n")
+        # The parent observes its live gateway counter when this notification
+        # arrives; it must never reconstruct call anchors from the final count.
+        print(json.dumps({"native_event": event, "session_id": sid, "native_notification": notification.payload}, ensure_ascii=False), flush=True)
         if event.get("type") == "tool/call":
             count += 1
             if count > request["tool_calls"]:

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .adapters import task_message
 from .claude_events import ClaudeEvents
+from .events import native_compaction
 from .claude_policy import validate_profile as validate_profile
 from .codex_adapter import validate_tool_result
 from .host import write_json
@@ -213,7 +214,16 @@ class ClaudeAdapter:
                     while line := await process.stdout.readline():
                         raw.write(line)
                         raw.flush()
-                        for event in state.consume(json.loads(line)):
+                        native = json.loads(line)
+                        rows = state.consume(native)
+                        reference = native_compaction(native, phase="completed", native_type="result",
+                            session_id=state.session_id, path="native_events.jsonl")
+                        if native.get("type") == "result" and state.completed and not state.failed:
+                            rows.append({**reference, "kind": "native_terminal"})
+                        for event in rows:
+                            event.update(gateway_calls=ctx.relay.calls,
+                                native_event_path=reference["native_event_path"],
+                                native_event_sha256=reference["native_event_sha256"])
                             trace.write(json.dumps(event, ensure_ascii=False, allow_nan=False) + "\n")
                             trace.flush()
                     await process.wait()
