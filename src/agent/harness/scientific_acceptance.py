@@ -267,6 +267,11 @@ def evidence_context(context, proposals, development):
         key: copy.deepcopy(context[key])
         for key in (
             "objective",
+            "criteria",
+            "constraints",
+            "acceptance_criteria",
+            "user_requirements",
+            "user_plan_revisions",
             "plan",
             "supplied_materials",
             "available_tools",

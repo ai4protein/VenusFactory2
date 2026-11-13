@@ -30,7 +30,14 @@ from .session_boundary import (
 from .tool_disclosure import DESCRIBE, GUIDANCE, SEARCH, DisclosureError, ToolDisclosure, ToolInspectionRequired
 
 
-def native_prompt(request):
+def native_prompt(request, *, research=False):
+    if research:
+        return (
+            "Start a fresh MLS research role session. The explicit task, declared plan and host evidence "
+            "below are the complete handoff. Do not continue another role's conversation or infer approval "
+            "from its prose. Preserve the user's objective and revisions.\n\n"
+            + CURRENT_CAPABILITY_FACTS + "\n\n## Current user request\n" + request["text"]
+        )
     history = request.get("messages", [])
     transcript = "\n\n".join(
         f"### {str(row.get('role', 'context')).capitalize()}\n{row.get('content', '')}"
@@ -470,6 +477,21 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
 
     prompt_request = request
     if is_research:
+        from .web_research_role_context import project_role_context, record_context
+        # Research authorization comes from the admitted checkpoint tool surface,
+        # not a user-controlled chat message. Agent history remains unchanged.
+        try:
+            original_context = json.loads(request["text"])
+        except (ValueError, TypeError):
+            original_context = None
+        if not isinstance(original_context, dict) or "objective" not in original_context:
+            # Direct native research calls may supply a plain-language objective.
+            # Preserve it verbatim, never recover it from a prior chat transcript.
+            original_context = {"objective": request["text"]}
+        isolated_context = project_role_context("MLS", original_context)
+        record_context(control, "MLS", original_context, isolated_context)
+        prompt_request = {**request, "messages": [], "memory": "",
+                          "text": json.dumps(isolated_context, ensure_ascii=False)}
         import hashlib
 
         from utils.scoped_files import write_bytes
@@ -477,7 +499,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         from .host import write_json
         from .research_context_projection import project_research_context
         try:
-            context_value = json.loads(request["text"])
+            context_value = json.loads(prompt_request["text"])
         except (ValueError, TypeError):
             context_value = None
         if isinstance(context_value, dict) and "objective" in context_value:
@@ -491,7 +513,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                     write_bytes(workspace, path, data)
                     reference_hashes[path] = hashlib.sha256(data).hexdigest()
                 projected_text = json.dumps(projection.context, ensure_ascii=False)
-                prompt_request = {**request, "text": projected_text}
+                prompt_request = {**prompt_request, "text": projected_text}
                 write_json(control / "context-projection.json", {
                     "original_sha256": hashlib.sha256(request["text"].encode()).hexdigest(),
                     "projected_sha256": hashlib.sha256(projected_text.encode()).hexdigest(),
@@ -528,7 +550,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         [{key: row[key] for key in ('id', 'name', 'description')}
          for row in disclosure.overview()['categories']], ensure_ascii=False)
     task = Task(
-        workspace, capability, output, public_value(native_prompt(prompt_request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat",
+        workspace, capability, output, public_value(native_prompt(prompt_request, research=is_research), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat",
         interaction="research_execution" if is_research else None,
     )
     adapter, _ = builtin_registry().resolve(runtime_profile, request["runtimes"])

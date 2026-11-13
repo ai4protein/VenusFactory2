@@ -32,6 +32,8 @@ from .research_development import Development, model_goal, build_delivery
 from .research_topic import SCIENTIST_PURPOSE, topic_context
 from . import scientific_acceptance as sc_acceptance
 from .tool_disclosure import ToolDisclosure, CONTROLS, GUIDANCE
+from .role_context import POLICY as ROLE_CONTEXT_POLICY
+from .web_research_role_context import project_role_context, record_context, user_plan_revisions
 from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, selected_deliveries, has_delivery
 
 def development_next_action(summary, progress, prepared=None, *, materials=None):
@@ -209,7 +211,7 @@ def method_changes(previous, current, episode):
 def create(root, profile, objective, limits):
     if profile.harness not in NATIVE_EXPERT_HARNESSES:raise ValueError('Select a native Scientist harness')
     store=GoalStore.create(root,GoalSpec(objective,CRITERIA,**limits),profile)
-    write_json(store.root/'protocol.json',{'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA,'scientific_acceptance':sc_acceptance.POLICY})
+    write_json(store.root/'protocol.json',{'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA,'scientific_acceptance':sc_acceptance.POLICY,'role_context_policy':ROLE_CONTEXT_POLICY})
     (store.root/'workspace').mkdir()
     return store
 
@@ -226,6 +228,9 @@ class AutonomousResearch:
         self.consult_override=consult;self.executor_override=executor;self.extra_tools=tools
 
     async def consult(self, role, context, profile, relay, folder):
+        original_context = context
+        context = project_role_context(role, context)
+        record_context(folder, role, original_context, context)
         if self.consult_override:return await self.consult_override(role,context)
         from .scientist_role_output import specification, request_fields, output_content
         spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False), study_review_policy=context.get('scientific_acceptance',{}).get('study_review_policy'), analysis_review_policy=context.get('scientific_acceptance',{}).get('analysis_review_policy')) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
@@ -372,6 +377,7 @@ class AutonomousResearch:
     async def episode(self, index, profile, state, context_prompt):
         started=time.monotonic();folder=self.store.root/'episodes'/f'cycle_{index:03d}';folder.mkdir(parents=True,exist_ok=True)
         state=apply_revisions(self.store)
+        write_json(folder/'role_context_policy.json', {'policy':ROLE_CONTEXT_POLICY, 'fresh_role_requests':True, 'scope':'Web Scientist PI/CB/MLS/SC; ordinary Agent chat unchanged'})
         protocol_path=self.store.root/'protocol.json'
         protocol=json.loads(protocol_path.read_text()) if protocol_path.exists() else {'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA}
         if protocol.get('scientific_acceptance')!=sc_acceptance.POLICY:
@@ -488,7 +494,9 @@ class AutonomousResearch:
                 if remaining<=REVIEW_RESERVE:raise ValueError('No budget left for execution and review')
                 native=replace(profile,mode='science_agent',harness=NATIVE_EXPERT_HARNESSES[profile.harness],budget=replace(profile.budget,model_calls=remaining-REVIEW_RESERVE,wall_seconds=max(1,profile.budget.wall_seconds-(time.monotonic()-started))))
                 instructions=execution_instructions(context,native.budget.tool_calls)
-                request={'session_id':self.store.root.name,'profile':native.public(),'runtimes':self.runtimes,'research_focus':focus,'workspace':str(workspace),'control':str(folder),'messages':[],'text':json.dumps(context,ensure_ascii=False),'instructions':instructions,'base_url':relay.base_url,'token':relay.token,'budget':native.public()['budget'],'lang':'zh' if any('\u4e00'<=c<='\u9fff' for c in context['objective']) else 'en'}
+                execution_context=project_role_context('MLS',context)
+                record_context(folder,'MLS',context,execution_context)
+                request={'session_id':self.store.root.name,'profile':native.public(),'runtimes':self.runtimes,'research_focus':focus,'workspace':str(workspace),'control':str(folder),'messages':[],'role_context_policy':ROLE_CONTEXT_POLICY,'text':json.dumps(execution_context,ensure_ascii=False),'instructions':instructions,'base_url':relay.base_url,'token':relay.token,'budget':native.public()['budget'],'lang':'zh' if any('\u4e00'<=c<='\u9fff' for c in context['objective']) else 'en'}
                 phase('MLS')
                 if self.executor_override:await self.executor_override(request,service,events)
                 else:
@@ -529,6 +537,9 @@ class AutonomousResearch:
                         policy.allowed = {'mcp__venusfactory__'+name for name in names}
                     else:
                         policy.scientific_tools = frozenset(names)
+                    original_continuation=continuation
+                    continuation=project_role_context('MLS',continuation)
+                    record_context(retry_folder,'MLS',original_continuation,continuation)
                     followup.update(text=json.dumps(continuation,ensure_ascii=False), research_focus=focus,
                                     instructions=execution_instructions(continuation,followup['budget']['tool_calls']))
                     write_json(retry_folder/'reason.json', {'reason':'native_return_without_checkpoint',
@@ -617,6 +628,9 @@ class AutonomousResearch:
                 phase('SC')
                 progress.pop('reviewed_episode',None)
                 progress['research_completed']=False
+                declared_plans=user_plan_revisions(context)
+                if declared_plans:
+                    context["user_plan_revisions"]=declared_plans
                 sc_context=sc_acceptance.evidence_context(context,service.proposals,development)
                 if "measurement_state" in sc_context:
                     progress["measurement_state"]=copy.deepcopy(sc_context["measurement_state"])

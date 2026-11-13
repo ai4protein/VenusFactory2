@@ -9,6 +9,32 @@ The PI derives a research direction from the goal and available materials. Plan
 steps keep their scientific acceptance criteria while their approach can change
 in response to experiments. Completed steps retain their verified evidence.
 
+## Independent role contexts
+
+PI, CBL (named `CB` internally), MLS and SC start with separate requests or native
+sessions. They do not resume each other's conversations. The host supplies an
+explicit input for each role:
+
+| Role | Input and handoff |
+| --- | --- |
+| PI | User goal, resources, requirements, verified progress and unresolved review obligations |
+| CBL | The task contract and PI's structured direction, constraints and unknowns |
+| MLS | The task contract, declared plan, relevant measured evidence and tool interfaces |
+| SC | The original objective, acceptance contract, host measurements and inspectable artifacts |
+
+Planning proposals are declarations, not measurements. SC does not inherit the
+full PI/CBL answers or MLS's self-assessment. Rejection returns explicit revision
+obligations to PI; it does not replace the user's requirements. User revisions
+remain part of the task contract. Ordinary Agent conversations keep their existing
+history and memory behavior.
+
+Role inputs have a versioned policy and private audit snapshots. Native planning
+handoffs use bounded structured JSON; malformed, duplicate or oversized fields
+are rejected instead of silently dropping requirements. Original answers, tool
+logs and evidence references remain available for audit. Legacy evidence keeps
+its original policy: a failed new-policy audit cannot fall back to old handoff
+rules.
+
 ## Scientific acceptance and revision
 
 SC receives a fresh evidence packet containing the objective, fixed acceptance
@@ -87,8 +113,8 @@ exit code alone do not establish a final report or the validity of a scientific 
 Native execution keeps the objective, scientific criteria, plan requirements,
 current feedback and prepared-data contract in context. Longer historical records
 and duplicate plans may move into bounded, hash-checked reference files read on
-demand. PI, SC and host validation retain the canonical context. References do not
-increase tool budgets or replace experimental receipts.
+demand. The host retains canonical records; each role receives its explicit projection.
+References do not increase tool budgets or replace experimental receipts.
 
 ## Algorithm freedom
 

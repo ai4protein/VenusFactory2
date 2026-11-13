@@ -221,7 +221,11 @@ async def test_exhausted_inconsistent_review_preserves_fit_and_does_not_instruct
     assert len(measured) == 1 and len(pi_calls) == 2 and sc_calls == 3
     next_progress = pi_calls[1]["progress"]
     assert next_progress["review_evidence_error"]["code"] == "review_evidence_inconsistent"
-    assert pi_calls[0]["progress"]["sc_revision"] == stale
+    initial_revision = pi_calls[0]["progress"]["sc_revision"]
+    assert initial_revision["issues"] == stale["issues"]
+    assert initial_revision["requests"] == stale["requests"]
+    assert initial_revision["study_revision_requests"] == stale["study_revision_requests"]
+    assert "summary" not in initial_revision  # Typed obligations survive; prior reviewer prose does not.
     assert "sc_revision" not in next_progress
     assert "stale-missing-baseline" not in json.dumps(next_progress)
     assert "incorrect-baseline-pending-claim" not in json.dumps(next_progress)

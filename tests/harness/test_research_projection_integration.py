@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from agent.harness import web_native_worker
+from agent.harness.web_research_role_context import project_role_context
 from agent.harness.contracts import Budget, ModelBinding, Profile
 from agent.harness.research_workspace import ResearchWorkspace
 
@@ -50,6 +51,7 @@ async def test_native_projection_reads_immutable_references_without_changing_req
                  "VENUS_CAPABILITY_POLICY_SNAPSHOT", "VENUS_MODEL_RUNTIMES_CONFIG", "VENUS_SCIENTIST_PBS_RECORD"):
         monkeypatch.delenv(name, raising=False)
     source = research_context()
+    role_input = project_role_context("MLS", source)
     workspace, control = tmp_path / "workspace", tmp_path / "control"
     service = ResearchWorkspace(workspace, control / "tools", source["plan"])
     race = {"path": None, "triggered": False}
@@ -78,10 +80,11 @@ async def test_native_projection_reads_immutable_references_without_changing_req
     async def adapter(context):
         projected = json.loads(context.task.prompt.rsplit("## Current user request\n", 1)[1])
         assert request == original
-        assert projected["plan"] == source["plan"]  # No current-step guess: retain every approach.
-        for key in ("objective", "criteria", "PI", "model_development", "resources"):
+        assert projected["plan"] == role_input["plan"]  # No current-step guess: retain every approach.
+        assert "PI" not in projected and "previous_episodes" not in projected
+        for key in ("objective", "criteria", "model_development", "resources"):
             assert projected[key] == source[key]
-        for key, value in source["progress"].items():
+        for key, value in role_input["progress"].items():
             if key != "plan":
                 assert projected["progress"][key] == value
         assert context.profile.budget.model_calls == profile.budget.model_calls
@@ -124,8 +127,8 @@ async def test_native_projection_reads_immutable_references_without_changing_req
                 raw = "".join(read_content[part["path"]] for part in document["parts"]).encode()
                 assert hashlib.sha256(raw).hexdigest() == document["sha256"]
                 recovered[document["name"]] = json.loads(raw)
-            assert recovered["plan"] == source["plan"]
-            assert recovered["previous-episodes"] == source["previous_episodes"]
+            assert recovered["plan"] == role_input["plan"]
+            assert "previous-episodes" not in recovered  # Historical role prose is not an execution handoff.
             target = parts[0]
             path = target["path"]
             aliases = [path, "/workspace/" + path, "./" + path,
