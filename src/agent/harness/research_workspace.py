@@ -275,13 +275,21 @@ class ResearchWorkspace:
                     'scope':'Fixed sequence controls for the declared task; inspect scope before choosing.'}}
 
     async def get_research_baseline(self, reference: str='', sequence_column: str='sequence', output_field: str='value', output_file: str='', task: str='regression') -> dict:
-        """List classic sequence controls for task=regression or task=multilabel. Select a reference ID and output_file to save runnable fit/predict code with verified sequence encoding; omit output_file to read the source. Existing different files are never overwritten. Fit it with train_research_model, then develop a measured revision. Preserve its platform-reference provenance."""
+        """Call with only task=regression or task=multilabel to list reference IDs and scope; omit reference and output_file when listing. Select a reference ID and output_file to save runnable fit/predict code with verified sequence encoding; omit output_file to read the source. Existing different files are never overwritten. Fit it with train_research_model, then develop a measured revision. Preserve its platform-reference provenance."""
         from .research_development import immutable_copy
         from .research_reference_baselines import reference_baseline
         result=reference_baseline(reference,sequence_column,output_field,task=task)
         if output_file:
-            if not reference or not isinstance(output_file,str) or not output_file.endswith('.py'):
+            if not isinstance(output_file,str) or not output_file.endswith('.py'):
                 raise ValueError('Select a reference ID and a relative .py output_file')
+            if not reference:
+                choices = ', '.join(item['id'] for item in result['references'])
+                raise ValueError(
+                    f"A reference ID is required to save source. Available IDs for {task}: {choices}. "
+                    f"Scope: {result['scope']} "
+                    f"First call get_research_baseline(task={task!r}) without reference or output_file to list controls. "
+                    f"Then call get_research_baseline(task={task!r}, reference='<selected ID>', "
+                    "output_file='src/baseline.py') after choosing a compatible reference. No source was written.")
             safe_file(self.workspace,output_file,exists=False)
             immutable_copy(self.workspace,output_file,result['source'].encode())
             result={key:value for key,value in result.items() if key!='source'}
