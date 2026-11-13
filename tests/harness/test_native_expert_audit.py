@@ -593,9 +593,13 @@ async def test_v5_contexts_and_sessions_are_independent(completed):
     assert "handoffs" not in critic and not any(k in critic for k in ["PI", "CB", "MLS"])
     assert "text" not in critic["execution_evidence"]["native_result"]
     assert critic["episode_review_contract"] == contexts["PI"]["episode_review_contract"]
-    sessions = [json.loads((task.output / "roles" / r / "request_binding.json").read_text())["session_id"]
+    bindings = [json.loads((task.output / "roles" / r / "request_binding.json").read_text())
                 for r in ["PI", "CB", "SC"]]
-    assert len(set(sessions)) == 3
+    assert result["context_policy"] == "scientist_role_context.v2"
+    assert all(value["role_context"]["policy"] == "scientist_role_context.v2" for value in contexts.values())
+    assert all(value["context_policy"] == "scientist_role_context.v2" for value in bindings)
+    assert len({value["session_id"] for value in bindings}) == 3
+    assert audit_native_expert(task.output, task.workspace, task.capability)["passed"]
     assert (task.output / "roles/MLS/native_result.json").read_text().find("Measured length 10") >= 0
 
 

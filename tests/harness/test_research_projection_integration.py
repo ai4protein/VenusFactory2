@@ -39,8 +39,9 @@ def research_context():
                                    "status": "needs_revision"} for i in range(12)]}
 
 
+@pytest.mark.parametrize("objective_bytes", [0, 300000])
 @pytest.mark.asyncio
-async def test_native_projection_reads_immutable_references_without_changing_request_or_budget(tmp_path, monkeypatch):
+async def test_native_projection_reads_immutable_references_without_changing_request_or_budget(tmp_path, monkeypatch, objective_bytes):
     for key, value in {"VENUS_RUNTIME_ROOT": tmp_path / "runtime", "VENUS_JOB_QUEUE_ROOT": tmp_path / "queue",
                        "VENUS_USAGE_DB": tmp_path / "usage.sqlite", "VENUS_ACCESS_DB": tmp_path / "access.sqlite",
                        "PYTHON_DOTENV_DISABLED": "1", "PYTHONDONTWRITEBYTECODE": "1",
@@ -51,6 +52,8 @@ async def test_native_projection_reads_immutable_references_without_changing_req
                  "VENUS_CAPABILITY_POLICY_SNAPSHOT", "VENUS_MODEL_RUNTIMES_CONFIG", "VENUS_SCIENTIST_PBS_RECORD"):
         monkeypatch.delenv(name, raising=False)
     source = research_context()
+    if objective_bytes:
+        source["objective"] += "x" * objective_bytes + "FINAL USER REQUIREMENT"
     role_input = project_role_context("MLS", source)
     workspace, control = tmp_path / "workspace", tmp_path / "control"
     service = ResearchWorkspace(workspace, control / "tools", source["plan"])
@@ -80,6 +83,10 @@ async def test_native_projection_reads_immutable_references_without_changing_req
     async def adapter(context):
         projected = json.loads(context.task.prompt.rsplit("## Current user request\n", 1)[1])
         assert request == original
+        if objective_bytes:
+            assert projected["objective"].endswith("FINAL USER REQUIREMENT")
+            assert len(projected["objective"].encode()) > 262144
+        assert projected["role_context"]["policy"] == "scientist_role_context.v2"
         assert projected["plan"] == role_input["plan"]  # No current-step guess: retain every approach.
         assert "PI" not in projected and "previous_episodes" not in projected
         for key in ("objective", "criteria", "model_development", "resources"):

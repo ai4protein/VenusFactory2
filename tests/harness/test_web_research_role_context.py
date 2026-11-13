@@ -8,7 +8,7 @@ import pytest
 from agent.harness.web_research_role_context import project_role_context
 from agent.harness.web_native_worker import native_prompt
 from agent.harness.autonomous_research import AutonomousResearch
-from agent.harness.role_context import POLICY, RoleContextError
+from agent.harness.role_context import POLICY
 
 
 def task():
@@ -112,11 +112,15 @@ async def test_actual_consult_entry_projects_before_override_and_appends_private
     assert original["PI"] == "PI_FULL_TRANSCRIPT"
 
 
-def test_oversized_user_goal_fails_explicitly_instead_of_silent_truncation():
-    original = {"objective": "x" * 300000}
-    with pytest.raises(RoleContextError, match="byte limit"):
-        project_role_context("PI", original)
-    assert len(original["objective"]) == 300000
+@pytest.mark.parametrize("role", ["PI", "CB", "MLS", "SC"])
+def test_large_user_goal_preserves_final_requirement_without_an_implicit_limit(role):
+    original = task()
+    original["objective"] = "x" * 300000 + "FINAL USER REQUIREMENT"
+    projected = project_role_context(role, original)
+    assert projected["objective"] == original["objective"]
+    assert projected["objective"].endswith("FINAL USER REQUIREMENT")
+    assert not {"messages", "memory", "previous_episodes"} & projected.keys()
+    assert "PRIOR_SC_VERDICT" not in json.dumps(projected)
 
 
 def test_replanning_preserves_typed_revision_obligations_not_critic_narrative():

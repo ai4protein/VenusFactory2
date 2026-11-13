@@ -1,4 +1,4 @@
-"""Deterministic, bounded handoffs between independent Scientist role sessions.
+"""Deterministic, explicit handoffs between independent Scientist role sessions.
 
 Callers supply a host-authored task projection, never a conversation transcript.
 This module neither summarizes science nor promotes role opinions to evidence.
@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import json
 
-POLICY = "scientist_role_context.v1"
-MAX_CONTEXT_BYTES = 262144
-MAX_HANDOFF_BYTES = 16384
+POLICY = "scientist_role_context.v2"
 _FORBIDDEN_TASK_KEYS = frozenset({
     "messages", "memory", "history", "previous_episodes", "conversation",
     "PI", "CB", "CBL", "MLS", "SC", "role_outputs",
@@ -23,11 +21,17 @@ class RoleContextError(ValueError):
     """An explicit projection is missing, malformed or exceeds its declared bound."""
 
 
-def json_snapshot(value, *, max_bytes=MAX_CONTEXT_BYTES):
-    """Copy JSON without aliases; fail instead of silently losing requirements."""
+def json_snapshot(value, *, max_bytes=None):
+    """Copy finite JSON without aliases or an implicit context-size admission limit.
+
+    A caller may supply an explicit transport bound. Role isolation itself must
+    not preempt native context management or truncate scientific requirements.
+    """
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
+        raise RoleContextError("An explicit byte limit must be a nonnegative integer")
     try:
         encoded = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-        if len(encoded.encode("utf-8")) > max_bytes:
+        if max_bytes is not None and len(encoded.encode("utf-8")) > max_bytes:
             raise RoleContextError(
                 "Role context exceeds its byte limit; preserve the original audit artifact "
                 "and supply explicit evidence references or reduce scope, never truncate requirements"
@@ -47,7 +51,7 @@ def canonical_role(role):
 
 
 def planning_handoff(role, response):
-    """Validate a compact typed proposal; the full response stays in the audit log."""
+    """Validate a typed proposal; the full response stays in the audit log."""
     role = canonical_role(role)
     primary = {"PI": "direction", "CB": "steps"}.get(role)
     if primary is None:
@@ -71,7 +75,7 @@ def planning_handoff(role, response):
             raise RoleContextError("Planning handoff fields must be lists of nonempty strings")
         if key == primary and not items:
             raise RoleContextError("Planning handoff cannot omit its primary proposal")
-    return json_snapshot(value, max_bytes=MAX_HANDOFF_BYTES)
+    return json_snapshot(value)
 
 
 def build_role_context(role, task, *, handoffs=None, evidence=None, revision=None):
@@ -96,7 +100,7 @@ def build_role_context(role, task, *, handoffs=None, evidence=None, revision=Non
             if value is not None:
                 if not isinstance(value, dict):
                     raise RoleContextError("Handoffs must be explicit structured proposals, not transcripts")
-                selected[name] = json_snapshot(value, max_bytes=MAX_HANDOFF_BYTES)
+                selected[name] = json_snapshot(value)
         if selected:
             context["handoffs"] = selected
     if evidence is not None and role in {"MLS", "SC"}:
