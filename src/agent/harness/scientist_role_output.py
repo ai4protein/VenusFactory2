@@ -180,6 +180,20 @@ class RoleOutputError(ValueError):
         super().__init__(message)
         self.raw = raw[:12000] if isinstance(raw,str) else ""
 
+def _schema_field_names(schema):
+    """Names trusted by the output contract, including fields in nested objects."""
+    names = set()
+    pending = [schema]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, dict):
+            names.update(node.get("properties", {}))
+            pending.extend(value for value in node.values() if isinstance(value, (dict, list)))
+        elif isinstance(node, list):
+            pending.extend(node)
+    return names
+
+
 def validate_output(raw, spec):
     try:
         parsed = json.loads(raw, object_pairs_hook=_unique, parse_constant=_finite)
@@ -222,7 +236,24 @@ def validate_output(raw, spec):
                       "Expected a string matching the declared format.")
         elif exc.validator == "enum":
             detail = "Allowed values: " + ", ".join(str(x) for x in exc.schema["enum"])
-        elif exc.validator in {"required","additionalProperties"}:
-            detail = "Allowed fields: " + ", ".join(exc.schema.get("properties",{}))
+        elif exc.validator in {"required", "additionalProperties"}:
+            properties = exc.schema.get("properties", {})
+            fields = exc.instance if isinstance(exc.instance, dict) else {}
+            if exc.validator == "required":
+                names = [key for key in exc.schema.get("required", []) if key not in fields]
+                label = "Missing required fields: "
+            else:
+                names = [key for key in fields if key not in properties]
+                label = "Unexpected fields: "
+            # Field names are model output too. Never echo arbitrary prose or
+            # values into a format-repair instruction.
+            known_fields = _schema_field_names(spec["schema"])
+            safe_names = [key if key in known_fields else "<unrecognized field>" for key in names[:8]]
+            detail = label + ", ".join(safe_names)
+            if len(names) > 8:
+                detail += ", ..."
+            detail += ". Allowed fields: " + ", ".join(properties)
+            if spec["role"] == "CB" and location[:1] == ["steps"] and "needs_input" in names:
+                detail += ". needs_input belongs at the plan root, not inside a step."
         raise RoleOutputError("Scientific role schema mismatch at " + path + ". " + detail,raw) from exc
     return json.dumps(parsed,ensure_ascii=False) if normalized else raw
