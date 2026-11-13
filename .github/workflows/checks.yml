@@ -67,7 +67,7 @@ jobs:
           tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py
           tests/test_research_review_recovery.py tests/test_research_measurements.py
           tests/harness/test_research_algorithm_checks.py tests/harness/test_focused_repair.py tests/harness/test_outbound_strings.py
-          tests/harness/test_role_context.py tests/harness/test_web_research_role_context.py tests/harness/test_study_review_state.py
+          tests/harness/test_role_context.py tests/harness/test_web_research_role_context.py
           tests/harness/test_native_expert_team.py tests/harness/test_native_expert_audit.py
           tests/harness/test_scientist_tool_policy.py
 
@@ -215,7 +215,7 @@ jobs:
           tests/harness/test_research_data_memory.py
           tests/harness/test_scientific_acceptance.py
           tests/harness/test_multilabel_evaluation.py tests/harness/test_multilabel_training.py tests/harness/test_multilabel_references.py
-          tests/harness/test_research_input_profile.py tests/harness/test_native_expert_responses.py tests/harness/test_research_projection_integration.py tests/harness/test_autonomous_research.py
+          tests/harness/test_research_input_profile.py tests/harness/test_native_expert_responses.py tests/harness/test_research_projection_integration.py tests/harness/test_autonomous_research.py tests/harness/test_study_review_state.py
           tests/harness/test_research_worker_recovery.py
           tests/harness/test_private_research_capabilities.py
           tests/harness/test_training_stagnation.py
