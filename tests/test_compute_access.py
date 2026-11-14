@@ -21,16 +21,16 @@ def store(tmp_path, monkeypatch):
     return value
 
 
-def test_daily_workflows_are_per_visitor_not_shared_ip(store):
-    for i in range(5):
-        store.admit('a'+str(i), 'a', {'workflow': 1})
+def test_daily_predictions_are_per_visitor_not_shared_ip(store):
+    for i in range(20):
+        store.admit('a'+str(i), 'a', {'prediction': 1})
     with pytest.raises(HTTPException) as error:
-        store.admit('a-six', 'a', {'workflow': 1})
+        store.admit('a-twenty-one', 'a', {'prediction': 1})
     assert error.value.status_code == 429
-    assert store.status('a')['workflow']['remaining'] == 0
-    assert store.status('b')['workflow']['remaining'] == 5
-    store.admit('b-first', 'b', {'workflow': 1})
-    assert store.status('b')['workflow']['remaining'] == 4
+    assert store.status('a')['prediction']['remaining'] == 0
+    assert store.status('b')['prediction']['remaining'] == 20
+    store.admit('b-first', 'b', {'prediction': 1})
+    assert store.status('b')['prediction']['remaining'] == 19
 
 
 def test_concurrent_requests_cannot_exceed_twenty_predictions(store):
@@ -50,22 +50,20 @@ def test_concurrent_requests_cannot_exceed_twenty_predictions(store):
         store.admit('switch-entry', 'another-entry-for-a', {'prediction': 1})
 
 
-def test_workflow_reservation_is_atomic_and_old_workspaces_keep_identity(store):
+def test_prediction_batch_reservation_is_atomic_and_old_workspaces_keep_identity(store):
     store.admit('nineteen', 'a', {'prediction': 19})
     with pytest.raises(HTTPException):
-        store.admit('too-large', 'a', {'workflow': 1, 'prediction': 2})
-    assert store.status('a')['workflow']['used'] == 0
+        store.admit('too-large', 'a', {'prediction': 2})
     assert store.status('a')['prediction']['used'] == 19
     store.bind('a', ('new-network', 'changed-cookie'))
     assert store.status('a')['prediction']['remaining'] == 1
-    store.admit('fits', 'a', {'workflow': 1, 'prediction': 1})
-    assert not store.admit('fits', 'a', {'workflow': 1, 'prediction': 1})
+    store.admit('fits', 'a', {'prediction': 1})
+    assert not store.admit('fits', 'a', {'prediction': 1})
 
 
 def test_day_rollover_and_network_burst_are_separate(store, monkeypatch):
-    store.admit('old-day', 'a', {'workflow': 5, 'prediction': 20})
+    store.admit('old-day', 'a', {'prediction': 20})
     monkeypatch.setattr(store, 'day', lambda: ('2099-01-01', '2099-01-02T00:00:00+08:00'))
-    assert store.status('a')['workflow']['remaining'] == 5
     assert store.status('a')['prediction']['remaining'] == 20
     monkeypatch.setenv('VENUS_ONLINE_IP_COMPUTE_STARTS_PER_MINUTE', '1')
     with pytest.raises(HTTPException) as error:
@@ -81,14 +79,13 @@ def queued(q, owner, kind, metadata=None, key=None):
 
 def test_web_and_mcp_share_quota_without_double_charging_reserved_children(store, tmp_path):
     q = JobQueue(tmp_path/'queue')
-    parent, _ = queued(q, 'a', 'platform:workflow', {'compute_demands': {'workflow': 1, 'prediction': 2}})
+    parent, _ = queued(q, 'a', 'platform:tool', {'compute_demands': {'prediction': 2}})
     queued(q, 'a', 'mcp:model_prediction', {'tool': 'predict_protein_function', 'parent_job': parent})
     queued(q, 'a', 'mcp:molecular_docking', {'tool': 'vina_dock', 'parent_job': parent})
     assert store.status('a')['prediction']['used'] == 2
-    queued(q, 'a', 'mcp:model_prediction', {'tool': 'predict_with_evolved_model'})
+    queued(q, 'a', 'mcp:model_prediction', {'tool': 'predict_residue_function'})
     access.inline_prediction('a', 'predict_s4pred', 'sequence_analysis')
     assert store.status('a')['prediction']['used'] == 4
-    assert store.status('a')['workflow']['used'] == 1
 
 
 def test_idempotency_queue_failure_and_unowned_compute(store, tmp_path, monkeypatch):
@@ -146,38 +143,8 @@ def test_mcp_submission_enforces_shared_limit_before_any_model_worker_starts(sto
 
 @pytest.mark.parametrize('value', ['', 'not-a-number', '0', '-1'])
 def test_invalid_configuration_keeps_safe_defaults(store, monkeypatch, value):
-    monkeypatch.setenv('WEBUI_V2_ONLINE_DAILY_WORKFLOW_LIMIT', value)
     monkeypatch.setenv('WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT', value)
-    assert store.status('a')['workflow']['limit'] == 5
     assert store.status('a')['prediction']['limit'] == 20
-
-
-def test_http_workflow_limit_identity_isolation_and_replay(store, tmp_path, monkeypatch):
-    from backend.web_v2 import model_platform_api as api
-    from backend.web_v2.model_platform import Platform
-    service = Platform(tmp_path/'platform')
-    monkeypatch.setattr(api, 'service', service)
-    monkeypatch.setattr(service, 'validate_graph', lambda *args: None)
-    app = FastAPI(); app.add_middleware(VisitorMiddleware); app.include_router(api.router)
-    payload = {'name': 'Empty test workflow', 'graph': {'nodes': [], 'edges': []}}
-    with TestClient(app) as a, TestClient(app) as b:
-        a.get('/api/model-platform/session'); b.get('/api/model-platform/session')
-        headers = {'Idempotency-Key': 'first-workflow'}
-        first = a.post('/api/model-platform/workflows/run', json=payload, headers=headers)
-        assert first.status_code == 200, first.text
-        replay = a.post('/api/model-platform/workflows/run', json=payload, headers=headers)
-        assert replay.status_code == 200, replay.text
-        assert replay.json()['id'] == first.json()['id']
-        for i in range(4):
-            response = a.post('/api/model-platform/workflows/run', json=payload)
-            assert response.status_code == 200, response.text
-        denied = a.post('/api/model-platform/workflows/run', json=payload)
-        assert denied.status_code == 429, denied.text
-        assert a.get('/api/model-platform/allowance').json()['workflow']['remaining'] == 0
-        assert b.get('/api/model-platform/allowance').json()['workflow']['remaining'] == 5
-        assert a.get('/api/model-platform/job-history').json()['total'] == 5
-        assert b.get('/api/model-platform/job-history').json()['items'] == []
-        assert b.get('/api/model-platform/jobs/'+first.json()['id']).status_code == 404
 
 
 def test_legacy_sync_and_streaming_endpoints_share_twenty_without_double_count(store, monkeypatch):
@@ -219,25 +186,6 @@ def test_legacy_adapter_reuses_queue_reservation(store, tmp_path, monkeypatch):
     assert store.status('a')['prediction']['used'] == 1
 
 
-def test_workflow_counts_predictions_but_not_training_or_database_queries(tmp_path, monkeypatch):
-    from backend.web_v2.model_platform import Platform
-    from mcp_tools.scheduler import catalog
-    from types import SimpleNamespace
-    service = Platform(tmp_path/'platform')
-    models = {'features': {'adapter':'descriptors', 'model_type':'tool'},
-              'solubility': {'adapter':'classical', 'model_type':'user'},
-              'docking': {'adapter':'external:vina', 'model_type':'tool'},
-              'tool:query_kegg': {'adapter':'registered-tool'},
-              'tool:predict_s4pred': {'adapter':'registered-tool'}}
-    monkeypatch.setattr(service, 'model', lambda owner, identity: models[identity])
-    monkeypatch.setattr(service, 'workflow_component', lambda owner, identity: models[identity])
-    monkeypatch.setattr(catalog, 'native_tools', lambda: {name:SimpleNamespace(metadata=None) for name in ['query_kegg','predict_s4pred']})
-    nodes = [{'kind':'input'}, {'kind':'train'}, {'kind':'predict'}, {'kind':'output'}]
-    nodes += [{'kind':'tool' if name.startswith('tool:') else 'model', 'model_id':name} for name in models]
-    assert service.compute_demands('a', 'workflow', {'graph':{'nodes':nodes}}) == {'workflow':1, 'prediction':4}
-    assert service.compute_demands('a', 'predict', {'model_id':'features'}) == {'prediction':0}
-
-
 def test_researcher_children_share_prediction_quota_with_other_entries(store, tmp_path):
     q = JobQueue(tmp_path/'queue')
     store.admit('other-model-entry', 'a', {'prediction': 19})
@@ -253,3 +201,34 @@ def test_researcher_children_share_prediction_quota_with_other_entries(store, tm
     assert error.value.detail['code'] == 'COMPUTE_DAILY_LIMIT_REACHED'
     assert len(q.list('a')) == 2
     assert store.status('b')['prediction']['remaining'] == 20
+
+
+def test_standalone_tool_http_shares_prediction_quota_and_idempotency(store, tmp_path, monkeypatch):
+    from backend.web_v2 import model_platform_api as api, plaza_tools
+    from backend.web_v2.model_platform import Platform
+    from mcp_tools.scheduler import catalog
+    from types import SimpleNamespace
+    monkeypatch.setenv('WEBUI_V2_MODE', 'online')
+    service = Platform(tmp_path / 'platform'); monkeypatch.setattr(api, 'service', service)
+    monkeypatch.setattr(plaza_tools, 'card', lambda name: {
+        'id':'tool:' + name, 'name':'Fixture prediction', 'adapter':'registered-tool',
+        'available':True, 'input_kind':'table', 'contract':{'properties':{}}})
+    monkeypatch.setattr(catalog, 'native_tools', lambda: {'predict_s4pred':SimpleNamespace(metadata=None)})
+    app = FastAPI(); app.add_middleware(VisitorMiddleware); app.include_router(api.router)
+    with TestClient(app) as a, TestClient(app) as b:
+        a.get('/api/model-platform/session'); b.get('/api/model-platform/session')
+        data = a.post('/api/model-platform/datasets', files={'file':('protein.fasta', b'>x\nACDEFGHIK')}).json()
+        payload = {'tool_id':'tool:predict_s4pred', 'dataset_id':data['id']}
+        headers = {'Idempotency-Key':'same-tool-job'}
+        first = a.post('/api/model-platform/tools/run', json=payload, headers=headers)
+        assert first.status_code == 200, first.text
+        again = a.post('/api/model-platform/tools/run', json=payload, headers=headers)
+        assert again.status_code == 200 and again.json()['id'] == first.json()['id']
+        for _ in range(19):
+            response = a.post('/api/model-platform/tools/run', json=payload)
+            assert response.status_code == 200, response.text
+        assert a.post('/api/model-platform/tools/run', json=payload).status_code == 429
+        assert a.get('/api/model-platform/allowance').json()['prediction']['remaining'] == 0
+        assert b.get('/api/model-platform/allowance').json()['prediction']['remaining'] == 20
+        assert b.get('/api/model-platform/jobs/' + first.json()['id']).status_code == 404
+        assert b.post('/api/model-platform/tools/run', json=payload).status_code == 404

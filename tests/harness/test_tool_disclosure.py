@@ -177,10 +177,10 @@ def grouped_catalog(enabled=None, schema=None):
         'query_uniprot': 'Find protein records.\n\nArgs:\nsecret_schema_word',
         'predict_custom_model': 'Predict protein properties.',
         'calculate_protein': 'Calculate protein properties.',
-        'search_generated_capabilities': 'Find protein research methods.',
+        'train_protein_model': 'Train a protein model.',
         'list_skills': 'Find scientific workflow guides.\n\nprivate_skill_body',
     }
-    categories = ['databases', 'factory_models', 'compute', 'rsi', 'guides']
+    categories = ['databases', 'factory_models', 'compute', 'training', 'guides']
     tools = {name: SimpleNamespace(name=name, description=desc, metadata={'discovery_category': cat})
              for (name, desc), cat in zip(descriptions.items(), categories)}
     return ToolDisclosure(tools, schema=schema or (lambda t: {'type': 'object', 'properties': {}}),
@@ -361,12 +361,12 @@ def test_navigation_tools_can_describe_their_already_exposed_contract(name,prefi
         c.resolve('call_tool',{'name':'protein_model_0','arguments':{'sequence':'AC'}})
 
 
-def rsi_search_catalog(enabled=None, schema=None):
+def factory_search_catalog(enabled=None, schema=None):
     descriptions = {
-        "list_evolved_models": "Search Scientist model publications by text or engineering stage.",
-        "predict_with_evolved_model": "Predict using a registered model.",
+        "list_trained_models": "Search platform-trained models by protein property.",
+        "predict_custom_model": "Predict with a platform-trained model.",
     }
-    tools = {name: SimpleNamespace(name=name, description=description, metadata=None)
+    tools = {name: SimpleNamespace(name=name, description=description, metadata={"discovery_category": "factory_models"})
              for name, description in descriptions.items()}
     return ToolDisclosure(tools, schema=schema or (lambda t: {
         "type": "object", "properties": {"query": {"type": "string"}}
@@ -376,47 +376,47 @@ def rsi_search_catalog(enabled=None, schema=None):
 def test_category_router_gives_explicit_next_action_without_loading_records():
     def no_schema(tool):
         pytest.fail("The index must not load a reader's contract yet")
-    c = rsi_search_catalog(schema=no_schema)
-    result = c.metadata("search_tools", {"category": "rsi", "query": "model AT4G10320"})
+    c = factory_search_catalog(schema=no_schema)
+    result = c.metadata("search_tools", {"category": "factory_models", "query": "model AT4G10320"})
     assert result["records_searched"] is False
     assert result["next_action"] == {
-        "name": "describe_tool", "arguments": {"name": "list_evolved_models"}
+        "name": "describe_tool", "arguments": {"name": "list_trained_models"}
     }
     assert all(set(row) == {"name", "description"} for row in result["tools"])
     assert "inputSchema" not in result
     with pytest.raises(DisclosureError, match="describe_tool"):
-        c.resolve("call_tool", {"name": "list_evolved_models", "arguments": {"query": "AT4G10320"}})
+        c.resolve("call_tool", {"name": "list_trained_models", "arguments": {"query": "AT4G10320"}})
 
 
 def test_selected_router_preserves_topic_and_refreshes_it_on_next_search():
-    c = rsi_search_catalog()
-    c.metadata("search_tools", {"category": "rsi", "query": "model AT4G10320"})
-    description = c.metadata("describe_tool", {"name": "list_evolved_models"})
+    c = factory_search_catalog()
+    c.metadata("search_tools", {"category": "factory_models", "query": "model AT4G10320"})
+    description = c.metadata("describe_tool", {"name": "list_trained_models"})
     assert description["suggested_arguments"] == {"query": "model AT4G10320"}
-    c.metadata("search_tools", {"category": "rsi", "query": "solubility BRAF"})
-    assert c.metadata("describe_tool", {"name": "list_evolved_models"})["suggested_arguments"] == {"query": "solubility BRAF"}
+    c.metadata("search_tools", {"category": "factory_models", "query": "solubility BRAF"})
+    assert c.metadata("describe_tool", {"name": "list_trained_models"})["suggested_arguments"] == {"query": "solubility BRAF"}
 
 
 def test_navigation_hint_does_not_bypass_permission_or_invent_parameters():
-    enabled = {"list_evolved_models", "predict_with_evolved_model"}
-    c = rsi_search_catalog(enabled)
-    c.metadata("search_tools", {"category": "rsi", "query": "model AT4G10320"})
-    enabled.remove("list_evolved_models")
+    enabled = {"list_trained_models", "predict_custom_model"}
+    c = factory_search_catalog(enabled)
+    c.metadata("search_tools", {"category": "factory_models", "query": "model AT4G10320"})
+    enabled.remove("list_trained_models")
     with pytest.raises(DisclosureError, match="unavailable"):
-        c.metadata("describe_tool", {"name": "list_evolved_models"})
-    unavailable = c.metadata("search_tools", {"category": "rsi", "query": "model AT4G10320"})
+        c.metadata("describe_tool", {"name": "list_trained_models"})
+    unavailable = c.metadata("search_tools", {"category": "factory_models", "query": "model AT4G10320"})
     assert "next_action" not in unavailable
-    c = rsi_search_catalog(schema=lambda t: {"type": "object", "properties": {"name": {"type": "string"}}})
-    c.metadata("search_tools", {"category": "rsi", "query": "model AT4G10320"})
-    assert "suggested_arguments" not in c.metadata("describe_tool", {"name": "list_evolved_models"})
+    c = factory_search_catalog(schema=lambda t: {"type": "object", "properties": {"name": {"type": "string"}}})
+    c.metadata("search_tools", {"category": "factory_models", "query": "model AT4G10320"})
+    assert "suggested_arguments" not in c.metadata("describe_tool", {"name": "list_trained_models"})
 
 
 def test_reader_hint_does_not_leak_into_a_new_unrelated_search():
-    c = rsi_search_catalog()
-    c.metadata("search_tools", {"category": "rsi", "query": "model AT4G10320"})
-    assert c.metadata("describe_tool", {"name": "list_evolved_models"})["suggested_arguments"]
-    c.metadata("search_tools", {"category": "rsi", "query": "list_evolved_models"})
-    assert "suggested_arguments" not in c.metadata("describe_tool", {"name": "list_evolved_models"})
+    c = factory_search_catalog()
+    c.metadata("search_tools", {"category": "factory_models", "query": "model AT4G10320"})
+    assert c.metadata("describe_tool", {"name": "list_trained_models"})["suggested_arguments"]
+    c.metadata("search_tools", {"category": "factory_models", "query": "list_trained_models"})
+    assert "suggested_arguments" not in c.metadata("describe_tool", {"name": "list_trained_models"})
 
 
 

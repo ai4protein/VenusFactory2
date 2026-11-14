@@ -22,9 +22,9 @@ test('CSV includes full result rather than preview, quotes text, preserves negat
   assert.ok(csv.includes('"a""b\nc"')); assert.ok(csv.includes('"-2"')); assert.ok(csv.includes('"\'=1+1"'));
   assert.ok(csv.includes('{""x"":1}'));
 });
-test('multi-output workflow CSV identifies each result and does not overwrite data', () => {
-  const rows=resultRows({outputs:{a:{rows:[{value:1,workflow_output:'original'}]},b:{rows:[{value:2}]}}});
-  assert.equal(rows[0]._workflow_output,'a'); assert.equal(rows[0].workflow_output,'original');
-  assert.equal(rows[1]._workflow_output,'b');
+test('multi-output result CSV identifies each result and does not overwrite data', () => {
+  const rows=resultRows({outputs:{a:{rows:[{value:1,result_output:'original'}]},b:{rows:[{value:2}]}}});
+  assert.equal(rows[0]._result_output,'a'); assert.equal(rows[0].result_output,'original');
+  assert.equal(rows[1]._result_output,'b');
   assert.deepEqual(resultRows({outputs:{a:{rows:[{value:1}]}}}),[{value:1}]);
 });

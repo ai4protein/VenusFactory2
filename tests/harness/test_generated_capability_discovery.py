@@ -1,4 +1,4 @@
-"""Public RSI discovery: bounded pages, curator ownership and live model switches."""
+"""RSI cases: bounded archives, real scientific review and retired chat discovery."""
 import json
 
 import pytest
@@ -12,18 +12,20 @@ from mcp_tools.tools.discovery.tools_mcp import register_discovery_tools
 
 
 @pytest.mark.asyncio
-async def test_mcp_passes_page_offset_to_registry(monkeypatch):
-    seen=[]
-    def search(query='', limit=10, library=None, offset=0):
-        seen.append((query,limit,offset))
-        return {'total':13,'items':[{'id':'page-two'}],'next_offset':None}
-    monkeypatch.setattr(rw,'search_capabilities',search)
-    server=FastMCP('registry pagination fixture')
+async def test_mcp_does_not_register_or_load_retired_rsi_discovery(monkeypatch):
+    from fastmcp.exceptions import ToolError
+
+    def no_registry(*args, **kwargs):
+        pytest.fail('Retired conversational tools must not load the research registry')
+    monkeypatch.setattr(rw, 'search_capabilities', no_registry)
+    server = FastMCP('retired RSI discovery fixture')
     register_discovery_tools(server)
     async with Client(server) as client:
-        result=await client.call_tool('search_generated_capabilities',{'query':'solubility','limit':3,'offset':10})
-    assert result.data['items'][0]['id']=='page-two'
-    assert seen==[('solubility',3,10)]
+        names = {tool.name for tool in await client.list_tools()}
+        retired = {'search_generated_capabilities', 'describe_generated_capability', 'run_generated_capability'}
+        assert not names & retired
+        with pytest.raises(ToolError):
+            await client.call_tool('search_generated_capabilities', {'query':'solubility', 'limit':3, 'offset':10})
 
 
 @pytest.fixture
@@ -79,36 +81,50 @@ def test_ten_thousand_metadata_entries_are_paged_before_materialization(metadata
     assert len(last['items'])==2 and last['next_offset'] is None
 
 
+@pytest.mark.parametrize('mode', ['local', 'online'])
 @pytest.mark.parametrize('query', ['', 'predict enzyme solubility', '预测可溶性'])
-def test_unified_search_loads_only_the_selected_public_page(metadata_catalog, monkeypatch, query):
-    library, switches = metadata_catalog
+def test_unified_search_never_materializes_rsi_registry(metadata_catalog, monkeypatch, query, mode):
+    monkeypatch.setenv('WEBUI_V2_MODE', mode)
+    def no_registry(*args, **kwargs):
+        pytest.fail('Conversational discovery must not scan RSI case metadata')
+    for name in ('search', 'ranked_references', 'discovery_cards'):
+        monkeypatch.setattr(index, name, no_registry)
+    for offset in (0, 3, 9996):
+        page = discovery.search(query, kind='models', limit=3, offset=offset, tool_catalog=[])
+        assert page['results'] == []
+        assert page['matching_models'] == page['indexed_models'] == 0
+        assert page['next_offset'] is None
+
+
+def test_plaza_paginates_ten_thousand_curated_cases_without_model_loading(metadata_catalog, monkeypatch):
+    from backend.web_v2.rsi_plaza import RsiPlaza
+
+    library, _ = metadata_catalog
+    monkeypatch.setenv('WEBUI_V2_MODE', 'online')
     decode = json.loads
     decoded = []
-
     def count_decode(value, *args, **kwargs):
         decoded.append(1)
         return decode(value, *args, **kwargs)
-
     monkeypatch.setattr(index.json, 'loads', count_decode)
-    first = discovery.search(query, kind='models', limit=3, tool_catalog=[])
-    second = discovery.search(query, kind='models', limit=3, offset=3, tool_catalog=[])
-    assert first['matching_models'] == second['indexed_models'] == 9998
-    assert [item['entry_id'] for item in first['results']] == [f'{i:064x}' for i in (0, 1, 2)]
-    assert [item['entry_id'] for item in second['results']] == [f'{i:064x}' for i in (3, 4, 5)]
+    plaza = RsiPlaza(None, library)
+    monkeypatch.setattr(plaza, 'resolve', lambda *args: pytest.fail('Metadata pages must not load repositories'))
+    first = plaza.listing(set(), query='enzyme solubility', limit=3)
+    second = plaza.listing(set(), query='enzyme solubility', offset=3, limit=3)
+    # Execution switches do not hide read-only case archives; private, unreviewed,
+    # and superseded records remain excluded by the publication catalog.
+    assert first['total'] == second['total'] == 10000
+    assert [r['id'] for r in first['items']] == ['capability:' + f'{i:064x}' for i in (9999, 9998, 9997)]
+    assert [r['id'] for r in second['items']] == ['capability:' + f'{i:064x}' for i in (9996, 9995, 9994)]
     assert first['next_offset'] == 3 and second['next_offset'] == 6
     assert len(decoded) <= 10
     assert len(json.dumps(first)) < 3500
-    assert all('validation' not in item and 'publication' not in item for item in first['results'])
-    assert all(item['kind'] == 'research_capability' for item in first['results'])
-    last = discovery.search(query, kind='models', limit=3, offset=9996, tool_catalog=[])
-    assert len(last['results']) == 2 and last['next_offset'] is None
-    switches.set('tool:run_generated_capability', False, 0, {}, 'fixture')
-    monkeypatch.setattr(index, 'ranked_references', lambda *a, **kw: pytest.fail('Disabled catalog read'))
-    disabled = discovery.search(kind='models', tool_catalog=[])
-    assert disabled['results'] == [] and disabled['indexed_models'] == 0
+    assert all('validation' not in item and 'publication' not in item for item in first['items'])
+    last = plaza.listing(set(), limit=3, offset=9999)
+    assert len(last['items']) == 1 and last['next_offset'] is None
 
 
-def test_unified_ranking_merges_families_and_preserves_method_identity(tmp_path, monkeypatch):
+def test_rsi_metadata_preserves_method_identity_without_entering_tool_ranking(tmp_path, monkeypatch):
     from mcp_tools.tools.discovery.matching import query_groups, relevance
     library = tmp_path/'catalog'
     monkeypatch.setattr(rw, 'LIBRARY', library)
@@ -137,20 +153,28 @@ def test_unified_ranking_merges_families_and_preserves_method_identity(tmp_path,
         score = relevance(query_groups(query), 'Enzyme model', 'Predict solubility')
         return [(score, 'platform', platform)] if score is not None else []
     monkeypatch.setattr(discovery, 'platform_models', platform_models)
+    # Scientific metadata keeps names, method/model types and bounded scope cards.
+    references = index.ranked_references(library, lambda name, text, kind: relevance(query_groups('solubility'), name, text), public_only=True)
+    identities = [identity for identity, score in sorted(references, key=lambda r: (-r[1], r[0]))]
+    assert identities == ['a', 'c', 'b', 'd']
+    cards = index.discovery_cards(library, identities, public_only=True)
+    assert cards['a']['kind'] == 'method' and cards['b']['kind'] == 'model'
+    assert cards['b']['description'] == ('Solubility '*100)[:240]
+    assert all(r['scope_truncated'] and len(r['scope']['scenarios']) == 3 for r in cards.values())
+    unicode = index.ranked_references(library, lambda name, text, kind: relevance(query_groups('strasse'), name, text), public_only=True)
+    assert [identity for identity, score in unicode if score is not None] == ['d']
+    # Chat ranks only enabled existing tools and ordinary platform models.
     ranked = discovery.search('solubility', tool_catalog=[tool], limit=30)
-    assert [r.get('entry_id', r['name']) for r in ranked['results']] == ['a', 'c', 'solubility_tool', 'b', 'd', 'platform']
+    assert [r.get('entry_id', r['name']) for r in ranked['results']] == ['solubility_tool', 'platform']
     for query in ('solubility', ''):
         full = discovery.search(query, tool_catalog=[tool], limit=30)
-        pages = [discovery.search(query, tool_catalog=[tool], limit=2, offset=o) for o in range(0, 6, 2)]
+        pages = [discovery.search(query, tool_catalog=[tool], limit=1, offset=o) for o in range(2)]
         assert [r for page in pages for r in page['results']] == full['results']
-        assert all(page['indexed_models'] == 5 for page in pages)
+        assert all(page['indexed_models'] == 1 for page in pages)
     predicted = discovery.search('预测可溶性', kind='models', tool_catalog=[])
-    assert {r['entry_id'] for r in predicted['results']} == {'b','c','platform'}
-    scoped = discovery.search('rare buffer condition', kind='models', tool_catalog=[])
-    assert {r['entry_id'] for r in scoped['results']} == {'a','b','c','d'}
-    assert all(r['scope_truncated'] and len(r['scope']['scenarios']) == 3 for r in scoped['results'])
-    assert next(r for r in ranked['results'] if r.get('entry_id') == 'b')['description'] == ('Solubility '*100)[:240]
-    assert discovery.search('strasse', kind='models', tool_catalog=[])['results'][0]['entry_id'] == 'd'
+    assert {r['entry_id'] for r in predicted['results']} == {'platform'}
+    assert discovery.search('rare buffer condition', kind='models', tool_catalog=[])['results'] == []
+    assert discovery.search('strasse', kind='models', tool_catalog=[])['results'] == []
 
 
 def test_selected_page_rechecks_publication_after_index_read(tmp_path, monkeypatch):
@@ -166,72 +190,87 @@ def test_selected_page_rechecks_publication_after_index_read(tmp_path, monkeypat
     with index.database(library) as db:
         db.execute('INSERT INTO capabilities VALUES (?,?,?,?,?,?,?,?)',
                    ('withdrawn','topic',card['name'],'1.0','solubility',json.dumps(card),'fixture',0))
-    project = index.discovery_cards
-    def withdraw(*args, **kwargs):
-        with index.database(library) as db:
-            db.execute("UPDATE capabilities SET card=json_set(card,'$.visibility','private')")
-        return project(*args, **kwargs)
-    monkeypatch.setattr(index, 'discovery_cards', withdraw)
+    references = index.ranked_references(library, lambda *args: 1, public_only=True)
+    assert references == [('withdrawn', 1)]
+    with index.database(library) as db:
+        db.execute("UPDATE capabilities SET card=json_set(card,'$.visibility','private')")
+    assert index.discovery_cards(library, [identity for identity, _ in references], public_only=True) == {}
     assert discovery.search(kind='models', tool_catalog=[])['results'] == []
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('kind', ['tool', 'model'])
-async def test_reviewed_operator_release_is_discovered_invoked_and_revoked_over_mcp(tmp_path, monkeypatch, kind):
-    from functools import partial
-
+async def test_reviewed_operator_release_is_a_case_archive_and_revocation_is_live(tmp_path, monkeypatch, kind):
+    import zipfile
     from fastmcp.exceptions import ToolError
     from test_capability_admission import candidate, model_candidate, reviewer, spec
-
     from agent.harness.capability_review import review_proposal
     from agent.harness.curated_publication import publish_candidate
-    from mcp_tools.tools import runtime_tool_policy
-    from mcp_tools.tools.discovery.research_capabilities import search_generated_capabilities
-    shared=tmp_path/'shared'
-    monkeypatch.setattr(rw,'LIBRARY',shared)
-    monkeypatch.setattr(runtime_tool_policy,'is_online_mode',lambda:False)
-    switches=policy.CapabilityStore(path=tmp_path/'switches.sqlite3')
-    monkeypatch.setattr(policy,'CapabilityStore',lambda:switches)
-    monkeypatch.setattr(discovery,'model_cards',lambda:[])
-    monkeypatch.setattr(discovery,'platform_models',lambda *a:[])
-    service=await model_candidate(tmp_path) if kind == 'model' else await candidate(tmp_path,spec())
-    bundle=service.proposals[0]
-    receipt=await review_proposal(bundle,reviewer=reviewer,control=tmp_path/'review',runner=rw.run_python)
-    assert receipt['status']=='approved', receipt
+    from backend.web_v2.rsi_plaza import RsiPlaza
+    from mcp_tools.tools.discovery import generated_scope
+
+    shared = tmp_path/'shared'
+    monkeypatch.setattr(rw, 'LIBRARY', shared)
+    monkeypatch.setenv('WEBUI_V2_MODE', 'local')
+    monkeypatch.setattr('backend.web_v2.rsi_legacy_cases.cards', lambda query='': [])
+    switches = policy.CapabilityStore(path=tmp_path/'switches.sqlite3')
+    monkeypatch.setattr(policy, 'CapabilityStore', lambda:switches)
+    monkeypatch.setattr(discovery, 'model_cards', lambda:[])
+    monkeypatch.setattr(discovery, 'platform_models', lambda *a:[])
+    service = await model_candidate(tmp_path) if kind == 'model' else await candidate(tmp_path, spec())
+    bundle = service.proposals[0]
+    receipt = await review_proposal(bundle, reviewer=reviewer, control=tmp_path/'review', runner=rw.run_python)
+    assert receipt['status'] == 'approved', receipt
     if kind == 'model':
         assert receipt['automatic']['evaluation']['training_reproduced']
         assert receipt['automatic']['evaluation']['score'] == 1
-    rw.publish_proposals([bundle],'fixture-goal',tmp_path/'private')
-    for name in ('search_capabilities','describe_capability','run_capability'):
-        monkeypatch.setattr(rw,name,partial(getattr(rw,name),library=shared))
-    server=FastMCP('operator release fixture')
+    private = tmp_path/'private'
+    private_entry = rw.publish_proposals([bundle], 'fixture-goal', private)[0]
+    assert index.require_registered(private, private_entry['id'], receipt['receipt_sha256'])['visibility'] == 'private'
+    # The scientific engine retains offline reproduction without exposing an Agent tool.
+    assert await rw.run_capability(private_entry['id'], {'sequence':'ACDE'}, library=private) == {'value':4}
+    with pytest.raises(Exception):
+        await rw.run_capability(private_entry['id'], {'sequence':3}, library=private)
+    plaza = RsiPlaza(None, shared)
+    assert plaza.listing(set())['items'] == []
+    card = publish_candidate(bundle, 'fixture-goal', library=shared, author_email='author@example.org', curator='test operator')
+    identity = 'capability:' + card['id']
+    detail = plaza.detail(identity, set())
+    assert detail['author_email'] == 'author@example.org' and detail['visibility'] == 'public'
+    assert detail['id'] == plaza.listing(set())['items'][0]['id']
+    assert {'README.md', 'REPORT.md', 'length.py'} <= {r['path'] for r in detail['files']}
+    source = plaza.preview(identity, set(), 'length.py')['text']
+    assert 'def run(inputs)' in source
+    archive = plaza.download(identity, set())
+    with archive, zipfile.ZipFile(archive) as z:
+        assert set(z.namelist()) == {r['path'] for r in detail['files']}
+        assert z.read('length.py').decode() == source
+        assert z.read('REPORT.md').decode() == plaza.preview(identity, set(), 'REPORT.md')['text']
+        if kind == 'model': assert 'weights.json' in z.namelist()
+    server = FastMCP('RSI release is a downloadable case')
     register_discovery_tools(server)
     async with Client(server) as client:
-        assert (await client.call_tool('search_generated_capabilities',{})).data['total']==0
-        assert (await client.call_tool('search_research_tools',{'kind':'models'})).data['matching_models']==0
-        card=publish_candidate(bundle,'fixture-goal',library=shared,author_email='author@example.org',curator='test operator')
-        monkeypatch.setattr(runtime_tool_policy,'is_online_mode',lambda:True)
-        page=(await client.call_tool('search_generated_capabilities',{'query':'length'})).data
-        native=json.loads(search_generated_capabilities.invoke({'query':'length'}))
-        assert native==page
-        assert page['items'][0]['id']==card['id']
-        assert page['items'][0]['author_email']=='author@example.org'
-        assert 'validation' not in page['items'][0]
-        generic=(await client.call_tool('search_research_tools',{'query':'length','kind':'models'})).data
-        assert generic['results'][0]['entry_id']==card['id']
-        assert generic['results'][0]['author_email']=='author@example.org'
-        assert generic['indexed_models']==1 and 'validation' not in generic['results'][0]
-        detail=(await client.call_tool('describe_generated_capability',{'capability_id':card['id']})).data
-        assert detail['input_schema']['required']==['sequence']
-        assert detail['review_status']=='approved'
-        assert detail['kind'] == kind
-        result=(await client.call_tool('run_generated_capability',{'capability_id':card['id'],'inputs':{'sequence':'ACDE'}})).data
-        assert result=={'value':4}
-        with pytest.raises(ToolError):
-            await client.call_tool('run_generated_capability',{'capability_id':card['id'],'inputs':{'sequence':3}})
-        switches.set('model:capability:'+card['id'],False,0,
-                     {'id':'capability:'+card['id'],'adapter':'capability','tools':['run_generated_capability']},'test operator')
-        assert (await client.call_tool('search_generated_capabilities',{})).data['total']==0
-        assert (await client.call_tool('search_research_tools',{'kind':'models'})).data['matching_models']==0
-        with pytest.raises(ToolError):
-            await client.call_tool('run_generated_capability',{'capability_id':card['id'],'inputs':{'sequence':'ACDE'}})
+        assert not ({'search_generated_capabilities', 'describe_generated_capability', 'run_generated_capability'} & {t.name for t in await client.list_tools()})
+        for mode in ('local', 'online'):
+            monkeypatch.setenv('WEBUI_V2_MODE', mode)
+            assert (await client.call_tool('search_research_tools', {'query':'length', 'kind':'models'})).data['matching_models'] == 0
+            assert generated_scope.search('length')['items'] == []
+            with pytest.raises(RuntimeError, match='RSI Plaza'): generated_scope.describe(card['id'])
+            with pytest.raises(ToolError):
+                await client.call_tool('run_generated_capability', {'capability_id':card['id'], 'inputs':{'sequence':'ACDE'}})
+    # An execution switch cannot create or withdraw a read-only publication.
+    switches.set('model:'+identity, False, 0, {'id':identity, 'adapter':'capability', 'tools':['run_generated_capability']}, 'test operator')
+    assert plaza.detail(identity, set())['id'] == identity
+    with index.database(shared) as db:
+        db.execute("UPDATE capabilities SET card=json_set(card,'$.visibility','private') WHERE id=?", (card['id'],))
+    assert plaza.listing(set())['items'] == []
+    for call, arguments in ((plaza.detail, ()), (plaza.preview, ('length.py',)), (plaza.download, ())):
+        with pytest.raises(ValueError, match='not been published by the operator'):
+            call(identity, set(), *arguments)
+    # Restore the separate compute switch for private offline reproduction.
+    switches.set('model:'+identity, True, 1, {'id':identity, 'adapter':'capability', 'tools':['run_generated_capability']}, 'test operator')
+    monkeypatch.setenv('WEBUI_V2_MODE', 'local')
+    assert generated_scope.search('length')['items'] == []
+    # Withdrawing a case hides it without destroying the original research evidence.
+    assert await rw.run_capability(private_entry['id'], {'sequence':'ACDE'}, library=private) == {'value':4}
+    assert (shared/card['id']/'length.py').read_text() == source

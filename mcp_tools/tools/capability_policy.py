@@ -231,6 +231,8 @@ def model_disabled(card):
 
 
 def assert_model_enabled(identity):
+    from mcp_tools.models.evolved.policy import is_rsi_model, RSI_ARCHIVE_MESSAGE
+    if is_rsi_model(identity): raise CapabilityDisabled(RSI_ARCHIVE_MESSAGE)
     if not CapabilityStore().enabled('model:'+identity): raise CapabilityDisabled(unavailable_message())
 
 

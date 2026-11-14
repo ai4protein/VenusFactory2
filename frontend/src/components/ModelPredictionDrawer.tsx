@@ -36,7 +36,7 @@ export function ModelPredictionDrawer({ model, onClose, onUpdate }: { model: Mod
     (detail.adapter === 'personal' && !!detail.sequence_column && !detail.features?.length));
   const paste = canPaste && mode === 'sequence';
   const selectedData = datasets.find(d => d.id === dataset);
-  const needsSequence = !molecular && detail.input_kind === 'table' && !['personal', 'scientist', 'capability'].includes(detail.adapter);
+  const needsSequence = !molecular && detail.input_kind === 'table' && detail.adapter !== 'personal';
   const requiredColumns = detail.adapter === 'personal' ? [...(detail.features || []), ...(detail.sequence_column ? [detail.sequence_column] : [])] : [];
   const missing = selectedData ? requiredColumns.filter(c => !selectedData.columns.includes(c)) : [];
   const active = Boolean(job && ['running', 'queued'].includes(job.status));
@@ -73,7 +73,7 @@ export function ModelPredictionDrawer({ model, onClose, onUpdate }: { model: Mod
         {detail.training_method && <div><dt>{zh ? '训练方法' : 'Training method'}</dt><dd>{detail.training_method}</dd></div>}
       </dl>}
       {detail.target && <p><strong>{zh ? '预测性质' : 'Predicts'}:</strong> {detail.target}</p>}
-      {detail.available === false ? <button className="mp-button" disabled>{unavailableLabel(detail,zh)}</button> : !model.workflow ? <Link className="mp-button primary" to={`/${lang}${modelWorkspaceRoute(model)}`}>{zh ? '打开模型工作台' : 'Open model workspace'} ↗</Link> : <>
+      {detail.available === false ? <button className="mp-button" disabled>{unavailableLabel(detail,zh)}</button> : !detail.predictable ? <Link className="mp-button primary" to={`/${lang}${modelWorkspaceRoute(model)}`}>{zh ? '打开模型工作台' : 'Open model workspace'} ↗</Link> : <>
         <h3>{detail.extra_inputs?.length ? (zh?'蛋白受体':'Protein receptor') : (zh ? '输入数据' : 'Input data')}</h3>
         <fieldset className="mp-input-fields" disabled={busy || active || !ready}>
           {canPaste && <div className="mp-tabs mp-input-tabs"><button type="button" aria-pressed={paste} className={paste ? 'active' : ''} onClick={() => setMode('sequence')}>{molecular ? (zh?'粘贴 SMILES':'Paste SMILES') : (zh ? '粘贴序列' : 'Paste sequence')}</button><button type="button" aria-pressed={!paste} className={!paste ? 'active' : ''} onClick={() => setMode('file')}>{zh ? '使用文件' : 'Use a file'}</button></div>}
@@ -83,12 +83,12 @@ export function ModelPredictionDrawer({ model, onClose, onUpdate }: { model: Mod
             {selectedData && <><p className="mp-muted">{selectedData.name}{selectedData.kind==='table' ? ` · ${selectedData.count} ${zh?'行':'rows'}` : ''}</p>{molecular && selectedData.kind==='table' && <label className="mp-field">{zh?'SMILES 所在列':'SMILES column'}<select value={String(parameters.smiles_column || 'smiles')} onChange={e=>setParameters(v=>({...v,smiles_column:e.target.value}))}>{selectedData.columns.map(c=><option key={c}>{c}</option>)}</select></label>}{needsSequence && <label className="mp-field">{zh ? '蛋白序列所在列' : 'Protein sequence column'}<select value={sequence} onChange={e => setSequence(e.target.value)}><option value="">{zh ? '选择序列列' : 'Select sequence column'}</option>{selectedData.columns.map(c => <option key={c}>{c}</option>)}</select></label>}<details className="mp-details"><summary>{zh ? '预览数据' : 'Preview data'}</summary><ResultTable rows={selectedData.preview}/></details></>}
             {missing.length > 0 && <p className="mp-error" role="alert">{zh ? '数据中缺少这些输入列：' : 'Required columns missing: '}{missing.join(', ')}</p>}
             {!selectedData && requiredColumns.length > 0 && <p className="mp-muted">{zh ? '需要包含：' : 'Include columns: '}{requiredColumns.join(', ')}</p>}
-            {['scientist', 'capability'].includes(model.adapter) && <details className="mp-details"><summary>{zh ? '匹配输入列' : 'Match input columns'}</summary><p className="mp-muted">{zh ? '同名列自动匹配；名称不同时可在此指定。' : 'Matching names are used automatically. Map different names here.'}</p><label className="mp-field">{zh ? '参数名 → 数据列名' : 'Input → column'}<textarea value={mapping} onChange={e => setMapping(e.target.value)} rows={3}/></label></details>}
+            {detail.adapter === 'personal' && <details className="mp-details"><summary>{zh ? '匹配输入列' : 'Match input columns'}</summary><p className="mp-muted">{zh ? '同名列自动匹配；名称不同时可在此指定。' : 'Matching names are used automatically. Map different names here.'}</p><label className="mp-field">{zh ? '参数名 → 数据列名' : 'Input → column'}<textarea value={mapping} onChange={e => setMapping(e.target.value)} rows={3}/></label></details>}
           </>}
           <ModelExtraInputs model={detail} datasets={datasets} config={extraInputs} onChange={setExtraInputs} onUpload={d=>setDatasets(ds=>[d,...ds])} disabled={busy || active || !ready} zh={zh}/>
           <ModelParameters key={model.id} schema={molecular && detail.parameter_schema ? {...detail.parameter_schema,properties:Object.fromEntries(Object.entries(detail.parameter_schema.properties || {}).filter(([k])=>k!=='smiles_column'))} : detail.parameter_schema} values={parameters} onChange={setParameters} disabled={busy || active || !ready} zh={zh}/>
         </fieldset>
-        <div className="mp-actions"><button className="mp-button primary" disabled={!ready || !valid || busy || active} onClick={() => void run()}>{job?.status === 'queued' ? (zh ? '排队中…' : 'Queued…') : active ? (zh ? '正在运行…' : 'Running…') : (zh ? '开始预测' : 'Run prediction')}</button><Link className="mp-button" to={`/${lang}/workflows?model=${encodeURIComponent(model.id)}`}>{zh ? '加入工作流' : 'Add to workflow'}</Link></div>
+        <div className="mp-actions"><button className="mp-button primary" disabled={!ready || !valid || busy || active} onClick={() => void run()}>{job?.status === 'queued' ? (zh ? '排队中…' : 'Queued…') : active ? (zh ? '正在运行…' : 'Running…') : (zh ? '开始预测' : 'Run prediction')}</button></div>
       </>}
       {error && <p className="mp-error" role="alert">{error}</p>}
       {job && <JobProgress initial={job} onChange={setJob} inputColumns={inputColumns}/>}

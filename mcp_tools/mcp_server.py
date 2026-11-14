@@ -44,9 +44,6 @@ register_discovery_tools(mcp)
 # Training uses the shared queue and scoped ESM2-8M policy online.
 from mcp_tools.models.factory.training.tools_mcp import mcp as train_mcp
 mcp.mount(train_mcp)
-if is_local_mode():
-    from mcp_tools.models.evolved.tools_mcp import mcp as evolved_mcp
-    mcp.mount(evolved_mcp)
 
 
 

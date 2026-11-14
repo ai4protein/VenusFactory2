@@ -58,8 +58,6 @@ def test_vina_secondary_dataset_is_owned_and_coordinator_holds_no_compute_slot(t
     payload={'model_id':'external:vina','dataset_id':receptor['id'],'config':config}
     job=p.start('a','predict',payload,launch=False)
     assert job['status']=='queued' and p.resource_for('a','predict',payload)=='api:orchestration'
-    graph={'nodes':[{'id':'input','kind':'data','dataset_id':receptor['id']},{'id':'dock','kind':'model','model_id':'external:vina','config':config},{'id':'result','kind':'output'}], 'edges':[{'source':'input','target':'dock'},{'source':'dock','target':'result'}]}
-    assert p.validate_graph('a',graph)[0]==['input','dock','result']
 
 
 def test_all_upstream_commands_and_output_paths(tmp_path):

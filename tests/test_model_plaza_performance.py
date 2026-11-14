@@ -25,7 +25,7 @@ def isolated(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("mode", ["online", "local"])
-@pytest.mark.parametrize("listing", ["plaza_catalog", "workflow_components"])
+@pytest.mark.parametrize("listing", ["plaza_catalog"])
 def test_fresh_catalog_does_not_import_inference_or_registered_tool_implementations(tmp_path, mode, listing):
     code = """
 import json,sys

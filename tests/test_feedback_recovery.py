@@ -52,15 +52,14 @@ def test_reset_restores_all_resources_without_erasing_identity_history_or_idempo
     for i,mode in enumerate(['agent','scientist','researcher']):
         access.admit('chat:'+str(i),mode,'ip','visitor')
     compute.bind('owner',('ip','visitor'))
-    compute.admit('job','owner',{'workflow':5,'prediction':20})
+    compute.admit('job','owner',{'prediction':20})
     assert access.status('ip','visitor')['remaining']==0
     feedback.reset(access,{'email':'admin@example.org'})
     assert access.status('ip','visitor')['remaining']==3
     assert compute.status('owner')['prediction']['remaining']==20
-    assert compute.status('owner')['workflow']['remaining']==5
     assert access.owned_chat_ids('visitor')=={'0','1','2'}
     assert access.admit('chat:0','agent','ip','visitor') is False
-    assert compute.admit('job','owner',{'workflow':5,'prediction':20}) is False
+    assert compute.admit('job','owner',{'prediction':20}) is False
     stats=feedback.overview(compute)
     assert stats['modes']==dict(agent=1,scientist=1,researcher=1)
     assert stats['conversations_used']==stats['predictions_used']==0

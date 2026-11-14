@@ -21,31 +21,12 @@ def discovery_instructions(tool_names):
     search = registered("search_research_tools")
     if not search:
         return CAPABILITY_BOUNDARY + '\n\n' + help_text
-    describe = registered("describe_evolved_model")
-    predict = registered("predict_with_evolved_model")
     text = (
-        "Capability discovery: when asked what tools or protein models are available, or to find a tool/model "
-        "for a task, call " + search + " before answering. Use kind='models', query='' for the Model Plaza "
-        "inventory of enabled platform and curator-published models, kind='tools' for native tools, or kind='all' for a task search. "
-        "Search by protein identifier or property; use stage and pagination to narrow large catalogs. "
-        "Report returned counts and representative matches without claiming a page is the complete catalog. "
-        "If a search returns no matches, broaden the query or inspect the empty-query overview before claiming no capability exists. "
-        "Scientist-created protein predictors are scientific tools; the UI Model selector chooses the chat LLM. "
+        "Capability discovery: search enabled platform tools and Factory-trained models before claiming availability. "
+        "Use kind='models' for the Model Plaza inventory, kind='tools' for native tools, or kind='all' for a task search. "
+        "Search by protein or property and paginate. An empty page is not proof of missing capability. "
+        "RSI outputs are case repositories in RSI Plaza for preview and ZIP download; they cannot be called by Agent or Researcher. "
     )
-    if describe and predict:
-        text += (
-            "To use a Scientist model, call " + describe + " with a discovered entry_id, then " + predict
-            + " using the returned scope and input contract. Ask for missing sequences, features or conditions; "
-            "do not invent measurements or use an unrelated protein scope. New published models are discovered "
-            "at tool-call time, so refresh the search instead of relying on remembered model lists. "
-        )
-    generated = registered("search_generated_capabilities")
-    inspect_generated = registered("describe_generated_capability")
-    run_generated = registered("run_generated_capability")
-    if generated and inspect_generated and run_generated:
-        text += ("For autonomous Scientist creations, use " + generated + " to search the reviewed registry by protein/property/scenario. "
-                 "Inspect the selected ID with " + inspect_generated + " for its interface, author, version, evaluation and limitations, then call " + run_generated + ". "
-                 "An executed research artifact or a Critic approval alone is not public tool admission. Never describe pending candidates as available tools. ")
     web = registered("query_web")
     serp = registered("query_serpapi")
     if web:

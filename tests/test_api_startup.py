@@ -35,13 +35,15 @@ from pydantic import ValidationError
 client = TestClient(app)
 paths = ['/health', '/api/chat/agent-execution-options',
          '/api/chat/science-goals/catalog?view=composer', '/api/report/options',
-         '/api/model-platform/catalog?limit=1', '/api/model-platform/workflow-components?limit=1']
+         '/api/model-platform/catalog?limit=1', '/api/rsi-plaza/cases?limit=1']
 for path in paths:
     response = client.get(path)
     assert response.status_code == 200, (path, response.status_code, response.text[:1000])
     assert isinstance(response.json(), dict)
-detail = client.get('/api/model-platform/workflow-components/tool:query_pubmed')
+detail = client.get('/api/model-platform/tools/tool:query_pubmed')
 assert detail.status_code == 200 and 'query' in detail.json()['contract']['properties']
+for retired in ('/api/model-platform/workflow-components', '/api/model-platform/workflows'):
+    assert client.get(retired).status_code == 404
 assert not {'backend', 'api_key'} & MutationRunBody.model_json_schema()['properties'].keys()
 for field in ('backend', 'api_key'):
     try:

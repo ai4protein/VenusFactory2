@@ -204,7 +204,7 @@ def cards():
     for key,(name,category,description,url,_) in MODELS.items():
         ready,reason=availability(key)
         c={'id':'external:'+key,'name':name,'category':category,'description':description,'source':'platform',
-           'visibility':'public','adapter':'external:'+key,'workflow':True,'input_kind':'structure',
+           'visibility':'public','adapter':'external:'+key,'predictable':True,'input_kind':'structure',
            'parameter_schema':schema(key),'available':ready,'disabled_reason':reason,'reference_url':url,
            'input_accept':'.pdbqt' if key=='vina' else '.pdb'}
         if key=='admet_ai':

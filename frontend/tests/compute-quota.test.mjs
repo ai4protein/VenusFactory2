@@ -4,7 +4,7 @@ import { computeQuotaError, COMPUTE_QUOTA_CHANGED } from '../src/lib/computeQuot
 
 test('shared compute allowance errors show required/remaining counts and reset without opening chat credits', () => {
   const events = []; const old = globalThis.window;
-  globalThis.window = { location: { pathname: '/en/workflows' }, dispatchEvent: event => events.push(event) };
+  globalThis.window = { location: { pathname: '/en/models' }, dispatchEvent: event => events.push(event) };
   try {
     const quota = { enforced: true, mode: 'online', prediction: { limit: 20, used: 19, remaining: 1 }, resets_at: '2099-01-02T00:00:00+08:00', timezone: 'Asia/Shanghai' };
     const text = computeQuotaError({ detail: { code: 'COMPUTE_DAILY_LIMIT_REACHED', resource: 'prediction', required: 2, quota } });
@@ -12,8 +12,8 @@ test('shared compute allowance errors show required/remaining counts and reset w
     assert.match(text, /00:00/);
     assert.equal(events[0].type, COMPUTE_QUOTA_CHANGED);
     assert.equal(events[0].detail, quota);
-    globalThis.window.location.pathname = '/zh/workflows';
-    assert.match(computeQuotaError({ detail: { code: 'COMPUTE_DAILY_LIMIT_REACHED', resource: 'workflow', required: 1, quota: { ...quota, workflow: { remaining: 0 } } } }), /今日剩余 0 次/);
+    globalThis.window.location.pathname = '/zh/models';
+    assert.match(computeQuotaError({ detail: { code: 'COMPUTE_DAILY_LIMIT_REACHED', resource: 'prediction', required: 1, quota: { ...quota, prediction: { remaining: 0 } } } }), /今日剩余 0 次/);
     assert.equal(computeQuotaError({ detail: 'Invalid dataset' }), null);
   } finally { globalThis.window = old; }
 });

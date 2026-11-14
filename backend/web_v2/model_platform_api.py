@@ -1,4 +1,4 @@
-"""HTTP boundary for browser-private models, uploads, jobs and workflows."""
+"""HTTP boundary for browser-private models, uploads, jobs and standalone tools."""
 from urllib.parse import urlsplit
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, Query
 from fastapi.responses import FileResponse
@@ -82,36 +82,14 @@ async def predict(body: dict, who=Depends(owner)):
     return await call(service.start, who, 'predict', body)
 
 
-@router.get('/workflow-components')
-async def workflow_components(query: str = Query('', max_length=200), category: str = '', source: str = '',
-                              kind: str = Query('', pattern='^(|model|tool)$'), offset: int = Query(0, ge=0),
-                              limit: int = Query(24, ge=1, le=100), who=Depends(owner)):
-    return await call(service.workflow_components, who, query, category, source, kind, offset, limit)
+@router.get('/tools/{identity}')
+async def tool(identity: str, who=Depends(owner)):
+    return await call(service.tool, identity)
 
 
-@router.get('/workflow-components/{identity}')
-async def workflow_component(identity: str, who=Depends(owner)):
-    return await call(service.workflow_component, who, identity)
-
-
-@router.get('/workflows')
-async def workflows(who=Depends(owner)):
-    return await call(service.workflows, who)
-
-
-@router.post('/workflows')
-async def save_workflow(body: dict, who=Depends(owner)):
-    return await call(service.save_workflow, who, body)
-
-
-@router.post('/workflows/run')
-async def run_workflow(body: dict, who=Depends(owner)):
-    return await call(service.start, who, 'workflow', body)
-
-
-@router.get('/workflows/{identity}')
-async def workflow(identity: str, who=Depends(owner)):
-    return await call(service.workflow, who, identity)
+@router.post('/tools/run')
+async def run_tool(body: dict, who=Depends(owner)):
+    return await call(service.start, who, 'tool', body)
 
 
 @router.get('/job-history')

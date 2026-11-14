@@ -310,11 +310,9 @@ DENOVO_TOOLS: list[BaseTool] = (
     else []
 )
 
-from mcp_tools.models.evolved.tools_agent import EVOLVED_MODEL_TOOLS
 from mcp_tools.tools.discovery.tools_agent import DISCOVERY_TOOLS
 from mcp_tools.models.pretrained.design_docking.tools_agent import EXTERNAL_TOOLS
 from mcp_tools.tools.research.tools_agent import PUBLIC_PROTEIN_TOOLS
-from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
 
 ALL_TOOLS: list[BaseTool] = (
     MUTATION_TOOLS
@@ -325,10 +323,8 @@ ALL_TOOLS: list[BaseTool] = (
     + SKILL_TOOLS
     + DATABASE_TOOLS
     + DENOVO_TOOLS
-    + EVOLVED_MODEL_TOOLS
     + DISCOVERY_TOOLS
     + EXTERNAL_TOOLS
-    + RESEARCH_CAPABILITY_TOOLS
     + PUBLIC_PROTEIN_TOOLS
 )
 

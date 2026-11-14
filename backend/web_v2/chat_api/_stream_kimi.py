@@ -87,8 +87,6 @@ def _build_system_prompt(lang: str) -> str:
 
     from mcp_tools.tools.research.basic_queries import BASIC_PUBLIC_TOOL_NAMES
     discovery_names = ['mcp__venusfactory__' + name for name in ('search_research_tools', 'query_web', 'query_serpapi', *BASIC_PUBLIC_TOOL_NAMES)]
-    if is_local_mode():
-        discovery_names += ["mcp__venusfactory__describe_evolved_model", "mcp__venusfactory__predict_with_evolved_model"]
     guidance = discovery_instructions(discovery_names)
 
     return f"""\

@@ -274,6 +274,7 @@ app.include_router(settings_v2_router)
 app.include_router(models_v2_router)
 app.include_router(_import_attr('backend.web_v2.tool_jobs_api', "router"))
 app.include_router(_import_attr('backend.web_v2.model_platform_api', "router"))
+app.include_router(_import_attr('backend.web_v2.rsi_plaza_api', "router"))
 # The router enforces per-operation policy: online training is limited to
 # ESM2-8M, with browser-owned uploads and queued jobs. Metadata is needed in
 # both modes so the UI never remains stuck on its loading placeholders.

@@ -70,58 +70,7 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
 
     platform = platform_models(query, [t["name"] for t in tools]) if kind != "tools" and not stage else []
     model_results.extend(platform)
-    cards = []
-    model_status = "not_requested"
-    if kind != "tools":
-        model_status = "available"
-        if is_local_mode():
-            try:
-                cards = model_cards()
-                model_status = "available"
-            except Exception:
-                logger.exception("Scientist model catalog could not be loaded")
-                model_status = "unavailable"
-    from mcp_tools.tools.capability_policy import CapabilityStore
-    settings = CapabilityStore()
-    cards = [
-        card for card in cards
-        if card.get("runtime_compatible", True)
-        and settings.enabled("model:scientist:" + card["entry_id"])
-        and is_tool_allowed("predict_with_evolved_model")
-    ]
-    if cards:
-        from mcp_tools.models.evolved.service import discovery_card, model_relevance
-    for card in cards:
-        if stage and card["stage"] != stage:
-            continue
-        score = model_relevance(groups, card)
-        if score is None:
-            continue
-        model_results.append((score, card["entry_id"], {
-            "kind": "scientist_model",
-            "model_family": "rsi",
-            **discovery_card(card),
-        }))
-
-    capability_count = 0
-    if kind != "tools" and not stage and is_tool_allowed("run_generated_capability"):
-        from .generated_scope import GeneratedScope
-
-        def rank_capability(name, search_text, capability_kind):
-            if capability_kind == "model":
-                search_text += " predict prediction"
-            return relevance(groups, name, search_text)
-
-        capability_scope = GeneratedScope()
-        references = capability_scope.references(rank_capability)
-        for identity, score in references:
-            if not settings.enabled("model:capability:" + identity):
-                continue
-            capability_count += 1
-            if score is not None:
-                model_results.append((score, identity, {
-                    "kind": "research_capability", "entry_id": identity,
-                }))
+    model_status = "available" if kind != "tools" else "not_requested"
 
     def order(item):
         return -item[0], item[1]
@@ -134,21 +83,6 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
         combined = [item for pair in zip_longest(tool_results, model_results) for item in pair if item is not None]
     total = len(combined)
     page = [item[2] for item in combined[offset:offset + limit]]
-    selected = [item["entry_id"] for item in page if item["kind"] == "research_capability"]
-    if selected:
-        compact = capability_scope.cards(selected)
-        # A publication can be withdrawn or superseded between index and page reads.
-        page = [item for item in page if item["kind"] != "research_capability"
-                or item["entry_id"] in compact]
-        for item in page:
-            if item["kind"] != "research_capability":
-                continue
-            identity = item["entry_id"]
-            card = compact[identity]
-            item.update({key: value for key, value in card.items() if key not in {"id", "kind"}})
-            item.update(model_family="rsi", describe={
-                "tool": "describe_generated_capability", "arguments": {"capability_id": identity},
-            }, predict_tool="run_generated_capability")
     return {
         "success": True,
         "query": query,
@@ -158,9 +92,9 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
         "matching_tools": len(tool_results),
         "matching_models": len(model_results),
         "available_tools": len(tools),
-        "indexed_models": len(cards) + capability_count + len(platform_models("", [t["name"] for t in tools])) if kind != "tools" else 0,
-        "model_stages": dict(sorted(Counter(c["stage"] for c in cards).items())),
+        "indexed_models": len(platform_models("", [t["name"] for t in tools])) if kind != "tools" else 0,
+        "model_stages": {},
         "model_catalog_status": model_status,
         "next_offset": offset + limit if offset + limit < total else None,
-        "model_usage": "Describe the selected entry and follow its input contract. For an evolved model, pass its scope_ref to prediction; preserve supplied record IDs and values. Ask for missing inputs. Published protein models are callable scientific tools, separate from the chat language-model selector.",
+        "model_usage": "Describe the selected entry and follow its input contract. Preserve supplied record IDs and values. RSI cases are downloadable repositories in RSI Plaza, not callable tools. Ask for missing inputs. Published protein models are callable scientific tools, separate from the chat language-model selector.",
     }

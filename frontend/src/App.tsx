@@ -7,7 +7,7 @@ import { QuotaDialog } from "./components/QuotaDialog";
 import { ModelPlazaLayout, LegacyModelRedirect } from "./components/ModelPlazaLayout";
 const ModelPlazaPage = lazy(() => pageLoaders.ModelPlazaPage().then(m => ({ default: m.ModelPlazaPage })));
 const ModelCreatePage = lazy(() => pageLoaders.ModelCreatePage().then(m => ({ default: m.ModelCreatePage })));
-const ModelWorkflowPage = lazy(() => pageLoaders.ModelWorkflowPage().then(m => ({ default: m.ModelWorkflowPage })));
+const RSIPlazaPage = lazy(() => pageLoaders.RSIPlazaPage().then(m => ({ default: m.RSIPlazaPage })));
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { LangNavigate } from "./components/LangLink";
@@ -203,12 +203,14 @@ function LocalizedApp() {
           <Route path="models" element={<ModelPlazaLayout />}>
             <Route index element={<ModelPlazaPage />} />
             <Route path="new" element={<ModelCreatePage />} />
+            <Route path="rsi" element={<RSIPlazaPage />} />
             <Route path="training" element={<CustomModelTrainingPage readonly={runtimeMode === "unknown"} workspaceEnabled={workspaceEnabled} />} />
             <Route path="evaluation" element={<CustomModelEvaluationPage readonly={!localFeaturesEnabled} workspaceEnabled={workspaceEnabled} />} />
             <Route path="predict" element={<CustomModelPredictPage readonly={!localFeaturesEnabled} workspaceEnabled={workspaceEnabled} />} />
             <Route path="leaderboards" element={<LeaderboardsPage />} />
           </Route>
-              <Route path="workflows" element={<ModelWorkflowPage />} />
+          <Route path="workflow/*" element={<UnavailablePage />} />
+          <Route path="workflows/*" element={<UnavailablePage />} />
               <Route path="quick-tools/directed-evolution" element={<DirectedEvolutionPage workspaceEnabled={workspaceEnabled} />} />
           <Route path="quick-tools/sequence-design" element={<SequenceDesignPage workspaceEnabled={workspaceEnabled} />} />
           <Route
@@ -263,4 +265,9 @@ function LocalizedApp() {
     </div>
     </SidebarContext.Provider>
   );
+}
+
+function UnavailablePage() {
+  const lang = langFromPath(useLocation().pathname) || 'en';
+  return <section className="mp-page"><span className="mp-eyebrow">404</span><h1>{lang === 'zh' ? '页面不可用' : 'Page unavailable'}</h1><a className="mp-button" href={`/${lang}/agent/chat`}>{lang === 'zh' ? '返回对话' : 'Back to chat'}</a></section>;
 }

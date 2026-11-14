@@ -9,7 +9,7 @@ import './JobHistory.css';
 import { JOBS_CHANGED, mergeJobUpdate, jobPollDelay, type JobUpdate } from '../lib/jobUpdates';
 
 const statuses: Record<string, [string, string]> = { active: ['In progress', '进行中'], queued: ['Queued', '排队中'], running: ['Running', '运行中'], completed: ['Completed', '已完成'], failed: ['Failed', '失败'], interrupted: ['Interrupted', '已中断'], cancelled: ['Cancelled', '已取消'] };
-const kinds: Record<string, [string, string]> = { train: ['Training', '训练'], training: ['Training', '训练'], predict: ['Prediction', '预测'], evaluation: ['Evaluation', '评估'], workflow: ['Workflow', '工作流'] };
+const kinds: Record<string, [string, string]> = { train: ['Training', '训练'], training: ['Training', '训练'], predict: ['Prediction', '预测'], evaluation: ['Evaluation', '评估'], tool: ['Tool', '工具'] };
 
 export function JobHistory({ customTask, defer = false, presentation = 'inline' }: { customTask?: string; defer?: boolean; presentation?: 'inline' | 'dialog' }) {
   const { lang } = useLang(); const zh = lang === 'zh'; const tr = (pair: [string, string]) => pair[zh ? 1 : 0];
@@ -78,7 +78,7 @@ export function JobHistory({ customTask, defer = false, presentation = 'inline' 
       <div className="job-history-filters">
         <input aria-label={zh ? '搜索我的作业' : 'Search my jobs'} placeholder={zh ? '作业号或模型名称' : 'Job number or model name'} value={query} onChange={e => { setQuery(e.target.value); setOffset(0); }}/>
         <select aria-label={zh ? '作业状态' : 'Job status'} value={status} onChange={e => { setStatus(e.target.value); setOffset(0); }}><option value="">{zh ? '全部状态' : 'All statuses'}</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{tr(label)}</option>)}</select>
-        {!customTask && <select aria-label={zh ? '作业类型' : 'Job type'} value={kind} onChange={e => { setKind(e.target.value); setOffset(0); }}><option value="">{zh ? '全部类型' : 'All types'}</option>{['predict', 'train', 'workflow'].map(value => <option key={value} value={value}>{tr(kinds[value])}</option>)}</select>}
+        {!customTask && <select aria-label={zh ? '作业类型' : 'Job type'} value={kind} onChange={e => { setKind(e.target.value); setOffset(0); }}><option value="">{zh ? '全部类型' : 'All types'}</option>{['predict', 'train', 'tool'].map(value => <option key={value} value={value}>{tr(kinds[value])}</option>)}</select>}
       </div>
       {error && <p role="alert" className="mp-error">{error}</p>}
       <div className="job-history-list" aria-busy={loading}>{!!page?.items.length && <div className="job-history-columns" aria-hidden="true"><span>{zh ? '名称 / 作业号' : 'Name / job number'}</span><span>{zh ? '类型' : 'Type'}</span><span>{zh ? '状态' : 'Status'}</span><span>{zh ? '提交时间' : 'Submitted'}</span><span>{zh ? '操作' : 'Actions'}</span></div>}{page?.items.map(job => <article key={job.id}>

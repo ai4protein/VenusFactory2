@@ -1,81 +1,27 @@
+"""RSI cases never re-enter the executable Model Plaza, including old IDs."""
 import pytest
 from backend.web_v2.model_platform import Platform
 from mcp_tools.models.evolved import service
 
-def test_stale_model_detail_remains_readable_but_cannot_run(tmp_path,monkeypatch):
-    p=Platform(tmp_path)
-    card={"id":"scientist:stale","name":"Published model","adapter":"scientist",
-          "source":"scientist","category":"function","input_kind":"table","workflow":True}
-    monkeypatch.setattr(p,"shared",lambda:([card],[]))
-    monkeypatch.setattr(service,"configured_library",lambda:object())
-    def changed(*args):
-        raise ValueError("plugin implementation changed after policy freeze")
-    monkeypatch.setattr(service,"describe_model",changed)
-    result=p.model("owner","scientist:stale",detail=True)
-    assert result["available"] is False
-    assert result["disabled_reason"]=="needs_revalidation"
-    assert result["contract"]["verified_now"] is False
-    with pytest.raises(ValueError,match="revalidation"):p.require_available(result)
 
-def test_evolved_search_excludes_incompatible_publications(monkeypatch):
-    from mcp_tools.tools.capability_policy import CapabilityStore
-    monkeypatch.setattr(CapabilityStore,"enabled",lambda *args:True)
-    cards=[{"entry_id":"old","stage":"test","runtime_compatible":False},
-           {"entry_id":"current","stage":"test","runtime_compatible":True}]
-    for card in cards:
-        card.update(scope={"protein":"fixture","target":"activity","assay":"measurement"},
-                    interface="generated_python.v1", verified_now=False)
-    monkeypatch.setattr(service,"catalog_cards",lambda _: (cards,{"indexed_entries":2,"counting_rule":"fixture"}))
-    result=service.list_models(object())
-    assert [x["entry_id"] for x in result["models"]]==["current"]
-
-
-def test_known_stale_card_does_not_replay_full_evidence_on_detail(tmp_path, monkeypatch):
+@pytest.mark.parametrize("identity", ["scientist:stale", "capability:reviewed"])
+def test_old_rsi_model_details_do_not_read_or_replay_evidence(tmp_path, monkeypatch, identity):
     p = Platform(tmp_path)
-    card = {"id": "scientist:stale", "name": "Archived model", "adapter": "scientist",
-            "source": "scientist", "category": "function", "input_kind": "table",
-            "workflow": True, "validation_status": "needs_revalidation"}
-    monkeypatch.setattr(p, "shared", lambda: ([card], []))
-    def unexpected(*args):
-        raise AssertionError("Known incompatible evidence must not be replayed on a detail request")
-    monkeypatch.setattr(service, "describe_model", unexpected)
-    detail = p.model("owner", card["id"], detail=True)
-    assert not detail["available"]
-    assert detail["contract"]["verified_now"] is False
+    monkeypatch.setattr(p, "shared", lambda: pytest.fail("Old RSI ID read executable catalog"))
+    monkeypatch.setattr(service, "describe_model", lambda *a: pytest.fail("Replayed retired model"))
+    with pytest.raises(FileNotFoundError): p.model("owner", identity, detail=True)
+    with pytest.raises(FileNotFoundError): p.predict("owner", identity, {"kind":"table","rows":[]})
 
 
-def test_online_plaza_never_loads_unselected_local_research_models(tmp_path, monkeypatch):
+@pytest.mark.parametrize("local", [True, False])
+def test_shared_catalog_never_loads_rsi_but_keeps_factory_models(tmp_path, monkeypatch, local):
     from agent.harness import research_workspace
     from mcp_tools.tools import runtime_tool_policy
     from mcp_tools.models.factory.training import model_registry
-
-    platform = Platform(tmp_path)
-    monkeypatch.setattr(platform, "official", lambda: [])
-    monkeypatch.setattr(model_registry, "list_trained_models", lambda: {"models": []})
-    curated = {"id": "reviewed", "name": "Reviewed model", "description": "Selected publication",
-               "author_email": "author@example.org"}
-    monkeypatch.setattr(research_workspace, "capability_cards", lambda: [curated])
-    local = [True]
-    monkeypatch.setattr(runtime_tool_policy, "is_local_mode", lambda: local[0])
-    reads = []
-
-    def load():
-        reads.append(1)
-        assert local[0], "Online catalogs must not read the private local library"
-        return object()
-
-    monkeypatch.setattr(service, "configured_library", load)
-    monkeypatch.setattr(service, "catalog_cards", lambda _: ([{
-        "entry_id": "private", "scope": {"protein": "unpublished", "target": "activity"},
-        "interface": "fixture.v1", "stage": "activity", "runtime_compatible": True,
-    }], {}))
-    assert {c["id"] for c in platform.shared()[0]} == {"scientist:private", "capability:reviewed"}
-    local[0] = False
-    online, issues = platform.shared()
-    assert not issues and [c["id"] for c in online] == ["capability:reviewed"]
-    assert online[0]["author_email"] == "author@example.org"
-    with pytest.raises(FileNotFoundError):
-        platform.model("visitor", "scientist:private")
-    assert len(reads) == 1
-    local[0] = True
-    assert len(platform.shared()[0]) == 2 and len(reads) == 2
+    p = Platform(tmp_path)
+    monkeypatch.setattr(runtime_tool_policy, "is_local_mode", lambda: local)
+    monkeypatch.setattr(p, "official", lambda: [{"id":"builtin:example"}])
+    monkeypatch.setattr(model_registry, "list_trained_models", lambda: {"models":[]})
+    monkeypatch.setattr(service, "configured_library", lambda: pytest.fail("Model Plaza scanned RSI library"))
+    monkeypatch.setattr(research_workspace, "capability_cards", lambda: pytest.fail("Model Plaza scanned RSI programs"))
+    assert p.shared() == ([{"id":"builtin:example"}], [])

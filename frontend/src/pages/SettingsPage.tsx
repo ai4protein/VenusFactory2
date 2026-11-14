@@ -80,7 +80,7 @@ const LABELS: Record<string, [string, string]> = {
   TEMP_OUTPUTS_DIR: ["File storage directory", "文件存储目录"], TEMP_OUTPUTS_ENABLE_TTL_CLEANUP: ["Automatic file cleanup", "自动清理文件"],
   MCP_HTTP_HOST: ["MCP listen address", "MCP 监听地址"], MCP_HTTP_PORT: ["MCP port", "MCP 端口"],
   SCP_HUB_API_KEY: ["SCP Hub API key", "SCP Hub API 密钥"], ESMFOLD_BACKEND: ["ESMFold service", "ESMFold 服务"],
-  SCP_WORKFLOW_SERVER_URL: ["Workflow server", "工作流服务地址"], DRUGSDA_MODEL_SERVER_URL: ["DrugSDA model server", "DrugSDA 模型服务地址"],
+  SCP_WORKFLOW_SERVER_URL: ["Remote file service", "远程文件服务"], DRUGSDA_MODEL_SERVER_URL: ["DrugSDA model server", "DrugSDA 模型服务地址"],
   DRUGSDA_TOOL_SERVER_URL: ["DrugSDA tool server", "DrugSDA 工具服务地址"], VENUSMINE_MMSEQS_DATABASE_PATH: ["VenusMine database", "VenusMine 数据库"],
   MMSEQS_DATABASE_PATH: ["MMseqs database", "MMseqs 数据库"], HF_ENDPOINT: ["Hugging Face endpoint", "Hugging Face 地址"],
   PT_DATA_DIR: ["Protein data directory", "蛋白质数据目录"], VENUS_CKPT_REPO_ID: ["Checkpoint repository", "模型权重仓库"],

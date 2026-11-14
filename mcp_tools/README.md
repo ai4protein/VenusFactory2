@@ -1,13 +1,13 @@
 # MCP tools
 
-The MCP service is the shared capability boundary for Chat, Model Plaza and Workflows.
+The MCP service is the shared capability boundary for Chat and Model Plaza.
 Public tool names and model IDs are independent of Python package paths.
 
 | Directory | Responsibility |
 | --- | --- |
 | `models/pretrained/` | Upstream methods: ProSST, ProtSSN, ESM-1v/IF1, ProteinMPNN, LigandMPNN, AntiBMPNN, BindCraft, BoltzGen, DiffDock, Vina, ADMET and S4PRED |
 | `models/factory/` | Platform training, evaluation and prediction; dataset-specific checkpoints such as DeepSol · ESM2-650M |
-| `models/evolved/` | Access to reviewed Scientist/RSI artifacts; ownership, applicability and public admission remain enforced |
+| `models/evolved/` | Internal Scientist/RSI evidence and offline replay; public case preview/download lives in the RSI Plaza API, not MCP prediction |
 | `models/profiles.py` | Administrator-owned runtime configuration and repository-relative paths |
 | `models/execution.py` | Shared bounded subprocess dispatch, without importing model weights into the API |
 | `scheduler/` | Tool discovery, resource queues, async jobs, MCP client and worker entry points |

@@ -70,12 +70,7 @@ def test_http_catalog_and_tool_drawer_execution(setup, monkeypatch):
         assert client.get('/api/model-platform/catalog?kind=unknown').status_code == 422
         assert client.get('/api/model-platform/catalog?limit=101').status_code == 422
         d = client.post('/api/model-platform/datasets', files={'file': ('example.fasta', b'>fixture\nACDEFGHIK')}).json()
-        graph = {'nodes': [
-            {'id': 'input', 'kind': 'data', 'dataset_id': d['id']},
-            {'id': 'tool', 'kind': 'tool', 'model_id': 'tool:read_fasta', 'config': {'parameters': {}, 'sequence_column': 'sequence'}},
-            {'id': 'result', 'kind': 'output'},
-        ], 'edges': [{'source': 'input', 'target': 'tool'}, {'source': 'tool', 'target': 'result'}]}
-        response = client.post('/api/model-platform/workflows/run', json={'graph': graph})
+        response = client.post('/api/model-platform/tools/run', json={'tool_id':'tool:read_fasta', 'dataset_id':d['id'], 'config':{'parameters':{}, 'sequence_column':'sequence'}})
         assert response.status_code == 200, response.text
         job = response.json(); p.execute(job['id'])
         done = client.get('/api/model-platform/jobs/' + job['id']).json()

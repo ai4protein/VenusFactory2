@@ -14,6 +14,7 @@ from agent.harness import research_workspace as rw
 from backend.web_v2.job_queue import JobQueue
 from backend.web_v2.research_capability_access import owned_sessions, private_libraries
 from mcp_tools.tools import capability_policy
+from mcp_tools.tools.capability_policy import CapabilityDisabled
 from mcp_tools.tools.discovery import generated_scope, service
 
 
@@ -111,16 +112,15 @@ def test_search_binds_current_owner_and_never_reveals_other_sessions(private_env
     lease(state, monkeypatch, "owner-a", "agent-a")
     assert set(owned_sessions()) == {"agent-a", "research-a"}
     page = generated_scope.search("synthetic")
-    assert [item["id"] for item in page["items"]] == ["a" * 64]
-    assert page["items"][0]["visibility"] == "private"
+    assert page["items"] == [] and page["total"] == 0
     assert "research-b" not in json.dumps(page) and str(state.root) not in json.dumps(page)
-    with pytest.raises(ValueError, match="Model unavailable"):
+    with pytest.raises(RuntimeError, match="RSI Plaza"):
         generated_scope.describe("b" * 64)
-    with pytest.raises((ValueError, KeyError, FileNotFoundError)):
+    with pytest.raises(RuntimeError, match="RSI Plaza"):
         generated_scope.describe("a" * 64)  # Metadata cannot bypass actual SC evidence.
     monkeypatch.setattr(service, "model_cards", lambda: [])
     monkeypatch.setattr(service, "platform_models", lambda *args: [])
-    assert service.search(kind="models", tool_catalog=[])["results"][0]["entry_id"] == "a" * 64
+    assert service.search(kind="models", tool_catalog=[])["results"] == []
 
 
 @pytest.mark.parametrize(
@@ -164,7 +164,7 @@ def test_revocation_is_rechecked_after_search(private_environment, monkeypatch, 
         folder.symlink_to(saved, target_is_directory=True)
     assert scope.cards(["a" * 64]) == {}
     assert generated_scope.search()["total"] == 0
-    with pytest.raises(ValueError, match="Model unavailable"):
+    with pytest.raises(RuntimeError, match="RSI Plaza"):
         scope.library_for("a" * 64)
 
 
@@ -188,314 +188,53 @@ def test_local_scientist_legacy_queue_owner_does_not_grant_online_access(
 
 
 async def verify_private_reuse(state, goal, source_session, monkeypatch):
-    """Continue the actual trained/SC-reviewed worker-recovery fixture via Agent MCP."""
+    """A real SC-reviewed recovery fixture remains private and cannot enter Agent."""
     from fastmcp import Client, FastMCP
     from fastmcp.exceptions import ToolError
-
-    from agent.harness.tool_disclosure import DisclosureError, ToolDisclosure
-    from mcp_tools.tools import runtime_tool_policy
-    from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
-    from mcp_tools.tools.discovery.scoped import ScopedScientistCatalog
     from mcp_tools.tools.discovery.tools_mcp import register_discovery_tools
 
-    identity = goal.read()["progress"]["deliveries"][0]["candidate_id"]
+    before = goal.read()
+    identity = before["progress"]["deliveries"][0]["candidate_id"]
     session(state, source_session, "fixture-owner")
     session(state, "agent-fixture", "fixture-owner")
-    session(state, "agent-foreign", "foreign-owner")
     attach_goal(state, goal, source_session)
-    queue, root = lease(state, monkeypatch, "fixture-owner", "agent-fixture")
-    monkeypatch.setattr(service, "model_cards", lambda: [])
-    monkeypatch.setattr(service, "platform_models", lambda *args: [])
-    # The online policy is applied throughout. Private reuse never publishes a
-    # model to the shared library or requires a permissive local policy.
-    monkeypatch.setattr(runtime_tool_policy, "is_online_mode", lambda: True)
-    mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
-    adapter = ScopedScientistCatalog(mapping, lambda tool: True)
-    disclosure = ToolDisclosure(
-        mapping,
-        schema=lambda tool: tool.args_schema.model_json_schema(),
-        allowed=lambda tool: True,
-        model_catalog=adapter,
-    )
-    overview = disclosure.metadata("search_tools", {})
-    assert any(row["id"] == "rsi" for row in overview["categories"])
-    assert overview["tools"] == [] and identity not in json.dumps(disclosure.surface())
-    page = disclosure.metadata("search_tools", {"category": "rsi", "query": "recovery"})
-    name = adapter.prefix + identity
-    assert page["tools"][0]["name"] == name
-    assert set(page["tools"][0]) == {"name", "description"}
-    assert "inputSchema" not in json.dumps(page) and str(goal.root) not in json.dumps(page)
-    with pytest.raises(DisclosureError):
-        disclosure.resolve("call_tool", {"name": name, "arguments": {"inputs": {"x": "3"}}})
-    contract = disclosure.metadata("describe_tool", {"name": name})
-    assert contract["inputSchema"]["properties"]["inputs"]["required"] == ["x"]
-    assert contract["review_status"] == "approved" and contract["visibility"] == "private"
-    assert "validation" not in contract and "review_receipt" not in contract
-    with pytest.raises(DisclosureError):
-        disclosure.resolve("call_tool", {"name": name, "arguments": {"inputs": {"x": "3"}, "owner": "foreign-owner"}})
-    with pytest.raises(DisclosureError, match="contract"):
-        disclosure.resolve("call_tool", {"name": name, "arguments": {"inputs": {"x": 3}}})
-    key, tool, arguments = disclosure.resolve("call_tool", {"name": name, "arguments": {"inputs": {"x": "3"}}})
-    assert key == "run_generated_capability" and tool is mapping[key]
-    assert arguments == {"capability_id": identity, "inputs": {"x": "3"}}
-    # Real scheduler child credentials preserve the parent browser identity;
-    # the model-supplied child session ID is deliberately unrelated.
-    _, child = lease(state, monkeypatch, "fixture-owner", "untrusted-child-session", kind="mcp:cpu", parent=root["id"])
-    assert json.loads(await tool.ainvoke(arguments))["value"] == pytest.approx(9)
-    server = FastMCP("owner-private trained capability fixture")
+    queue, active = lease(state, monkeypatch, "fixture-owner", "agent-fixture")
+    monkeypatch.setenv("WEBUI_V2_MODE", "online")
+    server = FastMCP("RSI cases are not Agent tools")
     register_discovery_tools(server)
     async with Client(server) as client:
-        page = (await client.call_tool("search_generated_capabilities", {})).data
-        assert [card["id"] for card in page["items"]] == [identity]
-        native = json.loads(mapping["search_generated_capabilities"].invoke({}))
-        assert native == page
-        generic = (await client.call_tool("search_research_tools", {"kind": "models"})).data
-        assert [card["entry_id"] for card in generic["results"]] == [identity]
-        detail = (await client.call_tool("describe_generated_capability", {"capability_id": identity})).data
-        assert detail["input_schema"]["required"] == ["x"]
-        assert (await client.call_tool("run_generated_capability", arguments)).data["value"] == pytest.approx(9)
-        with pytest.raises(ToolError):
-            await client.call_tool("run_generated_capability", {"capability_id": identity, "inputs": {"x": "invalid"}})
-        # Tampering with the independent SC record invalidates an already
-        # inspected interface. Restore this test-owned fixture byte-for-byte.
-        delivery = goal.read()["progress"]["deliveries"][0]
-        receipt = goal.root / delivery["scientific_acceptance"]["receipt"]
-        original = receipt.read_bytes()
-        try:
-            receipt.write_text("{}")
-            with pytest.raises(DisclosureError):
-                disclosure.resolve("call_tool", {"name": name, "arguments": {"inputs": {"x": "3"}}})
+        names = {tool.name for tool in await client.list_tools()}
+        retired = {
+            "search_generated_capabilities": {},
+            "describe_generated_capability": {"capability_id": identity},
+            "run_generated_capability": {"capability_id": identity, "inputs": {"x": "3"}},
+        }
+        assert not (names & retired.keys())
+        for name, arguments in retired.items():
             with pytest.raises(ToolError):
-                await client.call_tool("run_generated_capability", arguments)
-        finally:
-            receipt.write_bytes(original)
-        # Operator disable must revoke a previously described binding as well
-        # as both discovery surfaces, without restarting any process.
-        state.switches.set(
-            "model:capability:" + identity,
-            False,
-            0,
-            {"id": "capability:" + identity, "adapter": "capability", "tools": ["run_generated_capability"]},
-            "test",
-        )
-        assert (await client.call_tool("search_generated_capabilities", {})).data["total"] == 0
-        with pytest.raises(DisclosureError):
-            disclosure.resolve("call_tool", {"name": name, "arguments": {"inputs": {"x": "3"}}})
-        with pytest.raises(ToolError):
-            await client.call_tool("run_generated_capability", arguments)
-        state.switches.set("model:capability:" + identity, True, 1, {}, "test")
-        await verify_native_private_reuse(state, goal, identity, monkeypatch)
-        # A different real owner cannot enumerate or invoke even a known ID.
-        queue.finish(child["id"], "completed", lease=child["lease"])
-        queue.finish(root["id"], "completed", lease=root["lease"])
-        _, foreign = lease(state, monkeypatch, "foreign-owner", "agent-foreign")
-        assert (await client.call_tool("search_generated_capabilities", {})).data["total"] == 0
-        with pytest.raises(ToolError):
-            await client.call_tool("describe_generated_capability", {"capability_id": identity})
-        with pytest.raises(ToolError):
-            await client.call_tool("run_generated_capability", arguments)
-        queue.finish(foreign["id"], "completed", lease=foreign["lease"])
-        lease(state, monkeypatch, "fixture-owner", "agent-fixture")
-        assert (await client.call_tool("search_generated_capabilities", {})).data["total"] == 1
-        with sqlite3.connect(state.database) as connection:
-            connection.execute("DELETE FROM sessions WHERE session_id=?", (source_session,))
-        assert (await client.call_tool("search_generated_capabilities", {})).data["total"] == 0
-        with pytest.raises(DisclosureError):
-            disclosure.resolve("call_tool", {"name": name, "arguments": {"inputs": {"x": "3"}}})
-    # All reuse remained private; no metadata or weights were copied publicly.
+                await client.call_tool(name, arguments)
+    assert goal.read() == before
     assert catalog.discovery_cards(rw.LIBRARY, [identity]) == {}
+    queue.finish(active["id"], "completed", lease=active["lease"])
 
 
-@pytest.mark.parametrize("limit", [1, 2, 3, 5])
-def test_progressive_search_pages_across_new_and_older_model_registries(private_environment, monkeypatch, limit):
+@pytest.mark.parametrize("mode", ["online", "local"])
+@pytest.mark.parametrize("tool_name", ["search_generated_capabilities", "describe_generated_capability", "run_generated_capability"])
+def test_old_bindings_and_admin_switch_cannot_restore_agent_execution(private_environment, monkeypatch, mode, tool_name):
     from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
     from mcp_tools.tools.discovery.scoped import ScopedScientistCatalog
 
     state = private_environment
-    metadata_goal(state, "research-a", "c" * 64)
+    monkeypatch.setenv("WEBUI_V2_MODE", mode)
     lease(state, monkeypatch, "owner-a", "agent-a")
     mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
     adapter = ScopedScientistCatalog(mapping, lambda tool: True)
-    old = [
-        {"name": adapter.legacy.prefix + char * 64, "description": "Older reviewed metadata fixture"}
-        for char in ("d", "e")
-    ]
-
-    def legacy(query, limit, offset):
-        return {"total": len(old), "tools": old[offset : offset + limit], "next_offset": None}
-
-    monkeypatch.setattr(adapter.legacy, "search", legacy)
-    expected = [adapter.prefix + char * 64 for char in ("a", "c")] + [item["name"] for item in old]
-    pages = [adapter.search("", limit, offset) for offset in range(0, 4, limit)]
-    assert all(page["total"] == 4 for page in pages)
-    assert [item["name"] for page in pages for item in page["tools"]] == expected
-    assert pages[-1]["next_offset"] is None
-    assert adapter.search("", limit, 4)["tools"] == []
-    # Tool-level enablement still applies with a cached adapter.
-    state.switches.set("tool:run_generated_capability", False, 0, {}, "test")
-    assert adapter.search("", limit, 0) == legacy("", limit, 0)
-
-
-def test_withdrawn_private_card_does_not_repeat_legacy_entries(private_environment, monkeypatch):
-    from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
-    from mcp_tools.tools.discovery.scoped import ScopedScientistCatalog
-
-    state = private_environment
-    metadata_goal(state, "research-a", "c" * 64)
-    lease(state, monkeypatch, "owner-a", "agent-a")
-    mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
-    adapter = ScopedScientistCatalog(mapping, lambda tool: True)
-    old = [{"name": adapter.legacy.prefix + "d" * 64, "description": "Older fixture"}]
-    monkeypatch.setattr(
-        adapter.legacy, "search", lambda query, limit, offset: {"total": 1, "tools": old[offset : offset + limit]}
-    )
-    monkeypatch.setattr(generated_scope.GeneratedScope, "cards", lambda *args: {})
-    first, second = adapter.search("", 2, 0), adapter.search("", 2, 2)
-    assert first["tools"] == [] and first["next_offset"] == 2
-    assert second["tools"] == old and second["next_offset"] is None
-
-
-def test_model_navigation_does_not_import_training_or_review_runtime():
-    import os
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[2]
-    code = """import sys
-from mcp_tools.tools.discovery.scoped import ScopedScientistCatalog
-for name in ('agent.harness.capability_review', 'agent.harness.research_workspace', 'agent.harness.scientific_acceptance', 'mcp_tools.models.evolved.service'):
-    assert name not in sys.modules, name
-"""
-    subprocess.run(
-        [sys.executable, "-c", code], cwd=root, env={**os.environ, "PYTHON_DOTENV_DISABLED": "1"}, check=True
-    )
-
-
-async def verify_native_private_reuse(state, goal, identity, monkeypatch):
-    """Real MCP navigation and model execution; controlled harness protocol only."""
-    import httpx
-
-    from agent.harness import web_native_worker as worker
-    from agent.harness.contracts import Budget, ModelBinding, Profile
-    from mcp_tools.scheduler import catalog as scheduler
-    from mcp_tools.scheduler import client as queue_client
-    from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
-    from mcp_tools.tools.discovery.scoped import ScopedScientistCatalog
-
-    mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
-    queued = []
-    name = ScopedScientistCatalog.prefix + identity
-
-    async def invoke(tool_name, arguments, **host):
-        queued.append((tool_name, arguments, host))
-        return json.loads(await mapping[tool_name].ainvoke(arguments))
-
-    monkeypatch.setattr(scheduler, "native_tools", lambda: mapping)
-    monkeypatch.setattr(queue_client, "invoke", invoke)
-
-    async def adapter(context):
-        connection = json.loads((context.task.capability / "connection.json").read_text())
-        async with httpx.AsyncClient(trust_env=False) as client:
-
-            async def call(tool, arguments):
-                response = await client.post(
-                    connection["url"],
-                    headers={"Authorization": "Bearer " + connection["token"]},
-                    json={
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "method": "tools/call",
-                        "params": {"name": tool, "arguments": arguments},
-                    },
-                )
-                result = response.json()["result"]
-                assert not result["isError"], result
-                return json.loads(result["content"][0]["text"])
-
-            overview = await call("search_tools", {})
-            assert overview["tools"] == []
-            page = await call("search_tools", {"category": "rsi", "query": "recovery"})
-            assert page["tools"][0]["name"] == name
-            contract = await call("describe_tool", {"name": name})
-            assert contract["inputSchema"]["properties"]["inputs"]["required"] == ["x"]
-            output = await call("call_tool", {"name": name, "arguments": {"inputs": {"x": "3"}}})
-            assert output["value"] == pytest.approx(9)
-        return {"status": "completed", "text": "Synthetic prediction: 9."}
-
-    monkeypatch.setattr(
-        worker, "builtin_registry", lambda: SimpleNamespace(resolve=lambda *args: (SimpleNamespace(run=adapter), None))
-    )
-    for harness in ("kimi-code", "deepseek-harness", "codex", "claude-code"):
-        workspace = state.root / ("native-" + harness)
-        workspace.mkdir()
-        control = workspace / "control"
-        control.mkdir()
-        profile = Profile(
-            "science_agent", harness, ModelBinding("fixture", "model", "http://127.0.0.1:1/v1"), Budget(tool_calls=8)
-        )
-        events = []
-        await worker.run(
-            {
-                "profile": profile.public(),
-                "workspace": str(workspace),
-                "control": str(control),
-                "session_id": "agent-fixture",
-                "runtimes": {},
-                "base_url": "http://127.0.0.1:1/v1",
-                "token": "fixture",
-                "text": "Use my synthetic recovery model for x=3",
-            },
-            tools=RESEARCH_CAPABILITY_TOOLS,
-            event_sink=events.append,
-        )
-        assert any(
-            event.get("kind") == "completed" and event.get("text") == "Synthetic prediction: 9." for event in events
-        )
-    assert len(queued) == 4
-    assert all(
-        tool == "run_generated_capability" and args == {"capability_id": identity, "inputs": {"x": "3"}}
-        for tool, args, host in queued
-    )
-
-
-@pytest.mark.parametrize("tool_name", [
-    "search_generated_capabilities", "describe_generated_capability", "run_generated_capability",
-])
-def test_cached_catalog_rechecks_current_guard_after_initial_import(private_environment, monkeypatch, tool_name):
-    import importlib.util
-
-    from mcp_tools.tools import runtime_tool_policy
-    from mcp_tools.tools.discovery import scoped
-    from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
-
-    state = private_environment
-    lease(state, monkeypatch, "owner-a", "agent-a")
-    mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
-    # Reproduce a first import while an embedding host temporarily supplies a
-    # guard. Restoring the authoritative guard must also affect this adapter.
-    spec = importlib.util.spec_from_file_location(
-        "mcp_tools.tools.discovery._scoped_guard_fixture", scoped.__file__,
-    )
-    module = importlib.util.module_from_spec(spec)
-    with monkeypatch.context() as startup:
-        startup.setattr(runtime_tool_policy, "assert_tool_allowed", lambda name: None)
-        spec.loader.exec_module(module)
-        adapter = module.ScopedScientistCatalog(mapping, lambda tool: True)
-    assert adapter.generated_page("", 3, 0)["total"] == 1
-
     name = adapter.prefix + "a" * 64
-    adapter.bindings[name] = {"type": "object"}  # An old binding cannot override revocation.
-    monkeypatch.setattr(adapter.legacy, "search", lambda *args: None)
-    revision = state.switches.set("tool:" + tool_name, False, 0, {}, "test")
+    adapter.bindings[name] = {"type": "object"}
+    state.switches.set("tool:" + tool_name, True, 0, {}, "test operator")
     assert not adapter.generated_available()
     assert adapter.generated_page("", 3, 0) is None
-    assert adapter.search("", 3, 0) is None
-    with pytest.raises(ValueError, match="unavailable"):
+    with pytest.raises(ValueError):
         adapter.describe(name)
-    with pytest.raises(ValueError, match="enabled model"):
+    with pytest.raises(ValueError):
         adapter.resolve(name, {"inputs": {}})
-
-    state.switches.set("tool:" + tool_name, True, revision, {}, "test")
-    assert adapter.generated_available()
-    assert adapter.generated_page("", 3, 0)["total"] == 1

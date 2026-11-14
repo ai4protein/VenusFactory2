@@ -79,83 +79,32 @@ def large_owned_catalog(tmp_path, monkeypatch):
     return state
 
 
-def search_entrypoint(surface):
-    if surface in {"native", "native-guarded"}:
-        # The production hub guards shared tool objects in place. Isolate this
-        # invocation so test order cannot silently add an authorization read.
-        function = search_generated_capabilities.func
-        while getattr(function, "_availability_guard", False):
-            function = function.__wrapped__
-        selected = search_generated_capabilities.model_copy(update={"func": function})
-        if surface == "native-guarded":
-            capability_policy.guard_tool(selected)
-
-        def page(offset=0):
-            value = json.loads(selected.invoke({"query": "synthetic", "limit": 3, "offset": offset}))
-            return value["total"], [item["id"] for item in value["items"]], value
-        return page
+@pytest.mark.parametrize("mode", ["online", "local"])
+def test_retired_discovery_does_not_materialize_ten_thousand_models(large_owned_catalog, monkeypatch, mode):
+    from mcp_tools.tools.capability_policy import CapabilityDisabled
+    state = large_owned_catalog
+    monkeypatch.setenv("WEBUI_V2_MODE", mode)
+    state.reads.clear()
+    state.materialized.clear()
     mapping = {tool.name: tool for tool in RESEARCH_CAPABILITY_TOOLS}
     adapter = ScopedScientistCatalog(mapping, lambda tool: True)
+    assert adapter.generated_page("synthetic", 3, 0) is None
+    assert generated_scope.search("synthetic")["items"] == []
+    with pytest.raises(RuntimeError, match="RSI Plaza"):
+        search_generated_capabilities.invoke({"query": "synthetic", "limit": 3})
+    assert state.materialized == []
+    # Retired discovery exits before reading the operator switches or registries.
+    assert state.reads == []
 
-    def page(offset=0):
-        value = adapter.generated_page("synthetic", 3, offset)
-        return value["total"], [item["name"].removeprefix(adapter.prefix) for item in value["tools"]], value
-    return page
 
-
-# Guarded execution adds one live entry authorization read. Inventory reads
-# remain constant for 10,000 records; neither path may materialize full catalogs.
-@pytest.mark.parametrize("surface,maximum_reads", [("native", 3), ("native-guarded", 4), ("scoped", 7)])
-def test_one_policy_read_per_inventory_in_both_private_discovery_paths(large_owned_catalog, surface, maximum_reads):
+@pytest.mark.parametrize("mode", ["online", "local"])
+def test_enabling_legacy_switch_still_cannot_scan_registry(large_owned_catalog, monkeypatch, mode):
+    from mcp_tools.tools.capability_policy import CapabilityDisabled
     state = large_owned_catalog
-    page = search_entrypoint(surface)
-    for offset in (0, 3):
-        state.reads.clear()
-        state.materialized.clear()
-        total, ids, response = page(offset)
-        assert total == 10000
-        assert ids == [f"{i:064x}" for i in range(offset, offset + 3)]
-        assert len(state.materialized) == 3
-        assert not any(key in json.dumps(response) for key in ("input_schema", "output_schema", "validation", "test_schema_marker"))
-        assert len(state.reads) <= maximum_reads, f"{surface}: {len(state.reads)} switch-table SELECTs for 10,000 metadata entries"
-    # The final private page uses actual owner/lease/goal provenance.
-    total, ids, _ = page(9999)
-    assert total == 10000 and ids == ["a" * 64]
-
-
-@pytest.mark.parametrize("surface", ["native", "native-guarded", "scoped"])
-def test_next_request_sees_admin_switch_changes_without_recreating_adapter(large_owned_catalog, surface):
-    state = large_owned_catalog
-    page = search_entrypoint(surface)
-    first = "0" * 64
-    assert page()[1][0] == first
-    spec = {"id": "capability:" + first, "adapter": "capability", "tools": ["run_generated_capability"]}
-    revision = state.switches.set("model:capability:" + first, False, 0, spec, "test")
-    total, ids, _ = page()
-    assert total == 9999 and first not in ids
-    state.switches.set("model:capability:" + first, True, revision, spec, "test")
-    assert page()[0] == 10000 and page()[1][0] == first
-    # Calls never reuse discovery's temporary policy map.
-    scope = generated_scope.GeneratedScope()
-    assert scope.library_for(first) == runtime.LIBRARY
-    state.switches.set("model:capability:" + first, False, revision + 1, spec, "test")
-    with pytest.raises(capability_policy.CapabilityDisabled):
-        scope.library_for(first)
-
-
-@pytest.mark.parametrize("surface,revocation", [("native", "owner"), ("native-guarded", "owner"), ("scoped", "lease")])
-def test_private_revocation_remains_live_after_large_search(large_owned_catalog, surface, revocation):
-    state = large_owned_catalog
-    page = search_entrypoint(surface)
-    assert page(9999)[1] == ["a" * 64]
-    scope = generated_scope.GeneratedScope()
-    scope.references(lambda *args: 1)
-    if revocation == "owner":
-        with sqlite3.connect(state.database) as connection:
-            connection.execute("UPDATE sessions SET owner_key='owner-b' WHERE session_id='research-a'")
-    else:
-        state.active_queue.cancel(state.active_lease["id"], "owner-a")
-    assert scope.cards(["a" * 64]) == {}
-    assert page(9999)[:2] == (9999, [])
-    with pytest.raises(ValueError, match="Model unavailable"):
-        scope.library_for("a" * 64)
+    monkeypatch.setenv("WEBUI_V2_MODE", mode)
+    state.switches.set("tool:run_generated_capability", True, 0, {}, "operator")
+    state.materialized.clear()
+    assert generated_scope.search()["total"] == 0
+    with pytest.raises(RuntimeError, match="RSI Plaza"):
+        search_generated_capabilities.invoke({})
+    assert state.materialized == []

@@ -4,7 +4,7 @@ export const pageLoaders = {
   AdminPage: () => import("../pages/AdminPage"),
   ModelPlazaPage: () => import("../pages/ModelPlazaPage"),
   ModelCreatePage: () => import("../pages/ModelCreatePage"),
-  ModelWorkflowPage: () => import("../pages/ModelWorkflowPage"),
+  RSIPlazaPage: () => import("../pages/RSIPlazaPage"),
   ChatPage: () => import("../pages/ChatPage"),
   ReportPage: () => import("../pages/ReportPage"),
   CustomModelTrainingPage: () => import("../pages/CustomModelTrainingPage"),
@@ -30,6 +30,6 @@ export const pageLoaders = {
   HomePage: () => import("../pages/HomePage"),
   LeaderboardsPage: () => import("../pages/LeaderboardsPage"),
 };
-export function warmPage(page: 'ChatPage' | 'ModelPlazaPage' | 'ModelWorkflowPage') {
+export function warmPage(page: 'ChatPage' | 'ModelPlazaPage' | 'RSIPlazaPage') {
   void pageLoaders[page]().catch(() => { /* A click can retry a transient download. */ });
 }

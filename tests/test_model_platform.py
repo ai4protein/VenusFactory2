@@ -51,24 +51,6 @@ class ModelPlatformTests(unittest.TestCase):
         self.p.visibility(self.owner, m['id'][5:], 'private')
         with self.assertRaises(FileNotFoundError): self.p.predict(self.other, m['id'], {'kind':'table','rows':[{'x':2}]})
 
-    def test_workflow_roundtrip_branch_and_cycle(self):
-        m = self.train()
-        graph = {'nodes': [{'id':'data','kind':'data','dataset_id':self.data['id']}, {'id':'predict','kind':'model','model_id':m['id']},
-                           {'id':'result','kind':'output'}, {'id':'raw','kind':'output'}],
-                 'edges':[{'source':'data','target':'predict'}, {'source':'predict','target':'result'}, {'source':'data','target':'raw'}]}
-        w = self.p.save_workflow(self.owner, {'name':'Workflow test','graph':graph})
-        self.assertEqual(self.p.workflows(self.owner)[0]['id'], w['id'])
-        self.assertEqual(self.p.workflows(self.other), [])
-        j = self.p.start(self.owner, 'workflow', {'graph':graph}, launch=False)
-        self.p.execute(j['id'])
-        done = self.p.job(self.owner,j['id'])
-        self.assertEqual(done['status'],'completed',done)
-        self.assertTrue(all(x['status']=='completed' for x in done['steps']))
-        result=read(self.p.root/'results'/(j['id']+'.json'))
-        self.assertEqual(len(result['outputs']['result']['rows']),80)
-        with self.assertRaises(FileNotFoundError): self.p.job(self.other,j['id'])
-        graph['edges'].append({'source':'result','target':'predict'})
-        with self.assertRaises(ValueError): self.p.validate_graph(self.owner,graph)
 
     def test_failure_is_not_completion(self):
         m=self.train()
@@ -102,7 +84,7 @@ class ModelPlatformTests(unittest.TestCase):
                 response=a.post('/api/model-platform/datasets',files={'file':('input.csv',b'x,y\n1,2')})
                 self.assertEqual(response.status_code,200,response.text)
                 self.assertEqual(len(b.get('/api/model-platform/datasets').json()),0)
-                self.assertEqual(a.post('/api/model-platform/workflows',json={'name':'x','graph':{}},headers={'origin':'https://elsewhere.example'}).status_code,403)
+                self.assertEqual(a.post('/api/model-platform/train',json={},headers={'origin':'https://elsewhere.example'}).status_code,403)
                 model=self.train()
                 self.assertEqual(b.get('/api/model-platform/models/'+model['id']).status_code,404)
                 self.assertEqual(b.patch('/api/model-platform/models/'+model['id']+'/visibility',json={'visibility':'public'}).status_code,404)

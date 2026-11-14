@@ -1,4 +1,4 @@
-"""Fresh PBS imports keep discovery indexes out of the frozen source tree."""
+"""PBS artifact catalogs stay private and never become conversational RSI tools."""
 import copy
 import hashlib
 import json
@@ -95,10 +95,32 @@ with capability_catalog.database(library) as connection:
         connection.execute('INSERT INTO capabilities VALUES (?,?,?,?,?,?,?,?)',
                            (identity, 'fixture-goal', card['name'], '1', 'synthetic fixture',
                             json.dumps(card), '0' * 64, number))
-page = search()
+# Artifact metadata remains available to the case catalog, with public scope intact.
+page = capability_catalog.search(library, public_only=True)
 assert page['total'] == 1 and page['items'][0]['id'] == '1' * 64
 references = GeneratedScope().references(lambda *args: 1)
 assert references == [('1' * 64, 1)]
+# Exercise the actual internal registration path without fabricating scientific admission.
+manifest = {'id': '3' * 64, 'name': 'Internal PBS fixture',
+            'description': 'Metadata registration fixture, not validated science',
+            'validation': {}, 'review_spec': {'author': 'fixture', 'version': '1',
+            'kind': 'tool', 'scope': {'proteins': ['fixture'], 'properties': ['test'],
+                                     'scenarios': ['PBS isolation']}}}
+registered = capability_catalog.register(library, manifest, {'receipt_sha256': 'a' * 64},
+                                         'private-pbs-goal')
+assert registered['visibility'] == 'private'
+assert capability_catalog.require_registered(library, '3' * 64, 'a' * 64) == registered
+assert capability_catalog.search(library, public_only=True)['total'] == 1
+assert len(capability_catalog.cards(library)) == 3
+# Neither curated metadata nor a newly recorded private result restores Agent access.
+assert search()['total'] == 0 and search()['items'] == []
+for identity in ('1' * 64, '2' * 64, '3' * 64):
+    try:
+        GeneratedScope().library_for(identity)
+    except RuntimeError as error:
+        assert 'RSI Plaza' in str(error)
+    else:
+        raise AssertionError('RSI artifact became a callable conversational tool')
 assert (library / 'catalog.sqlite3').is_file()
 assert not (Path(record['source']['root']) / 'research_runs').exists()
 print(json.dumps({'library': str(library), 'public_count': page['total']}))

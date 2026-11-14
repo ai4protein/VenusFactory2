@@ -11,6 +11,7 @@ import json
 from typing import Any, Iterable, Sequence
 
 from config import get_config
+from mcp_tools.models.evolved.policy import RSI_TOOL_NAMES, RSI_ARCHIVE_MESSAGE
 from mcp_tools.tools.tool_surface import RETIRED_CODE_TOOLS, CODE_MIGRATION_MESSAGE
 
 # Agent / MCP tool names disabled when WEBUI_V2_MODE=online.
@@ -56,7 +57,7 @@ def is_local_mode() -> bool:
 def is_tool_allowed(tool_name: str) -> bool:
     from mcp_tools.tools.capability_policy import CapabilityStore, canonical
     name = canonical((tool_name or "").strip())
-    if name in RETIRED_CODE_TOOLS or name == 'register_trained_model': return False
+    if name in RSI_TOOL_NAMES or name in RETIRED_CODE_TOOLS or name == 'register_trained_model': return False
     if not CapabilityStore().tool_enabled(name): return False
     if not is_online_mode(): return True
     if not name:
@@ -74,6 +75,7 @@ def is_tool_allowed(tool_name: str) -> bool:
 
 def online_disabled_reason(tool_name: str = "", *, feature: str = "") -> str:
     """JSON-friendly error message for online-mode denials."""
+    if tool_name in RSI_TOOL_NAMES: return RSI_ARCHIVE_MESSAGE
     if tool_name in RETIRED_CODE_TOOLS: return CODE_MIGRATION_MESSAGE
     if tool_name == 'register_trained_model':
         return 'Public model registration is an operator action. Keep research outputs private and request publication by email.'

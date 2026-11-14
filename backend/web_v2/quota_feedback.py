@@ -70,5 +70,5 @@ def overview(store):
             SUM(CASE WHEN kind='model' THEN total_tokens END) AS tokens
             FROM usage_events WHERE created>=? GROUP BY mode""",(start,))}
     return dict(mode_calls=mode_calls,day=day,visitors_today=visits[0],visits_today=visits[1],visitors_total=total,recent_visitors=active,
-        modes=modes,conversations_used=used,predictions_used=compute.get('prediction',0),workflows_used=compute.get('workflow',0),
+        modes=modes,conversations_used=used,predictions_used=compute.get('prediction',0),
         active_grants=grants,last_reset=cutoff)

@@ -43,7 +43,7 @@ export function resultRows(result: TableResult): Record<string, unknown>[] {
   const tables = Object.entries(result.outputs || {}).filter(([, value]) => value.rows?.length);
   if (tables.length === 1) return tables[0][1].rows!;
   const used = new Set(tables.flatMap(([, v]) => v.rows!.flatMap(r => Object.keys(r))));
-  let key = 'workflow_output'; while (used.has(key)) key = '_' + key;
+  let key = 'result_output'; while (used.has(key)) key = '_' + key;
   return tables.flatMap(([name, value]) => value.rows!.map(row => ({ [key]: name, ...row })));
 }
 export function tableCsv(rows: Record<string, unknown>[]): string {

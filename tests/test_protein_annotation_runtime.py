@@ -84,7 +84,7 @@ def test_s4pred_parse_and_no_user_command_arguments(tmp_path,monkeypatch):
 
 
 def test_plaza_and_mcp_annotation_contracts(monkeypatch):
-    from backend.web_v2.workflow_tools import card,registered
+    from backend.web_v2.plaza_tools import card,registered
     import mcp_tools.models.pretrained.s4pred as s4pred
     from mcp_tools.scheduler.catalog import classify
     monkeypatch.setattr(s4pred,'runtime',lambda:{})

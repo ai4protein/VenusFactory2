@@ -1,4 +1,4 @@
-"""Model marketplace, private datasets and executable dataflow workflows.
+"""Model marketplace, private datasets and queued model/tool execution.
 
 Marketplace identifiers are adapters over the existing registries, never a second
 Scientist publication authority. Personal models have an independent lifecycle.
@@ -43,7 +43,6 @@ def prioritize_platform_models(cards):
             priority = (1, index, 0)
         ranked.append((priority, card))
     return [card for _, card in sorted(ranked, key=lambda item: item[0])]
-
 
 
 def catalog_card_summary(card):
@@ -93,7 +92,7 @@ class Platform:
         self._cache_time = 0
 
     def path(self, area, identity):
-        require(area in {'sessions', 'datasets', 'models', 'workflows', 'jobs'}, 'Unknown collection')
+        require(area in {'sessions', 'datasets', 'models', 'jobs'}, 'Unknown collection')
         require(bool(re.fullmatch('[a-f0-9]{32,64}', identity)), 'Invalid identifier')
         return self.root / area / (identity + '.json')
 
@@ -176,6 +175,9 @@ class Platform:
 
     @staticmethod
     def require_available(card):
+        from mcp_tools.models.evolved.policy import is_rsi_model, RSI_ARCHIVE_MESSAGE
+        if is_rsi_model(card.get("id", "")) or card.get("adapter") in {"scientist", "capability"}:
+            raise ValueError(RSI_ARCHIVE_MESSAGE)
         card = Platform.availability(card)
         if not card.get('available', True):
             if card.get('disabled_reason')=='admin_disabled':
@@ -205,32 +207,11 @@ class Platform:
             return self._cache
         cards, issues = self.official(), []
         try:
-            from mcp_tools.models.evolved.service import configured_library, catalog_cards
-            records = catalog_cards(configured_library())[0] if local else []
-            for c in records:
-                scope = c['scope']
-                context = scope.get('context', scope.get('assay', c['stage']))
-                description = ' · '.join(str(context[k]) for k in ('organism', 'application', 'perturbation') if context.get(k)) if isinstance(context, dict) else str(context)
-                cards.append({'id': 'scientist:' + c['entry_id'], 'name': str(scope.get('protein', 'Protein')) + ' · ' + str(scope.get('target', c['interface'])),
-                              'category': 'function', 'source': 'scientist', 'visibility': 'public', 'description': description or str(c['interface']),
-                              'adapter': 'scientist', 'workflow': True, 'input_kind': 'table', 'scope': scope, 'interface': c['interface'],
-                              'validation_status': 'recorded' if c.get('runtime_compatible', True) else 'needs_revalidation'})
-        except Exception:
-            issues.append('scientist')
-        try:
-            from agent.harness.research_workspace import capability_cards
-            for c in capability_cards():
-                cards.append({'id': 'capability:' + c['id'], 'name': c['name'], 'description': c['description'], 'category': 'custom',
-                              'source': 'scientist', 'visibility': c.get('visibility','public'), 'adapter': 'capability', 'workflow': True, 'input_kind': 'table',
-                              **{k:c[k] for k in ('author','author_email','version','scope','review_status') if k in c}})
-        except Exception:
-            issues.append('capabilities')
-        try:
             from mcp_tools.models.factory.training.model_registry import list_trained_models
             for m in list_trained_models()['models']:
                 if m.get('status') == 'registered':
                     cards.append({'id': 'checkpoint:' + m['model_id'], 'name': m['model_id'], 'description': str(m.get('plm_model') or 'Registered checkpoint'),
-                                  'category': 'custom', 'source': 'platform', 'visibility': 'public', 'adapter': 'checkpoint', 'workflow': True, 'input_kind': 'table',
+                                  'category': 'custom', 'source': 'platform', 'visibility': 'public', 'adapter': 'checkpoint', 'predictable': True, 'input_kind': 'table',
                                    **{k:m[k] for k in ('model_type','runtime_id','backbone','training_dataset','training_method','provenance','artifact','version') if k in m}})
         except Exception:
             issues.append('checkpoints')
@@ -256,7 +237,7 @@ class Platform:
 
     @catalog_snapshot
     def plaza_catalog(self, owner, query='', category='', source='', mine=False, kind='', offset=0, limit=24, model_type=''):
-        from backend.web_v2.workflow_tools import catalog
+        from backend.web_v2.plaza_tools import catalog
         base = self.catalog(owner, mine=mine, limit=100000)
         tools, unavailable = ([], []) if mine else catalog(detail=False)
         cards = [{**m, 'node_kind': 'tool' if m['adapter'] == 'capability' else 'model'} for m in base['items']] + tools
@@ -276,10 +257,13 @@ class Platform:
     def model_card(m, owner):
         keys = ['name', 'description', 'category', 'visibility', 'target', 'features', 'sequence_column', 'metrics', 'method', 'problem', 'created', 'split', 'training_dataset', 'training_method']
         return {**{k: m.get(k) for k in keys}, 'id': 'user:' + m['id'], 'source': 'community', 'adapter': 'personal',
-                'owned': m['owner'] == owner, 'workflow': True, 'input_kind': 'table',
+                'owned': m['owner'] == owner, 'predictable': True, 'input_kind': 'table',
                 'model_type':'trained', 'runtime_id':'tabular', 'provenance':'user_training'}
 
     def model(self, owner, identity, detail=False):
+        from mcp_tools.models.evolved.policy import is_rsi_model
+        if is_rsi_model(identity):
+            raise FileNotFoundError("RSI cases are available in RSI Plaza")
         if identity.startswith('user:'):
             p = self.path('models', identity[5:])
             if not p.exists():
@@ -292,19 +276,13 @@ class Platform:
         m = next((dict(c) for c in cards if c['id'] == identity), None)
         if m is None:
             raise FileNotFoundError('Model not found')
-        if detail and m['adapter'] == 'scientist':
-            from mcp_tools.models.evolved.service import describe_model, configured_library
-            m['contract'] = {'verified_now': False, 'input_fields': [],
-                             'availability': 'This model needs operator revalidation.'}
-            if m.get('validation_status') != 'needs_revalidation':
-                try:
-                    m['contract'] = describe_model(configured_library(), identity.split(':', 1)[1])
-                except (ValueError, FileNotFoundError, KeyError):
-                    m['validation_status'] = 'needs_revalidation'
-        if detail and m['adapter'] == 'capability':
-            from agent.harness.research_workspace import describe_capability
-            m['contract'] = describe_capability(identity.split(':', 1)[1])
         return self.availability(m)
+
+    @staticmethod
+    def tool(identity):
+        require(isinstance(identity, str) and identity.startswith('tool:'), 'Unknown tool')
+        from backend.web_v2.plaza_tools import card
+        return card(identity.removeprefix('tool:'))
 
     def visibility(self, owner, identity, visibility):
         m = self.owned('models', identity, owner)
@@ -313,137 +291,13 @@ class Platform:
         write(self.path('models', identity), m)
         return self.model_card(m, owner)
 
-    @catalog_snapshot
-    def workflow_components(self, owner, query='', category='', source='', kind='', offset=0, limit=24):
-        from backend.web_v2.workflow_tools import catalog
-        base = self.catalog(owner, limit=100000)
-        tools, unavailable = catalog(detail=False)
-        rows = [{**m, 'node_kind': 'tool' if m['adapter'] == 'capability' else 'model'}
-                for m in base['items'] if m['workflow']] + tools
-        counts = {c: sum(m['category'] == c for m in rows) for c in {m['category'] for m in rows}}
-        kinds = {k: sum(m['node_kind'] == k for m in rows) for k in ('model', 'tool')}
-        words = query.casefold().split()
-        found = [m for m in rows if (not category or m['category'] == category) and (not source or m['source'] == source)
-                 and (not kind or m['node_kind'] == kind) and all(w in json.dumps(m, ensure_ascii=False).casefold() for w in words)]
-        found = prioritize_platform_models(found)
-        return {'items': [catalog_card_summary(card) for card in found[offset:offset+limit]], 'total': len(found), 'categories': counts, 'kinds': kinds,
-                'unavailable_sources': base['unavailable_sources'], 'unavailable_tools': unavailable}
-
-    def workflow_component(self, owner, identity):
-        if identity.startswith('tool:'):
-            from backend.web_v2.workflow_tools import card
-            return card(identity[5:])
-        m = self.model(owner, identity, detail=True)
-        return {**m, 'node_kind': 'tool' if m['adapter'] == 'capability' else 'model'}
-
-    def validate_graph(self, owner, graph):
-        require(isinstance(graph, dict), 'Workflow must be an object')
-        nodes, edges = graph.get('nodes', []), graph.get('edges', [])
-        require(isinstance(nodes, list) and isinstance(edges, list) and all(isinstance(n, dict) for n in nodes) and all(isinstance(e, dict) for e in edges), 'Invalid workflow steps or connections')
-        require(all(n.get('kind') in {'data','model','tool','train','predict','output'} for n in nodes), 'Unknown step type')
-        require(all(isinstance(n.get('config') or {}, dict) for n in nodes), 'Step parameters must be objects')
-        require(1 <= len(nodes) <= 32 and len(edges) <= 64, 'Use 1–32 steps and at most 64 connections')
-        ids = [n.get('id') for n in nodes]
-        require(all(isinstance(i, str) and re.fullmatch('[a-zA-Z0-9_-]{1,60}', i) for i in ids) and len(set(ids)) == len(ids), 'Step IDs must be unique')
-        byid, incoming, outgoing = {n['id']: n for n in nodes}, {i: [] for i in ids}, {i: [] for i in ids}
-        require(len({(e.get('source'), e.get('target')) for e in edges}) == len(edges), 'Repeated connection')
-        for e in edges:
-            a, b = e.get('source'), e.get('target')
-            require(a in byid and b in byid and a != b, 'Invalid connection')
-            require(byid[a]['kind'] != 'output' and byid[b]['kind'] != 'data', 'Connect a step output to a compatible input')
-            port = e.get('target_port')
-            if byid[b]['kind'] == 'predict':
-                expected = 'model' if byid[a]['kind'] == 'train' else 'data'
-                require(port is None or port == expected, 'Prediction input port must match the connected data or trained model')
-            else:
-                require(port in {None, 'data'}, 'Unknown input port')
-            incoming[b].append(a)
-            outgoing[a].append(b)
-        order, kinds = [], {}
-        while len(order) < len(nodes):
-            ready = [i for i in ids if i not in order and all(p in order for p in incoming[i])]
-            require(bool(ready), 'Remove the cycle before running')
-            order.extend(ready)
-        require(any(n['kind'] == 'output' for n in nodes), 'Add a result step')
-        for i in order:
-            n = byid[i]
-            if n['kind'] == 'data':
-                require(not incoming[i], 'Data steps cannot have inputs')
-                kinds[i] = self.owned('datasets', n.get('dataset_id', ''), owner)['kind']
-            elif n['kind'] == 'predict':
-                require(len(incoming[i]) == 2 and sorted(kinds[p] for p in incoming[i]) == ['model', 'table'],
-                        'Connect a trained model and prediction data to the prediction step')
-                kinds[i] = 'table'
-            else:
-                require(n['kind'] in {'model', 'tool', 'train', 'output'}, 'Unknown step type')
-                if n['kind'] == 'tool':
-                    m = self.workflow_component(owner, n.get('model_id', ''))
-                    require(m['node_kind'] == 'tool', 'Choose a registered tool')
-                    self.require_available(m)
-                    require(len(incoming[i]) == 1 or (not incoming[i] and m.get('standalone')), 'Connect one data input to the tool')
-                    if incoming[i]:
-                        require(kinds[incoming[i][0]] == m['input_kind'], m['name'] + ' requires ' + m['input_kind'] + ' input')
-                    kinds[i] = 'table'
-                else:
-                    require(len(incoming[i]) == 1, 'Connect exactly one input to each model, training or result step')
-                    source_kind = kinds[incoming[i][0]]
-                    if n['kind'] == 'model':
-                        m = self.model(owner, n.get('model_id', ''))
-                        self.require_available(m)
-                        from backend.web_v2.model_parameters import validated_parameters
-                        validated_parameters(m['adapter'], n.get('config'))
-                        if m['adapter'].startswith('external:'):
-                            from backend.web_v2.external_models import validate_inputs
-                            parent=byid[incoming[i][0]]
-                            data=self.owned('datasets',parent['dataset_id'],owner) if parent['kind']=='data' else None
-                            validate_inputs(self,owner,m['adapter'].split(':',1)[1],n.get('config'),data)
-                        require(m['workflow'], 'Choose a trained model for this workflow')
-                        require(source_kind in m.get('accepted_input_kinds',[m['input_kind']]), m['name'] + ' requires ' + m['input_kind'] + ' input')
-                        kinds[i] = 'table'
-                    elif n['kind'] == 'train':
-                        require(source_kind == 'table', 'Training requires tabular data')
-                        cfg = n.get('config') or {}
-                        require(cfg.get('method') in {'linear', 'forest', 'extra_trees'}, 'Choose a training method')
-                        require(cfg.get('problem') in {'regression', 'classification'}, 'Choose a prediction type')
-                        require(bool(cfg.get('target')) and (cfg.get('features') or cfg.get('sequence_column')), 'Set the training target and features')
-                        parent = byid[incoming[i][0]]
-                        if parent['kind'] == 'data':
-                            self.validate_training(owner, {**cfg, 'name': n.get('label', 'Trained model'), 'dataset_id': parent['dataset_id']})
-                        kinds[i] = 'model'
-                    else:
-                        kinds[i] = source_kind
-            if n['kind'] in {'model', 'tool', 'train'} and incoming[i]:
-                parent = byid[incoming[i][0]]
-                if parent['kind'] == 'data':
-                    from backend.web_v2.workflow_flow import validate_columns
-                    validate_columns(n, self.owned('datasets', parent.get('dataset_id', ''), owner), m if n['kind'] in {'model','tool'} else None)
-            require(n['kind'] == 'output' or outgoing[i], 'Connect every step to a result')
-            require(n['kind'] != 'output' or not outgoing[i], 'Result steps must be last')
-        return order, incoming
-
-    def save_workflow(self, owner, body):
-        name = str(body.get('name', '')).strip()
-        require(0 < len(name) <= 120, 'Name your workflow')
-        # Drafts may be incomplete. Full graph validation runs before execution.
-        graph = body.get('graph', {})
-        require(isinstance(graph, dict) and len(json.dumps(graph)) <= 100000, 'Workflow is too large')
-        identity = body.get('id') or uuid.uuid4().hex
-        if body.get('id'):
-            self.owned('workflows', identity, owner)
-        value = {'id': identity, 'owner': owner, 'name': name, 'graph': graph, 'updated': time.time()}
-        write(self.path('workflows', identity), value)
-        return {k: v for k, v in value.items() if k != 'owner'}
-
-    def workflows(self, owner):
-        rows = [{k: v for k, v in w.items() if k != 'owner'} for p in (self.root / 'workflows').glob('*.json') if (w := read(p))['owner'] == owner]
-        return sorted(rows, key=lambda w: w.get('updated', 0), reverse=True)
-
-    def workflow(self, owner, identity):
-        return {k: v for k, v in self.owned('workflows', identity, owner).items() if k != 'owner'}
 
     def register_job(self, job):
         payload = job.get('payload', {})
-        title = payload.get('name') or ('Workflow' if job['kind'] == 'workflow' else '')
+        title = payload.get('name') or ''
+        if not title and payload.get('tool_id'):
+            from backend.web_v2.plaza_tools import SPECS
+            title = SPECS.get(payload['tool_id'].removeprefix('tool:'), ('', 'Tool'))[1]
         if not title and payload.get('model_id'):
             try: title = self.model(job['owner'], payload['model_id'])['name']
             except (FileNotFoundError, ValueError, KeyError): title = 'Prediction'
@@ -481,15 +335,15 @@ class Platform:
                 write(self.path('jobs', identity), job)
         metadata = metadata or self.records.metadata('platform', identity, owner) or self.register_job(job)
         public = {**{k: v for k, v in job.items() if k not in {'owner', 'payload', 'pid', 'queue_id'}}, **metadata}
-        if job['kind'] == 'workflow':
-            payload = job['payload']
-            public['workflow'] = {'id': payload.get('workflow_id'), 'name': payload.get('name') or 'Workflow', 'graph': payload['graph']}
         return public
 
     def start(self, owner, kind, payload, launch=True):
-        require(kind in {'train', 'workflow', 'predict'}, 'Unknown job')
-        if kind == 'workflow':
-            self.validate_graph(owner, payload['graph'])
+        require(kind in {'train', 'tool', 'predict'}, 'Unknown job')
+        if kind == 'tool':
+            from backend.web_v2.plaza_tools import validate_input
+            tool = self.require_available(self.tool(payload['tool_id']))
+            data = self.owned('datasets', payload['dataset_id'], owner) if payload.get('dataset_id') else None
+            validate_input(payload['tool_id'].removeprefix('tool:'), data, payload.get('config'))
         elif kind == 'predict':
             model = self.require_available(self.model(owner, payload['model_id']))
             from backend.web_v2.model_parameters import validated_parameters
@@ -541,7 +395,7 @@ class Platform:
         from mcp_tools.scheduler.catalog import classify
         from backend.web_v2.compute_access import prediction_tool
         def prediction(identity):
-            model = self.workflow_component(owner, identity) if identity.startswith('tool:') else self.model(owner, identity)
+            model = self.tool(identity) if identity.startswith('tool:') else self.model(owner, identity)
             if model.get('adapter') == 'registered-tool':
                 from mcp_tools.scheduler.catalog import native_tools
                 name = identity.removeprefix('tool:')
@@ -551,24 +405,22 @@ class Platform:
                        (model.get('adapter') != 'descriptors' and model.get('model_type') != 'tool'))
         if kind == 'predict':
             return {'prediction': prediction(payload['model_id'])}
-        if kind == 'workflow':
-            count = sum(1 if n['kind'] == 'predict' else prediction(n['model_id'])
-                        for n in payload['graph']['nodes'] if n['kind'] in {'model','tool','predict'})
-            return {'workflow': 1, 'prediction': count}
+        if kind == 'tool':
+            return {'prediction': prediction(payload['tool_id'])}
         return {}
 
     def resource_for(self, owner, kind, payload):
-        if kind=='workflow': return 'api:orchestration'
+        if kind=='tool': return 'api:orchestration'
         if kind=='predict' and self.model(owner,payload['model_id'])['adapter'] in {'external:'+k for k in ('ligandmpnn','antibmpnn','vina','bindcraft','boltzgen','diffdock')}: return 'api:orchestration'
         if kind=='train': return 'cpu'
-        ids=[payload['model_id']] if kind=='predict' else [n['model_id'] for n in payload['graph']['nodes'] if n.get('model_id') and not n['model_id'].startswith('tool:')]
+        ids=[payload['model_id']] if kind=='predict' else []
         gpu={'function','residue','evolution','structure-evolution','design','discovery','checkpoint','structure-property',
              'external:ligandmpnn','external:antibmpnn','external:bindcraft','external:boltzgen','external:diffdock'}
         return 'gpu' if any(self.model(owner, identity)['adapter'] in gpu for identity in ids) else 'cpu'
 
     def jobs(self, owner):
         return [self.job(owner, item['identity'], metadata={'job_number': item['number'], 'title': item['title']}) for item in self.records.entries('platform', owner)
-                if self.path('jobs', item['identity']).is_file()]
+                if item['kind'] in {'train', 'predict', 'tool'} and self.path('jobs', item['identity']).is_file()]
 
     def job_page(self, owner, **filters):
         from backend.web_v2.job_records import page_jobs
@@ -696,7 +548,7 @@ class Platform:
     def _predict_local(self, owner, identity, data, config=None):
         config = config or {}
         m = self.require_available(self.model(owner, identity))
-        require(m['workflow'], 'Use this backbone in the training workspace')
+        require(m['predictable'], 'Use this backbone in the training workspace')
         require(data['kind'] in m.get('accepted_input_kinds',[m['input_kind']]), 'This model requires ' + m['input_kind'] + ' input')
         rows = data.get('rows', [])
         require(data['kind'] in {'structure','ligand'} or bool(rows), 'Input contains no records')
@@ -721,31 +573,6 @@ class Platform:
                 a = ProteinAnalysis(seq)
                 output.append({**row, 'length': len(seq), 'molecular_weight': a.molecular_weight(), 'isoelectric_point': a.isoelectric_point(), 'gravy': a.gravy(),
                                **{'fraction_' + aa: seq.count(aa) / len(seq) for aa in AA}})
-        elif adapter == 'scientist':
-            from mcp_tools.models.evolved.service import configured_library, describe_model, predict_model
-            library = configured_library()
-            detail = describe_model(library, identity.split(':', 1)[1])
-            fields = detail['input_fields']
-            mapping = config.get('columns', {})
-            inputs = [{key: row[mapping.get(key, key)] for key in fields} for row in rows]
-            for row in inputs:
-                for key in ['values', 'features']:
-                    if isinstance(row.get(key), str):
-                        row[key] = json.loads(row[key])
-            result = predict_model(library, identity.split(':', 1)[1], inputs, m['scope'])
-            output = result.get('predictions')
-            require(isinstance(output, list), 'Model returned no prediction table')
-            output = [v if isinstance(v, dict) else {'prediction': v} for v in output]
-        elif adapter == 'capability':
-            from agent.harness.research_workspace import run_capability
-            # Map table columns to the program's documented JSON arguments, per row.
-            mapping = config.get('columns', {})
-            output = []
-            require(len(rows) <= 100, 'Use up to 100 records for generated programs')
-            for row in rows:
-                inputs = {k: row[v] for k, v in mapping.items()} if mapping else row
-                result = asyncio.run(run_capability(identity.split(':', 1)[1], inputs))
-                output.append({**row, **(result if isinstance(result, dict) else {'result': result})})
         else:
             output = self.run_existing(m, data, config)
         return {'kind': 'table', 'rows': output}
@@ -815,64 +642,14 @@ class Platform:
                 data = self.owned('datasets', p['dataset_id'], job['owner'])
                 update(20, 'Running model')
                 result = self.predict(job['owner'], p['model_id'], data, p.get('config'))
+            elif job['kind'] == 'tool':
+                from backend.web_v2.plaza_tools import run
+                p = job['payload']
+                self.require_available(self.tool(p['tool_id']))
+                data = self.owned('datasets', p['dataset_id'], job['owner']) if p.get('dataset_id') else None
+                result = run(p['tool_id'].removeprefix('tool:'), data, p.get('config'), self.root / 'work' / identity, progress=update)
             else:
-                graph = job['payload']['graph']
-                order, incoming = self.validate_graph(job['owner'], graph)
-                nodes = {n['id']: n for n in graph['nodes']}
-                from backend.web_v2.workflow_flow import summarize, validate_columns
-                values = {}
-                job['events'] = []
-                def event(step, status, message=''):
-                    job['events'].append({'seq': job.get('event_seq', 0) + 1, 'step_id': step, 'status': status, 'time': time.time(), 'message': message[:200]})
-                    job['event_seq'] = job['events'][-1]['seq']
-                    job['events'] = job['events'][-256:]
-                job['steps'] = [{'id': i, 'status': 'queued'} for i in order]
-                for index, i in enumerate(order):
-                    n = nodes[i]
-                    step = job['steps'][index]
-                    step.update(status='running', started=time.time(), inputs=[{'source': p, **summarize(values[p])} for p in incoming[i]])
-                    event(i, 'running', n.get('label') or n['kind'])
-                    def step_progress(percent, message):
-                        step.update(progress=percent, message=message)
-                        event(i, 'progress', message)
-                        update(round((index + percent / 100) / len(order) * 100), message)
-                    update(round(index / len(order) * 100), n.get('label') or n['kind'])
-                    if n['kind'] == 'data':
-                        values[i] = self.owned('datasets', n['dataset_id'], job['owner'])
-                    elif n['kind'] == 'model':
-                        validate_columns(n, values[incoming[i][0]], self.model(job['owner'], n['model_id']))
-                        values[i] = self.predict(job['owner'], n['model_id'], values[incoming[i][0]], n.get('config'))
-                    elif n['kind'] == 'tool':
-                        data = values[incoming[i][0]] if incoming[i] else None
-                        validate_columns(n, data, self.workflow_component(job['owner'], n['model_id']))
-                        if n['model_id'].startswith('tool:'):
-                            from backend.web_v2.workflow_tools import run
-                            values[i] = run(n['model_id'][5:], data, n.get('config'), self.root / 'work' / identity, progress=step_progress)
-                        else:
-                            values[i] = self.predict(job['owner'], n['model_id'], data, n.get('config'))
-                    elif n['kind'] == 'train':
-                        data = values[incoming[i][0]]
-                        data = {**data, 'columns': list(data.get('rows', [{}])[0])}
-                        payload = {**n.get('config', {}), 'name': n.get('label') or 'Trained model'}
-                        payload.setdefault('features', [])
-                        validate_columns(n, data)
-                        train_progress = step_progress
-                        trained = self.train({'payload': payload, 'owner': job['owner']}, train_progress, data)
-                        values[i] = {'kind': 'model', 'model': trained['model']}
-                        job['steps'][index]['model'] = trained['model']
-                    elif n['kind'] == 'predict':
-                        model = next(values[p]['model'] for p in incoming[i] if values[p]['kind'] == 'model')
-                        data = next(values[p] for p in incoming[i] if values[p]['kind'] == 'table')
-                        validate_columns(n, data, model)
-                        values[i] = self.predict(job['owner'], model['id'], data, n.get('config'))
-                    else:
-                        values[i] = values[incoming[i][0]]
-                    step.update(status='completed', progress=100, rows=len(values[i].get('rows', [])), output=summarize(values[i]), finished=time.time())
-                    event(i, 'completed')
-                    update(round((index + 1) / len(order) * 100), n.get('label') or n['kind'])
-                result = {'outputs': {i: {k: v for k, v in values[i].items() if k in {'kind', 'rows', 'structure', 'model', 'artifacts', 'metadata'}}
-                                      for i in order if nodes[i]['kind'] == 'output'},
-                          'models': [values[i]['model'] for i in order if nodes[i]['kind'] == 'train']}
+                raise ValueError('This job type is no longer supported')
             result_path = self.root / 'results' / (identity + '.json')
             write(result_path, result)
             preview = result.get('rows') or next((v['rows'] for v in result.get('outputs', {}).values() if v.get('rows')), [])
@@ -888,7 +665,6 @@ class Platform:
                 for step in job['steps']:
                     if step['status'] == 'running':
                         step.update(status='failed', finished=time.time())
-                        if job.get('events') is not None: event(step['id'], 'failed')
                     elif step['status'] == 'queued': step.update(status='skipped', message='Run stopped before this step')
             message = str(exc) if isinstance(exc, (ValueError, KeyError)) else 'Run failed. Check the input schema and model availability.'
             job.update(status='failed', message=message[:300])

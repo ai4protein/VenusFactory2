@@ -50,7 +50,7 @@ def official_cards():
     def add(name, category, adapter, **extra):
         identity = 'builtin:' + hashlib.sha256(json.dumps([name, category, extra], sort_keys=True).encode()).hexdigest()[:24]
         cards.append({'id': identity, 'name': name, 'category': category, 'source': 'platform', 'visibility': 'public',
-                      'description': extra.get('task', name), 'adapter': adapter, 'workflow': adapter != 'foundation',
+                      'description': extra.get('task', name), 'adapter': adapter, 'predictable': adapter != 'foundation',
                       'input_kind': 'structure' if adapter in {'design', 'discovery', 'structure-evolution', 'structure-property'} else 'table', **extra})
     for task, datasets in ui['dataset_mapping_function'].items():
         for model in ui['model_mapping_function']:

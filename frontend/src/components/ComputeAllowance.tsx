@@ -4,7 +4,7 @@ import { platform } from '../lib/modelPlatform';
 import { COMPUTE_QUOTA_CHANGED, type ComputeQuota } from '../lib/computeQuota';
 import './ComputeAllowance.css';
 
-export function ComputeAllowance({ only }: { only?: 'workflow' | 'prediction' }) {
+export function ComputeAllowance({ only }: { only?: 'prediction' }) {
   const { lang } = useLang(); const zh = lang === 'zh';
   const [quota, setQuota] = useState<ComputeQuota>();
   useEffect(() => {
@@ -18,9 +18,9 @@ export function ComputeAllowance({ only }: { only?: 'workflow' | 'prediction' })
   }, []);
   if (!quota?.enforced) return null;
   return <div className="compute-allowance" aria-label={zh ? '今日剩余额度' : 'Remaining today'}>
-    {(['workflow', 'prediction'] as const).filter(kind => !only || only === kind).map(kind => {
+    {(['prediction'] as const).filter(kind => !only || only === kind).map(kind => {
       const value = quota[kind]; if (!value) return null;
-      return <span key={kind} className={value.remaining ? '' : 'is-empty'}><span>{kind === 'workflow' ? (zh ? '工作流' : 'Workflow') : (zh ? '模型推理' : 'Predictions')}</span><strong>{value.remaining}<small> / {value.limit}</small></strong></span>;
+      return <span key={kind} className={value.remaining ? '' : 'is-empty'}><span>{zh ? '模型推理' : 'Predictions'}</span><strong>{value.remaining}<small> / {value.limit}</small></strong></span>;
     })}<span className="compute-allowance-label">{zh ? '今日剩余' : 'left today'}</span>
   </div>;
 }

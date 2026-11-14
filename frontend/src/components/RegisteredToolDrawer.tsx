@@ -1,8 +1,7 @@
 import { unavailableLabel } from '../lib/capabilityAvailability';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useLang } from '../lib/i18n';
-import { Dataset, Graph, Job, ModelCard, categoryNames, platform, post } from '../lib/modelPlatform';
+import { Dataset, Job, ModelCard, categoryNames, platform, post } from '../lib/modelPlatform';
 import { DataUpload, JobProgress, ModelGlyph } from './ModelPlatformShared';
 
 type FieldSchema = { type?: string; anyOf?: { type: string }[]; title?: string; default?: unknown; enum?: string[]; minimum?: number; maximum?: number };
@@ -23,7 +22,7 @@ export function RegisteredToolDrawer({ tool: summary, onClose }: { tool: ModelCa
   const active = !ready || busy || Boolean(job && ['queued', 'running'].includes(job.status));
   useEffect(() => {
     let alive = true;
-    void platform<ModelCard>('/workflow-components/' + encodeURIComponent(summary.id)).then(value => { if (alive) { setTool(value); setReady(true); } }).catch(e => { if (alive) setError(e.message); });
+    void platform<ModelCard>('/tools/' + encodeURIComponent(summary.id)).then(value => { if (alive) { setTool(value); setReady(true); } }).catch(e => { if (alive) setError(e.message); });
     void platform<Dataset[]>('/datasets').then(d => { if (alive) setDatasets(d); }).catch(e => { if (alive) setError(e.message); });
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', key);
@@ -33,15 +32,7 @@ export function RegisteredToolDrawer({ tool: summary, onClose }: { tool: ModelCa
     if (!ready || tool.available === false) return;
     setBusy(true); setError('');
     try {
-      const graph: Graph = {
-        nodes: [
-          ...(dataset ? [{ id: 'input', kind: 'data' as const, label: 'Input', x: 0, y: 0, dataset_id: dataset }] : []),
-          { id: 'tool', kind: 'tool', label: tool.name, x: 250, y: 0, model_id: tool.id, config: { parameters, sequence_column: sequence } },
-          { id: 'result', kind: 'output', label: 'Result', x: 500, y: 0 },
-        ],
-        edges: [...(dataset ? [{ source: 'input', target: 'tool' }] : []), { source: 'tool', target: 'result' }],
-      };
-      setJob(await post<Job>('/workflows/run', { graph }));
+      setJob(await post<Job>('/tools/run', { tool_id: tool.id, dataset_id: dataset || undefined, config: { parameters, sequence_column: sequence } }));
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   return <div className="mp-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -71,7 +62,7 @@ export function RegisteredToolDrawer({ tool: summary, onClose }: { tool: ModelCa
               : <input required={required.includes(key)} disabled={active} type={type === 'integer' || type === 'number' ? 'number' : 'text'} step={type === 'number' ? 'any' : undefined} min={schema.minimum} max={schema.maximum} value={String(value)} onChange={e => update(type === 'integer' || type === 'number' ? (e.target.value === '' ? undefined : Number(e.target.value)) : e.target.value)}/>}
           </label>;
         })}
-        <div className="mp-actions"><button type="submit" className="mp-button primary" disabled={active || (!tool.standalone && !dataset)}>{zh ? '运行工具' : 'Run tool'}</button><Link className="mp-button" to={`/${lang}/workflows?model=${encodeURIComponent(tool.id)}`}>{zh ? '加入工作流' : 'Add to workflow'}</Link></div>
+        <div className="mp-actions"><button type="submit" className="mp-button primary" disabled={active || (!tool.standalone && !dataset)}>{zh ? '运行工具' : 'Run tool'}</button></div>
       </form>}
       {error && <p role="alert" className="mp-error">{error}</p>}
       {job && <JobProgress initial={job} onChange={setJob}/>}

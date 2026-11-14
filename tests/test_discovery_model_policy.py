@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import pytest
 
-from backend.web_v2 import remote_discovery, workflow_tools
+from backend.web_v2 import remote_discovery, plaza_tools
 from backend.web_v2.model_platform import Platform
 import mcp_tools.models.pretrained.runners.mutation as mutation
 from mcp_tools.tools import runtime_tool_policy as policy
@@ -52,7 +52,7 @@ def test_online_policy_keeps_scoring_remote_search_but_not_local_discovery(monke
     diffdock = next(c for c in cards if c['adapter'] == 'external:diffdock')
     assert diffdock.get('disabled_reason') != 'local_only' and policy.is_tool_allowed('diffdock_dock')
     for name in ('query_ncbi_blast','query_foldseek_remote'):
-        card = workflow_tools.card(name)
+        card = plaza_tools.card(name)
         assert card['category'] == 'discovery' and card['available']
         assert not {'job_id', 'sequence', 'structure_pdb', 'accession'} & card['contract']['properties'].keys()
 

@@ -14,8 +14,7 @@ from backend.web_v2.online_access import AccessStore, online
 actor_context = ContextVar('compute_actor', default=None)
 request_key_context = ContextVar('compute_request_key', default=None)
 inline_request_context = ContextVar('inline_compute_request', default=None)
-LIMITS = {'workflow': ('WEBUI_V2_ONLINE_DAILY_WORKFLOW_LIMIT', 5),
-          'prediction': ('WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT', 20)}
+LIMITS = {'prediction': ('WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT', 20)}
 
 
 def positive_setting(key, default):
@@ -140,8 +139,6 @@ def demands_for(kind, metadata):
         return dict(metadata['compute_demands'])
     if kind in {'platform:predict', 'custom:predict', 'custom:evaluation'}:
         return {'prediction': 1}
-    if kind == 'platform:workflow':
-        return {'workflow': 1}
     if kind.startswith('mcp:') and prediction_tool(metadata.get('tool'), kind[4:]):
         return {'prediction': 1}
     return {}
@@ -150,6 +147,8 @@ def demands_for(kind, metadata):
 def enqueue(q, owner, kind, resource, spec, namespace, *, metadata=None, priority=0,
             session_key=None, request_key=None, request_hash=None):
     """Reserve before enqueue, retaining queue idempotency and rollback semantics."""
+    if kind == 'platform:workflow':
+        raise ValueError('This job type is no longer supported')
     metadata = dict(metadata or {})
     args = dict(metadata=metadata, priority=priority, session_key=session_key,
                 request_key=request_key, request_hash=request_hash)
@@ -162,8 +161,8 @@ def enqueue(q, owner, kind, resource, spec, namespace, *, metadata=None, priorit
     if parent_id and demands:
         parent = q.get(parent_id, owner)
         reserved = parent['metadata'].get('compute_reservation', {})
-        if parent['kind'] in {'platform:predict', 'platform:workflow', 'custom:predict'} and reserved.get('demands', {}).get('prediction', 0):
-            demands = {}  # A workflow's model nodes were reserved together at admission.
+        if parent['kind'] in {'platform:predict', 'platform:tool', 'custom:predict'} and reserved.get('demands', {}).get('prediction', 0):
+            demands = {}  # The parent model/tool run already reserved its prediction allowance.
     from agent.rsi.engine.storage import file_lock
     request_id = hashlib.sha256((owner+'|'+request_key).encode()).hexdigest() if request_key else uuid.uuid4().hex
     lock = q.root/'compute-admission-locks'/request_id

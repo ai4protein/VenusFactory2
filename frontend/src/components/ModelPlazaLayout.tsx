@@ -6,7 +6,7 @@ import '../model-platform.css';
 import '../model-plaza-workspace.css';
 
 const sections = [
-  ['', 'Explore', '工具与模型'], ['training', 'Train', '训练'],
+  ['', 'Explore', '工具与模型'], ['rsi', 'RSI Plaza', 'RSI 广场'], ['training', 'Train', '训练'],
   ['evaluation', 'Evaluate', '评估'], ['predict', 'Predict', '预测'],
   ['leaderboards', 'Leaderboards', '排行榜'],
 ];
