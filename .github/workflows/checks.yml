@@ -223,7 +223,7 @@ jobs:
           tests/harness/test_research_data_memory.py
           tests/harness/test_scientific_acceptance.py
           tests/harness/test_multilabel_evaluation.py tests/harness/test_multilabel_training.py tests/harness/test_multilabel_references.py
-          tests/harness/test_research_input_profile.py tests/harness/test_native_expert_responses.py tests/harness/test_research_projection_integration.py tests/harness/test_autonomous_research.py tests/harness/test_study_review_state.py
+          tests/harness/test_research_input_profile.py tests/harness/test_native_expert_responses.py tests/harness/test_research_projection_integration.py tests/harness/test_autonomous_research.py tests/harness/test_unattended_research.py tests/harness/test_study_review_state.py
           tests/harness/test_research_worker_recovery.py
           tests/harness/test_web_native_context_recovery.py
           tests/harness/test_claude_host.py

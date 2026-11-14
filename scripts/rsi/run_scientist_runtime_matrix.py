@@ -29,6 +29,7 @@ from agent.harness.catalog import ExecutionCatalog
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import write_json
 from agent.harness.installation import default_runtimes
+from agent.harness.unattended_research import POLICY as EXECUTION_POLICY
 
 SMOKE_ID = "synthetic-token-counts.v1"
 SMOKE_OBJECTIVE = (
@@ -106,6 +107,7 @@ def _build_plan(catalog_path, base_profile, runtimes, runtime_root):
         for harness in harnesses:
             cell = {
                 "id": f"cell_{len(cells):03d}", "model_id": row["id"], "harness": harness,
+                "execution_policy": EXECUTION_POLICY,
                 "platform": {"status": "unverified"},
                 "research": {"status": "not_started"},
                 "availability": {"static": "configured_zero_price", "effective": "not_probed",
@@ -130,6 +132,7 @@ def _build_plan(catalog_path, base_profile, runtimes, runtime_root):
             cells.append(cell)
     return {
         "schema": 1, "kind": "scientist_runtime_acceptance", "status": "dry_run",
+        "execution_policy": EXECUTION_POLICY,
         "catalog_sha256": file_hash(catalog_path),
         "runtime_root": str(Path(runtime_root).resolve()),
         "runtimes": {k: str(v) for k, v in runtimes.items()},
@@ -351,11 +354,14 @@ def classify(goal_root, state, kind):
                 "goal_status": state.get("status")}
     if state.get("progress", {}).get("sc_revision"):
         research["status"] = "rejected"
+    if state.get("status") == "waiting_for_input":
+        research["status"] = "blocked_missing_input"
     if kind == "non_research_smoke":
         research["status"] = "not_applicable_smoke"
     platform = {"status": "unverified"}
     availability = {"static": "configured_zero_price", "effective": "unverified", "credential": "resolved_by_host"}
     evidence = []
+    automatic_confirmations = 0
     requests_ok = []
     blockers = []
     runtime_errors = []
@@ -398,6 +404,9 @@ def classify(goal_root, state, kind):
         events = folder / "events.json"
         if events.exists():
             for event in json.loads(events.read_text()):
+                if (event.get("kind") == "automatic_approval"
+                        and event.get("policy") == EXECUTION_POLICY and event.get("decision") == "approve"):
+                    automatic_confirmations += 1
                 if event.get("kind") == "completed" and event.get("event_audit", {}).get("passed") is True:
                     completed_native = True
     if blockers:
@@ -415,6 +424,8 @@ def classify(goal_root, state, kind):
     if binding_problems:
         platform["native_binding_problems"] = binding_problems
     return {"platform": platform, "research": research, "availability": availability,
+            "automation": {"policy": EXECUTION_POLICY, "automatic_confirmations": automatic_confirmations,
+                           "input_blocked": state.get("status") == "waiting_for_input"},
             "compression": compression_evidence(root, native_contexts=native_contexts)}
 
 
@@ -437,7 +448,7 @@ async def execute_cell(cell, folder, case, inputs, catalog, runtimes):
         for path, expected in zip(inputs, case.get("inputs", []), strict=True):
             if file_hash(path) != expected["sha256"]:
                 raise ValueError("Approved input changed after allocation")
-    store = create(folder / "goal", profile, case["objective"], case["limits"])
+    store = create(folder / "goal", profile, case["objective"], case["limits"], unattended=True)
     if case["kind"] == "non_research_smoke":
         fixture = folder / "smoke_input.json"
         write_json(fixture, SMOKE_INPUT)
@@ -448,7 +459,9 @@ async def execute_cell(cell, folder, case, inputs, catalog, runtimes):
     runner = AutonomousResearch(store, credential, runtimes, **({"tools": []} if case["kind"] == "non_research_smoke" else {}))
     state = await runner.run()
     cell.update(classify(store.root, state, case["kind"]))
-    cell["execution"] = "finished"
+    cell["execution"] = "blocked" if state.get("status") == "waiting_for_input" else "finished"
+    if state.get("status") == "waiting_for_input":
+        cell["blocker"] = "missing_research_input"
 
 
 async def _run(args):

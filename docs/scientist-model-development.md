@@ -754,6 +754,20 @@ bank approval. The runner never chooses a topic. Execution uses the full
 `AutonomousResearch.run()` goal loop with a separate goal directory for each
 cell; credentials remain inside the existing host resolver.
 
+Once a reviewed case is started, every cell uses `unattended_research.v1`.
+Allowed MCP operations and in-scope execution/plan confirmations run automatically;
+no operator click is required between PI, CB, MLS, SC or subsequent iterations.
+Automatic confirmations are recorded as policy decisions, never as a human answer
+or an SC acceptance. Tool enablement, session isolation, free-route selection,
+resource budgets and native Harness context compression still apply. Ordinary Web
+conversations retain their interactive questions and confirmations.
+
+Missing scientific inputs are not fabricated: if supplied materials and enabled
+tools cannot resolve them, that cell records `missing_research_input` and the matrix
+continues with the remaining combinations. Reports retain the fixed execution
+policy, automatic-confirmation count and input-blocked state. This execution policy
+does not replace the separate topic-selection approval before starting a study.
+
 Reports separate platform execution, research outcome, provider availability,
 protocol compatibility, and native context compression. A scientific rejection
 does not establish a platform defect. Authentication, quotas, rate limits and

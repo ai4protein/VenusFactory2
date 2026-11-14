@@ -208,9 +208,12 @@ def method_changes(previous, current, episode):
             and row['approach']!=old[row['id']].get('approach','')]
 
 
-def create(root, profile, objective, limits):
+def create(root, profile, objective, limits, *, unattended=False):
     if profile.harness not in NATIVE_EXPERT_HARNESSES:raise ValueError('Select a native Scientist harness')
-    store=GoalStore.create(root,GoalSpec(objective,CRITERIA,**limits),profile)
+    from .unattended_research import POLICY
+    if type(unattended) is not bool: raise ValueError('unattended must be a boolean')
+    store=GoalStore.create(root,GoalSpec(objective,CRITERIA,**limits),profile,
+        admission={'execution_policy':POLICY} if unattended else None)
     write_json(store.root/'protocol.json',{'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA,'scientific_acceptance':sc_acceptance.POLICY,'role_context_policy':ROLE_CONTEXT_POLICY})
     (store.root/'workspace').mkdir()
     return store
@@ -227,6 +230,11 @@ class AutonomousResearch:
         self.store=store;self.credential=credential;self.runtimes=runtimes
         self.consult_override=consult;self.executor_override=executor;self.extra_tools=tools
 
+    @property
+    def unattended(self):
+        from .unattended_research import enabled
+        return enabled(self.store.read()['definition'].get('admission',{}).get('execution_policy')) if self.store is not None else False
+
     async def consult(self, role, context, profile, relay, folder):
         original_context = context
         context = project_role_context(role, context)
@@ -237,6 +245,9 @@ class AutonomousResearch:
         output_spec = spec
         role_prompt=sc_acceptance.prompt_for_review(context) if role=='SC' else ROLES[role]
         instruction=SCIENTIST_PURPOSE+role_prompt+' Respond in the language of the research objective.'
+        if self.unattended and role in {'PI','CB'}:
+            from .unattended_research import GUIDANCE as unattended_guidance
+            instruction += '\n'+unattended_guidance
         if role=='SC' and context.get('scientific_acceptance',{}).get('analysis_review_policy'):
             instruction += ' Exact response schema: '+json.dumps(sc_acceptance.analysis_review_schema(context['scientific_acceptance']['analysis_review_policy']),ensure_ascii=False)
         elif role=='SC' and context.get('scientific_acceptance',{}).get('models'):
@@ -504,6 +515,7 @@ class AutonomousResearch:
                         'omitted_count':max(0,len(prior_analysis)-12),
                         'instruction':'These earlier host-captured computations remain byte-verified. Inspect and cite their result files in a new report/checkpoint instead of repeating unchanged calculations. They are not completed research or SC acceptance.'}
                 from .interactions import INTERACTION_NAMES
+                interaction_names = {'request_confirmation'} if self.unattended else INTERACTION_NAMES
                 from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
                 tools=scientific+service.tools()
                 if plan.get('deliverable')=='model':
@@ -515,7 +527,7 @@ class AutonomousResearch:
                         context['model_development']['next_action'] = repair_action(context['model_development']['next_action'], repair)
                 focus=selected_tools(context,tools)
                 context['model_development']['selected_tools']=focus
-                names=CONTROLS | WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | set(focus)
+                names=CONTROLS | WORKSPACE_PRIMITIVES | interaction_names | {'submit_research_checkpoint'} | set(focus)
                 context['tools'] = sorted(names)
                 if profile.model.protocol=='responses':policy.allowed={'mcp__venusfactory__'+n for n in names}
                 else:policy.scientific_tools=frozenset(names)
@@ -526,6 +538,9 @@ class AutonomousResearch:
                 execution_context=project_role_context('MLS',context)
                 record_context(folder,'MLS',context,execution_context)
                 request={'session_id':self.store.root.name,'profile':native.public(),'runtimes':self.runtimes,'research_focus':focus,'workspace':str(workspace),'control':str(folder),'messages':[],'role_context_policy':ROLE_CONTEXT_POLICY,'text':json.dumps(execution_context,ensure_ascii=False),'instructions':instructions,'base_url':relay.base_url,'token':relay.token,'budget':native.public()['budget'],'lang':'zh' if any('\u4e00'<=c<='\u9fff' for c in context['objective']) else 'en'}
+                if self.unattended:
+                    from .unattended_research import POLICY
+                    request['execution_policy']=POLICY
                 phase('MLS')
                 if self.executor_override:await self.executor_override(request,service,events)
                 else:
@@ -562,7 +577,7 @@ class AutonomousResearch:
                     else:continuation['model_development'].pop('repair_source', None)
                     focus = selected_tools(continuation, tools)
                     continuation['model_development']['selected_tools'] = focus
-                    names = CONTROLS | WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | set(focus)
+                    names = CONTROLS | WORKSPACE_PRIMITIVES | interaction_names | {'submit_research_checkpoint'} | set(focus)
                     continuation['tools'] = sorted(names)
                     if profile.model.protocol == 'responses':
                         policy.allowed = {'mcp__venusfactory__'+name for name in names}
@@ -604,6 +619,11 @@ class AutonomousResearch:
                                 'scientific_tool_attempts': copy.deepcopy(attempts)}
                             write_json(retry_folder/'execution_failure_interruption.json', interrupted_event)
                             event_sink(interrupted_event)
+                missing=next((e for e in events if e.get('kind')=='research_input_required'),None)
+                if missing:
+                    progress.update(questions=missing['questions'],research_completed=False)
+                    progress.pop('reviewed_episode',None)
+                    raise AwaitUser()
                 awaiting=next((e for e in events if e.get('kind')=='interaction'),None)
                 if awaiting:
                     from .interactions import Interaction

@@ -119,6 +119,10 @@ def sandbox_command(ctx, home, prepared):
         "--mcp-config",
         "/runtime_home/mcp.json",
         "--strict-mcp-config",
+        # Declared MCP tools are preapproved; undeclared native prompts must
+        # fail closed instead of waiting for an absent interactive host.
+        "--permission-mode",
+        "dontAsk",
         "--tools",
         "",
         "--allowedTools",

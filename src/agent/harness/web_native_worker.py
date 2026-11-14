@@ -97,6 +97,10 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         tools = filter_tools([t for t in get_tools() if t.name not in UNSAFE_TOOLS])[0]
         tools += session_tools(request["workspace"], Path(request["control"])/"session-tools")
     from .interactions import INTERACTION_GUIDANCE, INTERACTION_NAMES, interaction_tools
+    from .unattended_research import enabled as unattended_enabled, GUIDANCE as UNATTENDED_GUIDANCE
+    unattended = unattended_enabled(request.get("execution_policy"))
+    if unattended and (not request.get("audit_required") or not any(t.name == "submit_research_checkpoint" for t in tools)):
+        raise ValueError("Unattended policy requires an audited Scientist tool surface")
     interaction = None
     def request_input(value):
         nonlocal interaction
@@ -107,7 +111,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         # during cancellation must not lose the user's question.
         send({"kind": "interaction", "interaction": public_value(value, Path(request["workspace"]))})
     tools = [t for t in tools if t.name not in UNSAFE_TOOLS and t.name not in INTERACTION_NAMES]
-    tools += interaction_tools(request_input)
+    tools += interaction_tools(request_input, unattended=unattended,
+        on_automatic=lambda event: send(public_value(event, Path(request["workspace"]))))
     mapping = {web_tool_name(t.name, request["profile"]["harness"]): t for t in tools}
     if len(mapping) != len(tools):
         raise ValueError("Duplicate scientific tool identity")
@@ -561,13 +566,23 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                      "pass it in the tool output argument; otherwise create it with a session file tool. "
                      "Before reporting completion, check the tool receipt or file content. Link the actual saved file; "
                      "do not claim a differently named output satisfies the requested filename.")
-    instructions += "\n\n" + INTERACTION_GUIDANCE + "\n\n" + SECURITY_INSTRUCTIONS + "\n\n" + GUIDANCE
+    discovery_guidance = GUIDANCE
+    if unattended:
+        discovery_guidance = discovery_guidance.replace(
+            "ask_user and request_confirmation remain directly available.",
+            "request_confirmation records automatic policy approval; missing scientific inputs belong in the checkpoint.")
+        instructions = instructions.replace(
+            "Ask for missing scientific inputs; do not substitute demos or invented data.",
+            "Record missing scientific inputs in the checkpoint; do not substitute demos or invented data.").replace(
+            "Ask for genuinely missing scientific inputs; do not substitute demos or invented data.",
+            "Record missing scientific inputs in the checkpoint; do not substitute demos or invented data.")
+    instructions += "\n\n" + (UNATTENDED_GUIDANCE if unattended else INTERACTION_GUIDANCE) + "\n\n" + SECURITY_INSTRUCTIONS + "\n\n" + discovery_guidance
     instructions += '\n\nCurrent enabled capability categories:\n' + json.dumps(
         [{key: row[key] for key in ('id', 'name', 'description')}
          for row in disclosure.overview()['categories']], ensure_ascii=False)
     task = Task(
         workspace, capability, output, public_value(native_prompt(prompt_request, research=is_research), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat",
-        interaction="research_execution" if is_research else None,
+        interaction="research_unattended" if unattended else "research_execution" if is_research else None,
     )
     adapter, _ = builtin_registry().resolve(runtime_profile, request["runtimes"])
     ctx = RuntimeContext(
@@ -651,6 +666,11 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
             native_result_failure = None
             try:
                 result = await pending
+                if unattended and result.get("status") == "needs_input":
+                    questions = public_value(result.get("questions", []), workspace)
+                    send({"kind": "research_input_required", "research_complete": False,
+                          "questions": [json.dumps(q, ensure_ascii=False)[:2000] for q in questions] or ["Required scientific input is unavailable."]})
+                    return
                 if result.get("status") != "completed":
                     known_failure = (
                         result.get("status") == "runtime_error" and result.get("error_type") in (None, "runtime_error")

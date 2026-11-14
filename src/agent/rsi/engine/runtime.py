@@ -63,6 +63,9 @@ def build_task_message(system_prompt, prompt, *, interaction="bounded"):
             "are valid; do not invent a persistent research goal or require a file artifact. "
             "If information is missing, ask the user in your reply.\n\n" + prompt
         )
+    if interaction == "research_unattended":
+        from agent.harness.unattended_research import GUIDANCE
+        return "Unattended Scientist execution.\n" + system_prompt + "\n" + GUIDANCE + "\n\nCurrent research context:\n" + prompt
     if interaction == "research_execution":
         return (
             "Scientist execution: continue the assigned research goal.\n" + system_prompt
@@ -213,7 +216,7 @@ async def run_task(
                             )
                     questions = await client.list_pending_questions(sid)
                     if questions:
-                        if interaction in {"chat", "research_execution"}:
+                        if interaction in {"chat", "research_execution", "research_unattended"}:
                             raise ConversationNeedsInput(questions)
                         raise RuntimeError("task requested human input; task is not autonomous")
                     await asyncio.sleep(0.4)
@@ -291,7 +294,7 @@ async def run_task(
                         result["status"] = (
                             "runtime_error" if event.is_error or result.get("error_code") else "completed"
                         )
-                        if interaction in {"chat", "research_execution"} and result["status"] == "completed" and not result["text"].strip():
+                        if interaction in {"chat", "research_execution", "research_unattended"} and result["status"] == "completed" and not result["text"].strip():
                             result["status"] = "incomplete"
                         break
     except ConversationNeedsInput as exc:

@@ -211,6 +211,8 @@ def test_command_contains_only_declared_model_and_tools(tmp_path):
     command = adapter.sandbox_command(ctx, ctx.task.output, prepared)
     assert command[command.index("--tools") + 1] == ""
     assert command[command.index("--allowedTools") + 1] == "mcp__venusfactory__protein_probe"
+    assert command[command.index("--permission-mode") + 1] == "dontAsk"
+    assert "--dangerously-skip-permissions" not in command and "bypassPermissions" not in command
     assert command[command.index("--model") + 1] == "fixture"
     assert "--clearenv" in command and "--strict-mcp-config" in command
     assert not any("DMXAPI_API_KEY" in item for item in command)

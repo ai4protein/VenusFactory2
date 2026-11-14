@@ -95,6 +95,11 @@ def execution_followup(request, profile, events, *, checkpoint, remaining_calls,
                      "Use the selected interfaces directly, or describe a needed enabled tool before calling it. "
                      "Execute the next unfinished plan step, then submit_research_checkpoint with actual artifacts. "
                      "If missing input blocks useful work, use ask_user; do not assume an answer."}
+    from .unattended_research import POLICY
+    if request.get("execution_policy") == POLICY:
+        context["execution_followup"]["next_step"] = context["execution_followup"]["next_step"].replace(
+            "If missing input blocks useful work, use ask_user; do not assume an answer.",
+            "If missing input blocks useful work, save partial evidence and checkpoint needs_input; do not invent an answer.")
     discovery = discovery_only_observation(events)
     if discovery is not None:
         context["execution_followup"].update(discovery)

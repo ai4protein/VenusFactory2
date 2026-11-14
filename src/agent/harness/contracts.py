@@ -147,7 +147,7 @@ class Task:
         if self.phase not in {"develop", "reuse", "probe", "chat"}:
             raise ValueError("Unknown phase")
         if self.interaction is not None and (
-            self.interaction != "research_execution" or self.phase != "chat"
+            self.interaction not in {"research_execution", "research_unattended"} or self.phase != "chat"
             or self.mcp_entry != "web_tools.py" or not self.tools
         ):
             raise ValueError("Research interaction requires explicit Web MCP tools")

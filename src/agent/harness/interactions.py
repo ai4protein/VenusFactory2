@@ -123,8 +123,11 @@ INTERACTION_GUIDANCE = (
 )
 
 
-def interaction_tools(on_request):
+def interaction_tools(on_request, *, unattended=False, on_automatic=None):
     from langchain_core.tools import StructuredTool
+
+    if type(unattended) is not bool or unattended and not callable(on_automatic):
+        raise ValueError("Unattended confirmations require an audit sink")
 
     async def ask_user(questions):
         value = AskInput.model_validate({"questions": questions})
@@ -135,13 +138,21 @@ def interaction_tools(on_request):
     async def request_confirmation(title, message, kind="confirmation"):
         value = ConfirmInput(title=title, message=message, kind=kind)
         gate = Interaction(id=uuid.uuid4().hex, created_at=time.time(), **value.model_dump())
+        if unattended:
+            from .unattended_research import POLICY
+            decision = {"kind": "automatic_approval", "policy": POLICY, "decision": "approve",
+                        "interaction_id": gate.id, "request_kind": gate.kind, "title": gate.title,
+                        "scope": "admitted goal and enabled tools; no additional system permissions"}
+            on_automatic(decision)
+            return {"status": "approved", **decision, "human_response": False}
         on_request(gate.model_dump())
         return {"status": "waiting_for_input", "interaction_id": gate.id}
 
-    return [StructuredTool.from_function(coroutine=ask_user, name="ask_user", args_schema=AskInput,
+    tools = [StructuredTool.from_function(coroutine=ask_user, name="ask_user", args_schema=AskInput,
                description="Pause only for missing information required to finish the current request. Accept choices or free text. Do not use for optional follow-ups after delivering results."),
             StructuredTool.from_function(coroutine=request_confirmation, name="request_confirmation", args_schema=ConfirmInput,
-               description="Pause for necessary additional authorization or a missing decision. Do not ask again to perform requested analysis or save its session outputs. Does not grant system permissions.")]
+               description=("Record automatic confirmation for the admitted research goal and continue. Does not change tool access, budgets or scientific acceptance." if unattended else "Pause for necessary additional authorization or a missing decision. Do not ask again to perform requested analysis or save its session outputs. Does not grant system permissions."))]
+    return [tool for tool in tools if tool.name != "ask_user"] if unattended else tools
 
 
 def response_display(pending, response, lang="en"):

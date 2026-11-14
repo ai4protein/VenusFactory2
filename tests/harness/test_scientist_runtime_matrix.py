@@ -38,6 +38,8 @@ def test_inventory_retains_every_free_combination_and_runtime_failure(inventory,
     path, profile, runtimes = inventory
     result = matrix.build_plan(path, profile, runtimes, tmp_path)
     assert result["coverage"] == {"models": 2, "harnesses": 2, "cells": 4}
+    assert result["execution_policy"] == matrix.EXECUTION_POLICY
+    assert all(c["execution_policy"] == matrix.EXECUTION_POLICY for c in result["cells"])
     assert len({(c["model_id"], c["harness"]) for c in result["cells"]}) == 4
     assert all(c["availability"]["effective"] == "not_probed" for c in result["cells"])
     assert all(c["compression"]["status"] == "not_observed" for c in result["cells"])
@@ -279,7 +281,8 @@ def test_readonly_policy_never_opens_the_mutating_store_connection(tmp_path, mon
 
 
 @pytest.mark.asyncio
-async def test_execute_cell_uses_full_goal_entry_without_persisting_credentials(inventory, tmp_path, monkeypatch):
+@pytest.mark.parametrize("goal_status", ["budget_exhausted", "waiting_for_input"])
+async def test_execute_cell_uses_full_goal_entry_without_persisting_credentials(inventory, tmp_path, monkeypatch, goal_status):
     import agent.harness.autonomous_research as research
     import agent.harness.catalog as catalog_module
     from agent.harness.catalog import ExecutionCatalog
@@ -289,7 +292,8 @@ async def test_execute_cell_uses_full_goal_entry_without_persisting_credentials(
     folder = tmp_path / "cell"
     folder.mkdir()
     calls = []
-    def create(root, selected, objective, limits):
+    def create(root, selected, objective, limits, *, unattended):
+        assert unattended is True
         calls.append(("create", selected, objective, limits))
         root.mkdir()
         return SimpleNamespace(root=root)
@@ -300,7 +304,7 @@ async def test_execute_cell_uses_full_goal_entry_without_persisting_credentials(
             self.store = store
         async def run(self):
             calls.append(("run",))
-            return {"status": "budget_exhausted", "cycles": []}
+            return {"status": goal_status, "cycles": []}
     monkeypatch.setattr(research, "create", create)
     monkeypatch.setattr(research, "AutonomousResearch", Runner)
     monkeypatch.setattr(catalog_module, "resolve_credential", lambda *args: "synthetic-private-credential")
@@ -308,7 +312,11 @@ async def test_execute_cell_uses_full_goal_entry_without_persisting_credentials(
     await matrix.execute_cell(cell, folder, case, [], catalog, runtimes)
     assert [call[0] for call in calls] == ["create", "run"]
     assert calls[0][2] == case["objective"]
-    assert cell["execution"] == "finished"
+    assert cell["execution"] == ("blocked" if goal_status == "waiting_for_input" else "finished")
+    if goal_status == "waiting_for_input":
+        assert cell["blocker"] == "missing_research_input"
+        assert cell["research"]["status"] == "blocked_missing_input"
+        assert cell["platform"]["status"] == "unverified"
     assert "synthetic-private-credential" not in json.dumps(cell)
     assert not any("synthetic-private-credential" in f.read_text()
                    for f in folder.rglob("*") if f.is_file())
@@ -452,3 +460,16 @@ def test_persisted_web_binding_roundtrip_reuses_strict_native_audit(tmp_path, fo
     classified = matrix.classify(tmp_path, state, "approved_topic")
     assert classified["platform"]["status"] == "unverified"
     assert classified["compression"]["status"] == "continuation_unverified"
+
+
+def test_automatic_confirmations_are_not_scientific_acceptance(tmp_path):
+    folder = successful_transport(tmp_path)
+    (folder / "events.json").write_text(json.dumps([
+        {"kind": "automatic_approval", "policy": matrix.EXECUTION_POLICY, "decision": "approve"},
+        {"kind": "automatic_approval", "policy": "unknown", "decision": "approve"},
+        {"kind": "completed", "event_audit": {"passed": True}},
+    ]))
+    result = matrix.classify(tmp_path, {"status": "waiting_for_input", "cycles": [{"status": "needs_revision"}]}, "approved_topic")
+    assert result["automation"] == {"policy": matrix.EXECUTION_POLICY, "automatic_confirmations": 1, "input_blocked": True}
+    assert result["research"]["status"] == "blocked_missing_input"
+    assert result["compression"]["status"] == "not_observed"
