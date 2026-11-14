@@ -11,7 +11,7 @@ the literature, run predictions and develop models for your research.
 - **Ask and analyse.** Find protein information, use scientific tools and interpret results.
 - **Develop from your data.** Turn a research goal and measurements into model code, tests and a research report.
 - **Investigate a protein.** Bring literature, database records and predictions together in a report with sources.
-- **Reuse the results.** Run models directly, combine tools in a workflow, or request publication of a reviewed Scientist model.
+- **Explore research cases.** Preview Scientist projects, read their reports and download reproducible code from RSI Plaza.
 
 ![VenusFactory2 conversation workspace](docs/images/chat-workspace.jpg)
 
@@ -45,7 +45,7 @@ project and report can be downloaded as a ZIP. A useful result may be a new anal
 tool, a fitted machine-learning model or a method for your experimental setting.
 Scientist outputs stay private. To share a model, email its project and test report to
 [tanyang.august@sjtu.edu.cn](mailto:tanyang.august@sjtu.edu.cn). The platform operator
-selects reviewed models for publication; each published entry displays the author email.
+selects reviewed cases for RSI Plaza; each published entry displays the author email. RSI models are not added to Agent or Researcher tools.
 See [operator publication](docs/development/model-publication.md) for local registration.
 
 Scientist delivers a selected model or method with a README, runnable interface,
@@ -57,7 +57,7 @@ topic; they do not each become another default tool. See the
 
 **Model Plaza** groups models by biological function. Open a model to run a
 prediction, or use **Train**, **Evaluate** and **Predict** with your own dataset.
-**Workflow** lets you connect tools and follow the data through each step.
+Open **RSI Plaza** within Model Plaza to browse research repositories, read their README and reports, and download a project ZIP.
 
 | Research task | Example tools and models |
 | --- | --- |
@@ -128,7 +128,7 @@ The two modes share the same interface.
 
 ## Learn more
 
-- [Tutorials and examples](docs/wiki/Home.md): Chat, Model Plaza, Workflow and working with your data.
+- [Tutorials and examples](docs/wiki/Home.md): Chat, Model Plaza, RSI Plaza and working with your data.
 - [Installation](docs/installation.md): add models, weights and agent backends as needed.
 - [Developer guide](docs/development.md): repository layout, model integration, services and checks.
 

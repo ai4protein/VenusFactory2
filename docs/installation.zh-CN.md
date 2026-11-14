@@ -13,7 +13,7 @@ python3 install_full.py doctor      # 检查同一套完整配置
 ```
 
 完整入口会准备平台环境、内置能力、前端、科学技能、四种 Harness、独立模型工具目录、
-Factory 全部预测任务权重及其五种底座，以及 RSI 模型库接入。
+Factory 全部预测任务权重及其五种底座，以及 RSI 研究成果库与案例浏览。
 仍使用统一的环境检测、进度条、校验和重试机制。需要许可或缺少 GPU 的工具会单独列出，
 返回未完成状态；其余独立组件继续安装。安装后通过 `scripts/serve.py` 启动服务。
 Factory 任务权重与底座快照分别验收，部分 Hub 缓存不算完整底座；
@@ -35,7 +35,7 @@ Tavily/SerpAPI 的 key、InterProScan 联系邮箱在 Administration 配置；�
 python3 install_full.py --components none
 # 核心平台 + 选择的工具和 Harness
 python3 install_full.py --components external,harnesses --tools proteinmpnn,ligandmpnn --harnesses codex
-# 核心平台 + Factory 模型 + 已有 RSI 模型库
+# 核心平台 + Factory 模型 + 已有 RSI 研究成果库
 python3 install_full.py --components factory,rsi --rsi-library /path/to/reviewed-library
 ```
 

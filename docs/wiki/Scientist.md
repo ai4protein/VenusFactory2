@@ -24,7 +24,7 @@ Paper-based work can reproduce a defined part of a study, address a limitation o
 2. Send the goal to start the RSI topic. Follow **PI → Plan → Implement → SC (Acceptance)**, with revised plans and repeated experiments as needed.
 3. Use the revision controls or composer to add constraints, correct assumptions or supply new data in the same topic.
 4. Inspect the plan, intermediate results, model iterations, activity and project files. Model iterations show measured baselines, revisions, validation scores and their parent experiments.
-5. Review the final project and test report. Independent **Review** checks reusable candidates before admission.
+5. Review the final project and test report. Independent **Review** checks the deliverable and its reproducibility.
 
 Enter submits; Shift+Enter adds a line. A topic retains its own context when you switch modes. If it asks for essential missing information, reply in the same topic. A budget limit is a checkpoint, not evidence that research has finished.
 
@@ -46,7 +46,7 @@ Model research requires a measured baseline and a revised experiment on matched 
 
 SC independently assesses whether the model answers the research goal and has a useful, supported application. It examines measured results and controls, evaluation validity, and scope and limitations. A model can be useful without beating every baseline; claims of better prediction, lower cost, data efficiency or a new application need corresponding evidence.
 
-If the result is ineffective or evidence is insufficient, SC returns specific revision requests to PI. The topic continues through revised plans and experiments. A rejected candidate cannot proceed to technical Review or registration. After SC accepts the measured model version, independent Review checks final testing, interfaces and reproducibility. The model's test report includes both decisions.
+If the result is ineffective or evidence is insufficient, SC returns specific revision requests to PI. The topic continues through revised plans and experiments. A rejected candidate returns to research for revision. After SC accepts the measured model version, independent Review checks final testing, interfaces and reproducibility. The model's test report includes both decisions.
 
 ## Receive and reuse the results
 
@@ -56,11 +56,8 @@ The included test command replays both developer examples and independently revi
 
 Use **Download project (.zip)** for the selected releases and research report. Each release has its own README with use and reproduction commands. A draft without a reviewed release downloads the working project. Experiments, ablations and previous versions remain in the topic; expand their records when you need the details. Revisions of the same purpose appear as versions of one capability instead of filling the tool list with every trial.
 
-Research completion and public-tool admission are separate. Code execution or SC acceptance alone does not publish a model. Independent checks review interfaces, scope, reproducibility and evaluation evidence. Rejected candidates remain available for revision. Only reviewed, published and enabled capabilities can be discovered and called by [Agent](./Agent.md), Model Plaza or workflows.
+## Explore and share a case
 
+Open [RSI Plaza](./RSIPlaza.md) within Model Plaza to read case repositories and download their ZIP packages. RSI outputs are not added to Agent or Researcher tools, including previously registered RSI models. Scientific acceptance and technical review still assess the deliverable's quality and reproducibility; approval does not create a callable platform model.
 
-## Share a model with the platform
-
-Scientist outputs remain private in both local and online modes, even after independent Review passes. Download your project and test report for your own use. To request publication, choose **Request publication by email** and include your name, author email, scope, code/weights, test report and permission to share the data and model. Send the email to **tanyang.august@sjtu.edu.cn**. There is no in-app submission queue.
-
-The platform operator selects and publishes reviewed models. Published entries display the author email and become discoverable by Agent, Model Plaza and Workflow when enabled. Research completion, technical review and operator publication are three separate decisions.
+Private Scientist outputs remain available only to their owner. To request public case publication, email your project, test report, author email, scientific scope and sharing permission to **tanyang.august@sjtu.edu.cn**. The platform operator selects published cases. Publication exposes the approved project package and author information, not other files in a research workspace.

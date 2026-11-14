@@ -28,10 +28,8 @@ For custom analysis, Agent writes source files and runs them in the session sand
 
 Do not paste API keys into a conversation. Deployment credentials are managed in Administration.
 
-## Reuse Scientist work
+## Explore Scientist results
 
-Ask for a tool by protein, property or experimental scenario. Agent searches the registered catalog and inspects a matching model's interface and scope before running it. A research output becomes a shared tool only after independent review and publication, and it must be enabled in the current deployment.
+Scientist models are available as case repositories in [RSI Plaza](./en/rsi-plaza.md). Preview their README, code and reports, or download the project ZIP. They are not registered as Agent or Researcher tools. Agent continues to search and run enabled platform models.
 
-Registered Scientist model predictions appear in a result card with their units. Expand **Applicability** to check the supported conditions. Open **View report**, **CSV** or **JSON** to preview and download the complete result; long tables show a short preview in the conversation.
-
-See [Scientist](./en/scientist.md) to develop a capability and [Library](./en/library.md) to manage results.
+See [Scientist](./en/scientist.md) to develop a method and [Library](./en/library.md) to manage results.

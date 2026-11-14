@@ -23,7 +23,7 @@ Enter sends a message; Shift+Enter adds a line. The upload button, drag-and-drop
 
 - **Chat**: [Agent](manual:agent), [Scientist](manual:scientist) and [Researcher](manual:researcher) have separate histories.
 - **Model Plaza**: browse tools by function, use prediction forms, open custom training/evaluation and leaderboards.
-- **Workflows**: connect tools and models into a reusable process.
+- **RSI Plaza**: preview Scientist repositories and download research packages.
 - **Library**: browse files you can access. In online mode it follows your remaining conversations.
 - **Settings**: language, Manual and online credit entry; local deployments also provide an Administration entry.
 

@@ -10,7 +10,7 @@ Tools & models lists native/MCP tools, Scientist workspace tools, built-in model
 - Online policy: `runtime/online/state/capabilities.sqlite3`.
 - A custom `VENUS_RUNTIME_ROOT` changes the base, retaining the two mode subfolders.
 - Tool aliases share one switch. Model variants have stable, separate switches.
-- A disabled model stays visible in Model Plaza and workflows. Its run/add-to-workflow actions are unavailable. Hovering or clicking its card explains availability.
+- A disabled model stays visible in Model Plaza. Its prediction action is unavailable. Hovering or clicking its card explains availability.
 - Tool discovery omits disabled tools. A single-model tool disappears when its model is disabled; tools serving multiple variants validate the selected variant on each call.
 - Agent, Scientist, Researcher, MCP, legacy HTTP routes, direct prediction adapters and worker execution read the policy again. Cached conversations and queued jobs cannot rely on their earlier availability decision.
 - A running computation is not forcibly killed by changing an availability switch. Use its job cancellation action to stop it. Subsequent calls and jobs not yet executing are rejected.

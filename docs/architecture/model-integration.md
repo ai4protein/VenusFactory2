@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Upstream method | `mcp_tools/models/pretrained/` | Method, variant, upstream revision and weights |
 | Factory-trained model | `mcp_tools/models/factory/` | Dataset, backbone, training strategy, version and weight digest |
-| Scientist/RSI result | `mcp_tools/models/evolved/` | Author/owner, research run, scope, version, evidence, independent review and visibility |
+| Scientist/RSI case | Scientist project storage and RSI Plaza API | Author/owner, research run, scope, immutable package, scientific review and visibility |
 | Non-model service | `mcp_tools/tools/` | Service/tool interface and configuration |
 
 ProSST, ProtSSN, ESM-1v, ESM-IF1, ProteinMPNN and LigandMPNN belong to the same
@@ -30,7 +30,7 @@ permission to publish or execute.
    `mcp_tools.models.profiles.repository_path`; do not depend on the shell cwd.
 4. Expose the callable through the MCP hub and server. Catalog discovery and
    execution must both enforce the same administrator and online policy.
-5. Add Model Plaza/Workflow metadata where applicable. A UI card alone is not an
+5. Add Model Plaza metadata where applicable. A UI card alone is not an
    executable model, and a registered private checkpoint is not a public model.
 6. Validate real bounded inference, parameter forwarding, missing dependencies,
    disabled-tool denial and owner isolation. Record input provenance and output
@@ -53,62 +53,29 @@ Dataset presets in `src/constant.json` reference versioned JSON files under
 `data/`. The layout check validates those paths and documents; a planned dataset
 without a configuration is not an executable preset.
 
-Scientist creates a repository-like deliverable with code, report, tests and
-artifacts. Research completion and public admission are separate. Reproducibility,
-interface validation, evaluation evidence, leakage checks and independent review
-must pass before public tools can discover the result. The registry owns author,
-version, protein/property/scenario and visibility; model source directories do not.
+## RSI case delivery
 
-Agent discovers capabilities by search, reads selected interfaces and scope, then
-calls through MCP. Do not inline thousands of model descriptions into a prompt.
-Dedicated RSI search and unified search share protein/property relevance ranking.
-Enablement, runtime compatibility and stage filters apply before stable pagination;
-metadata order cannot push a named protein behind incidental description matches.
-The RSI category returns concise registered-model cards. Both model-list and
-capability search match the card's prediction description as well as its recorded
-protein and property; adding a prediction request must not hide an available
-predictor. Runtime compatibility and administrator switches still apply before
-ranking. Describing a selected
-card binds its immutable model and exact applicability scope for the current
-discovery session; the exposed call then accepts scientific inputs only. Resolving
-that call uses the original prediction tool, permissions and queue. A new session
-must inspect the model again. Existing explicit entry/scope tool calls remain valid.
+Scientist produces a repository-like project with code, a README, experiment evidence,
+model artifacts and a test report. SC acceptance and independent technical review
+remain part of research. These decisions do not register a prediction tool in Agent,
+Researcher or the regular Model Plaza.
 
-`mcp_tools/models/evolved/catalog.py` owns recorded discovery metadata. Its private
-`.discovery/` cache survives MCP worker restarts and contains no model weights or
-generated source. An authenticated record binds the library and registry file
-identities; creation, removal, replacement or changed file metadata invalidates it.
-Building or refreshing this metadata reads complete immutable model packets;
-unchanged catalogs do not. Concurrent workers share that build, while runtime compatibility and administrator switches are
-checked for each catalog response. Read-only or unsupported hosts retain the
-original discovery path. Keep `.discovery/` outside session mounts and downloads.
-This cache provides recorded descriptions only: selected-model inspection and
-prediction keep their original content and scientific-evidence checks.
+RSI Plaza exposes case metadata, a project tree, bounded file previews and ZIP
+packages. Its routes enforce session ownership for private projects and the existing
+operator publication decision for public cases. Never expose a caller-supplied
+filesystem root, another session's files, environment secrets or protected raw
+study datasets. Previewing source does not execute it. Public case publication
+retains author information and the selected immutable package.
 
-`agent.harness.capability_catalog` owns discovery for reviewed Scientist programs.
-Dedicated search and unified tool/model search use its current-version and public
-publication filters. Unified search ranks ID references with the existing bilingual
-matcher, merges them with the other model families, and loads compact cards only
-for the selected page. Inventory counts include enabled published programs. Search
-returns bounded name, description and scope summaries; full validation, interfaces
-and publication evidence stay behind selected-program inspection. The index is not
-an admission receipt: description and execution still validate the original bundle.
+The ordinary MCP registry serves pretrained methods, Factory models, databases,
+search and analysis tools. Legacy RSI tool names and model identifiers must be
+rejected at execution as well as omitted from discovery. This boundary applies
+in local and online mode; changing an admin switch does not make an RSI project
+callable by Agent or Researcher.
 
-Selected-model calls validate input with the original model interface before
-joining the compute queue. Explicit prediction calls use the same input check
-before numerical replay. Scope, data and evidence validation still run at execution.
-Prediction results carry their verified scope, including target, units and applicable
-conditions, bound to the inference receipt. Successful execution alone does not
-establish a complete answer: report the values with their units and relevant limits.
-
-The evolved-model delivery module owns prediction exports. Native executors call it
-after the original tool returns, under the existing workspace lock. It checks the
-session-bound receipt against normalized inputs, scope and output before writing
-CSV, JSON and a report through the shared descriptor-anchored file API. The chat
-stores a separate result card; model-authored answers and scientific history remain
-unchanged. Reload/replay deduplicates cards by receipt identity, and downloads keep
-the normal session authorization. Export failure retains the computed result without
-requesting another inference.
+The internal RSI registry, verification receipts and frozen scientific runs remain
+available to Scientist and offline research audits. They are research records,
+not a public inference catalog. No historical data is removed by the UI migration.
 
 ## Factory checkpoint target scale
 
@@ -139,11 +106,11 @@ as `<output>.csv.output-scale.json`; restored predictions also retain
 `prediction_model_space`. Consumers should carry the scale, unit and inverse
 limits into result cards and reports.
 
-## Preparing registered models for inference
+## Offline research-library replay
 
-Full Scientist publication verification replays training, scientific feedback and
-historical model dependencies. Keep that audit in registration and explicit
-verification; ordinary Agent prediction can use a host-prepared audit instead:
+Internal Scientist verification replays training, scientific feedback and historical
+model dependencies. The following preparation supports offline scientific replay;
+it does not expose an Agent, Researcher or Model Plaza prediction endpoint:
 
 ```bash
 PYTHONPATH=src python scripts/rsi/scientist_model_library.py \
@@ -155,7 +122,7 @@ The input is a JSON array of existing entry IDs (1–256). Preparation groups ID
 from the same research goal, runs the original full verification, and checks that
 all evidence is unchanged before and after it. It makes no LLM calls and does not
 create a model or grant public visibility. Run it as the service owner after
-publication or a source/runtime upgrade, outside request workers.
+a source/runtime upgrade, outside request workers.
 
 The host stores immutable signed records and a private signing key in the library's
 `.inference/` directory. This directory must stay outside session/sandbox mounts,
@@ -193,5 +160,5 @@ Unprepared models retain the original verification path. `resolve()` and the
 `verify` CLI command always perform a scientific audit regardless of preparation.
 Successful prepared predictions include an `inference_audit_id` in their ordinary
 usage receipt. They preserve scope/input validation, ownership, administrator
-policy, queue limits and prediction export behavior. A prepared private model is
-still private and still requires the separate curated-publication process.
+policy, queue limits and prediction export behavior. A prepared private model remains private. Public case publication is a separate
+operator decision and never grants conversational inference access.

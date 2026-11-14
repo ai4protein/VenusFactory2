@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-11-01",
+  "updated": "2026-11-14",
   "sections": [
     {
       "key": "start",
@@ -93,6 +93,25 @@
       }
     },
     {
+      "key": "rsi-plaza",
+      "title": {
+        "en": "RSI Plaza",
+        "zh": "RSI 广场"
+      },
+      "summary": {
+        "en": "Preview Scientist repositories and download project packages.",
+        "zh": "预览 Scientist 案例仓库，下载研究项目。"
+      },
+      "aliases": [
+        "rsi-gallery"
+      ],
+      "wiki": "RSIPlaza",
+      "files": {
+        "en": "en/rsi-plaza.md",
+        "zh": "zh/rsi-plaza.md"
+      }
+    },
+    {
       "key": "training",
       "title": {
         "en": "Train a model",
@@ -141,23 +160,6 @@
       "files": {
         "en": "en/evaluation.md",
         "zh": "zh/evaluation.md"
-      }
-    },
-    {
-      "key": "workflows",
-      "title": {
-        "en": "Workflows",
-        "zh": "工作流"
-      },
-      "summary": {
-        "en": "Connect tools, save a workflow and run it again.",
-        "zh": "组合工具、保存流程并重复运行。"
-      },
-      "aliases": [],
-      "wiki": "Workflows",
-      "files": {
-        "en": "en/workflows.md",
-        "zh": "zh/workflows.md"
       }
     },
     {

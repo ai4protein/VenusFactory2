@@ -23,7 +23,7 @@ Enter 发送，Shift+Enter 换行。可以用上传按钮、拖拽或粘贴文�
 
 - **Chat**：[Agent](manual:agent)、[Scientist](manual:scientist)、[Researcher](manual:researcher) 各自保留历史记录。
 - **Model Plaza**：按功能浏览工具模型，直接预测，进入自定义训练、评估及排行榜。
-- **Workflows**：把工具与模型组合成可复用流程。
+- **RSI 广场**：预览 Scientist 案例仓库并下载研究项目。
 - **Library**：浏览有权访问的文件；在线版与当前保留的对话关联。
 - **Settings**：语言、手册、线上额外额度；本地部署还提供 Administration 入口。
 

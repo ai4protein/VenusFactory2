@@ -9,10 +9,10 @@ Manual, Wiki and the Agent documentation tool share `docs/manual/catalog.json` a
 | [Scientist](./Scientist.md) | [Scientist 研发](./Scientist_CN.md) |
 | [Researcher](./Researcher.md) | [Researcher 报告](./Researcher_CN.md) |
 | [Model Plaza](./Models.md) | [模型广场](./Models_CN.md) |
+| [RSI Plaza](./RSIPlaza.md) | [RSI 广场](./RSIPlaza_CN.md) |
 | [Train a model](./Training.md) | [模型训练](./Training_CN.md) |
 | [Predict](./Prediction.md) | [模型预测](./Prediction_CN.md) |
 | [Evaluate](./Evaluation.md) | [模型评估](./Evaluation_CN.md) |
-| [Workflows](./Workflows.md) | [工作流](./Workflows_CN.md) |
 | [Library & files](./Library.md) | [Library 与文件](./Library_CN.md) |
 | [Find data](./Data.md) | [数据检索](./Data_CN.md) |
 | [Settings & access](./Settings.md) | [设置与额度](./Settings_CN.md) |

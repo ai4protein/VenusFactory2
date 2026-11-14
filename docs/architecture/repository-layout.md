@@ -12,7 +12,7 @@ mcp_tools/                      Shared scientific capability service
   models/
     pretrained/                 Upstream prediction/design/docking methods
     factory/                    Platform training and checkpoint prediction
-    evolved/                    Reviewed RSI model/capability access
+    evolved/                    Internal RSI evidence and offline replay
     profiles.py                 Runtime configuration (metadata, no weights)
     execution.py                Isolated environment command dispatch
   tools/                        Search, databases, files, sandbox, calculations

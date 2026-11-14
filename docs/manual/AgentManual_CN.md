@@ -28,10 +28,8 @@ Agent 可以搜索可用工具、检索网络、查询蛋白数据库和调用�
 
 API 密钥不要粘贴到对话中，部署密钥在 Administration 中管理。
 
-## 调用 Scientist 产物
+## 查看 Scientist 成果
 
-按蛋白、性质或实验场景提出需求。Agent 会搜索注册目录，查看匹配模型的接口和适用范围，再执行调用。研究产物需通过独立审核并发布后，才能成为共享工具；当前部署还需开启该工具。
+Scientist 模型作为案例仓库展示在 [RSI 广场](./zh/rsi-plaza.md)，可预览 README、代码和报告，或下载项目 ZIP。它们不注册为 Agent 或 Researcher 工具；Agent 仍可搜索和运行已开启的平台模型。
 
-已注册 Scientist 模型的预测会以结果卡片显示数值和单位。展开**适用范围**查看支持的条件；点击**查看报告**、**CSV** 或 **JSON**，即可预览和下载完整结果。长表格在对话中只展示少量预览。
-
-开发新能力见 [Scientist](./zh/scientist.md)，管理结果见 [Library](./zh/library.md)。
+开发新方法见 [Scientist](./zh/scientist.md)，管理结果见 [Library](./zh/library.md)。

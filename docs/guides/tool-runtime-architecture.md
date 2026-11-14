@@ -28,7 +28,7 @@ flowchart LR
 | Remote analyses | NCBI BLAST, remote Foldseek, InterPro, Clustal Omega, MMseqs2 | API |
 | Sequence calculations | FASTA parsing, physicochemical properties, translation | CPU |
 | Structure calculations | SASA, RSA, secondary structure, superposition | CPU |
-| Prediction and design | Function/residue prediction, ESMFold, ProteinMPNN, registered RSI models | GPU admission by default |
+| Prediction and design | Function/residue prediction, ESMFold and ProteinMPNN | GPU admission by default |
 | Training and development | Training configuration, model training, generated development code | GPU for training; CPU for preparation |
 | Files and capabilities | File operations, skill/model discovery, registration | CPU; lightweight discovery is inline |
 
@@ -61,7 +61,7 @@ catalog queries remain within their session. Researcher public-service analyses
 also use MCP, preserving remote ticket caches and reporting intermediate states.
 Cancelling their parent report cancels queued/running child tool jobs.
 
-Model Plaza, Custom Model and workflow domain jobs continue to use the same
+Model Plaza and Custom Model jobs continue to use the same
 persistent admission queue through their existing domain workers. Their REST
 endpoints are compatibility adapters, not all replaced with generic MCP calls.
 Report-specific identity lookup, literature aggregation, synthesis and lightweight

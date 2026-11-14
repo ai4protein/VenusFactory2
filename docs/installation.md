@@ -21,7 +21,7 @@ python3 install_full.py doctor       # audit the same complete selection
 
 This prepares the platform environment, built-in capabilities, frontend, scientific
 skills, all four Harnesses, the external-tool catalogue, Factory `predict-all` weights
-and their five required backbones, and the RSI model-library integration. It uses the
+and their five required backbones, and the internal RSI research library and case artifacts. It uses the
 same progress, checksums, rerun and environment detection as `initialize.py`.
 Factory heads and backbone snapshots are checked separately; a partial Hub cache
 is not accepted as a complete backbone. `doctor --verify-hashes` also checks the

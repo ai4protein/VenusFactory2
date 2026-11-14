@@ -14,9 +14,9 @@
 
 Administrator switches remain authoritative in both modes. Allowing ProSST prediction does not enable training larger backbones online. `Not configured` is an installation state, not permission to bypass a runtime check.
 
-## Model Plaza, workflows, and Chat
+## Model Plaza and Chat
 
-NCBI BLAST and Foldseek appear in **Protein Discovery**. Both use the existing public-service MCP implementation; Model Plaza queues a workflow over that same implementation. BLAST takes a FASTA/sequence table (one to five proteins per job); Foldseek takes a PDB structure and optional chain. Results contain actual hits, remote job identifiers, and source links. Waiting, unavailable, or timed-out requests are not reported as completed zero-hit predictions.
+NCBI BLAST and Foldseek appear in **Protein Discovery**. Both use the existing public-service MCP implementation; Model Plaza queues a prediction job over that same implementation. BLAST takes a FASTA/sequence table (one to five proteins per job); Foldseek takes a PDB structure and optional chain. Results contain actual hits, remote job identifiers, and source links. Waiting, unavailable, or timed-out requests are not reported as completed zero-hit predictions.
 
 Remote jobs are submitted once and their tickets checkpointed before polling. NCBI requests retain global spacing and per-RID polling limits; public services retain their daily submission cap. Chat tools `query_ncbi_blast` and `query_foldseek_remote` support submit/query by job ID. The UI job worker performs bounded polling for uploaded data and reports intermediate status.
 
@@ -38,7 +38,7 @@ These are proposed additions, not currently advertised as installed tools.
 4. **S4PRED**: CPU single-sequence secondary structure; no MSA or local search database, approximately 430 MB of weights. Useful for a low-cost structure summary alongside sequence properties.
 5. **DeepCoil2**: coiled-coil regions and heptad positions. CPU support, but its older Python/embedding stack warrants a separate runtime and measured memory limits.
 
-Use structured outputs for residue coordinates, scores, model version, and evidence/source URLs, so Agent, Scientist, Researcher, Model Plaza, and workflows share results. Put remote annotation in network queues and local sequence inference in bounded CPU/GPU queues.
+Use structured outputs for residue coordinates, scores, model version, and evidence/source URLs, so Agent, Scientist, Researcher and Model Plaza share results. Put remote annotation in network queues and local sequence inference in bounded CPU/GPU queues.
 
 Official sources checked 2026-11-02:
 

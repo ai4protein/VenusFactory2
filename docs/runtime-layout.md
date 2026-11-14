@@ -11,7 +11,7 @@ runtime/
     scientist/   # goals, plans and checkpoints
     reports/     # Researcher jobs and reports
     agent/       # Agent execution evidence
-    models/      # custom datasets, models, predictions and workflows
+    models/      # custom datasets, models and predictions
   online/        # same layout; separate mutable state
 ```
 

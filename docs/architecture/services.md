@@ -134,9 +134,9 @@ flowchart LR
 
 The queue belongs to the backend's shared persistence layer; MCP uses that same
 queue library instead of creating a second scheduler. Model inference and weight loading run in task workers; increasing the API
-worker count should not create extra model replicas. Registered numerical RSI
-models use the CPU queue in both Chat and Model Plaza; GPU prediction and PLM
-training retain their own slots. Queued MCP calls preserve their originating
+worker count should not create extra model replicas. Internal Scientist numerical experiments use bounded CPU resources; GPU prediction
+and PLM training retain their own slots. RSI cases are preview/download artifacts,
+not Chat or Model Plaza inference jobs. Queued MCP calls preserve their originating
 transport session in private job metadata and prediction receipts, independently
 of the worker's internal MCP connection. Scientific adapter code lives in
 `mcp_tools/models/` and `mcp_tools/tools/`; installed software and weights live outside source folders.
@@ -234,7 +234,7 @@ A push to `main` does not update an already running service.
 
 Before upgrades, check active jobs and publish one frontend build to both modes.
 The bundled launcher (`scripts/deploy_services.py`) checks Agent, Scientist and
-Researcher configuration, Model Plaza and Workflow catalogs, and API/MCP health
+Researcher configuration and the Model Plaza catalog, and API/MCP health
 before starting its tunnel. Empty catalogs are permitted for a fresh installation
 without configured API keys; broken or malformed catalogs are not ready. These startup checks make no LLM requests
 and submit no prediction or training jobs. Failed checks record the service port,
@@ -244,12 +244,12 @@ revision, dirty state and frontend index digest. Use that startup record rather 
 assuming the current checkout revision is what an existing process has loaded.
 Source archives without Git metadata are supported; their revision remains unknown.
 
-Model Plaza and Workflow listings return compact cards; selecting a component
+Model Plaza listings return compact cards; selecting a component
 loads its full input contract and adjustable parameters through the detail endpoint.
 The Agent model picker has a bounded configuration request and an explicit retry
 when loading fails; changing pages cancels the request. It does not poll the catalog.
 CI loads the complete API in fresh online/local processes without network access
-or inference runtimes, in addition to deployment-readiness, Workflow, shared-runtime
+or inference runtimes, in addition to deployment-readiness, model-job, shared-runtime
 discovery and frontend recovery tests.
 
 After deployment, verify a real queued tool call and a Scientist project download.
@@ -276,14 +276,13 @@ with bug reports or suggestions and separate daily chat and prediction requests.
 The applicant sends it from their email app; the platform does not collect feedback
 requests in its database or administration interface. Administrators review the email,
 set both amounts under Quota keys and return the generated key to the applicant.
-Sending a request does not award credits automatically. Activated prediction grants apply across Chat, Model Plaza and
-Workflow and share their daily allowance across devices. Rotation, expiry and revocation
+Sending a request does not award credits automatically. Activated prediction grants apply across Chat and Model Plaza and share their daily allowance across devices. Rotation, expiry and revocation
 invalidate the old binding.
 
 Administration shows browser visitor counts, recent visits, each mode's starts, LLM/tool
 calls, reported tokens and quota usage. Visitors are browser identities, not verified
 people; visit recording begins with this release. Reset all allowances restores the
-current deployment's daily chat, prediction and Workflow allowances after confirmation.
+current deployment's daily chat and prediction allowances after confirmation.
 It preserves historical admissions, conversation ownership, idempotency, running tasks,
 grant keys and IP burst protection, and writes an administrator audit event.
 

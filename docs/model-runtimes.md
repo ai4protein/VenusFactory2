@@ -1,10 +1,10 @@
 # Model runtimes
 
-Model Plaza and Workflows use the same typed parameters and queued execution.
+Model Plaza uses the same typed parameters and queued execution.
 The catalog includes LigandMPNN, AntiBMPNN, BindCraft, BoltzGen, AutoDock Vina
 and DiffDock. LigandMPNN, AntiBMPNN, AutoDock Vina and DiffDock are enabled in
 both online and local mode when installed and enabled by the administrator. They
-use the same resource queues and input limits through Model Plaza, Workflow and
+use the same resource queues and input limits through Model Plaza and
 Chat. BindCraft and BoltzGen remain local-only, with visible but disabled online
 cards. Missing installations are marked Not configured.
 
@@ -131,7 +131,7 @@ tool policies remain the authority for resource admission and online availabilit
 
 An execution environment is not a model identity. The same runtime can execute
 many checkpoints; the same backbone can yield many independently trained models.
-Model Plaza, workflow components and the shared model catalog preserve existing
+Model Plaza and the shared model catalog preserve existing
 IDs and distinguish these model types:
 
 | Type | Example | Identity and role |
@@ -206,7 +206,7 @@ the runtime adapter is not a second scheduler or a generated-code sandbox.
 ## Sequence annotation: S4PRED and InterProScan
 
 Both tools use the existing shared MCP service and administrator tool controls.
-They appear in Model Plaza and Workflows, and can be discovered by Agent,
+They appear in Model Plaza, and can be discovered by Agent,
 Scientist and Researcher. They are available in both local and online mode when
 configured; BindCraft and BoltzGen remain local-only.
 

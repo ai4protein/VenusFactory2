@@ -49,3 +49,7 @@ For an unambiguous human gene mapping, Researcher can collect Open Targets disea
 After drafting, a separate reviewer checks the claims against passages from the collected sources. Chapters with unsupported claims are revised within the remaining request budget and reviewed again. The final synthesis is checked separately. Until these checks finish, the report remains incomplete.
 
 The research package includes the assessments, quoted evidence and original-source locations in verification/. Earlier drafts are retained in drafts/. Continuing a report reuses unchanged assessments and checks revised text or changed sources again. These checks assess support in the collected evidence; they do not replace experimental validation.
+
+## Available prediction models
+
+Researcher uses enabled platform tools and Factory-trained models. RSI projects are browsed and downloaded separately from [RSI Plaza](./en/rsi-plaza.md); Researcher does not execute them.

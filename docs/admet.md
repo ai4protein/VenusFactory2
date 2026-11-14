@@ -19,7 +19,7 @@ by RDKit; that is separate from the v1 fingerprint model input.
 ## Product contract
 
 - Model Plaza / ADMET: paste one SMILES per line, upload CSV/TSV/JSON with a SMILES
-  column, or upload SDF/MOL. Workflows use the same registered model and schema.
+  column, or upload SDF/MOL. Chat uses the same registered model and schema.
 - Tool name `predict_admet`: shared native Agent and MCP implementation, searchable
   with `search_research_tools`. Standard tool scheduler places it on the CPU queue.
 - Uses an isolated CPU-only environment. No paid LLM or hosted ADMET API is called.

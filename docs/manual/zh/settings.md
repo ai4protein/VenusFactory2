@@ -24,7 +24,7 @@
 
 ## 线上计算限制
 
-上传文件每个不超过 10 MB，自定义训练限定 ESM2-8M，本地 VenusMine 禁用，Scientist 受研究预算限制。禁用工具不能通过 Chat、模型表单或工作流绕过限制，详见[训练](manual:training)和[文件](manual:library)。
+上传文件每个不超过 10 MB，自定义训练限定 ESM2-8M，本地 VenusMine 禁用，Scientist 受研究预算限制。禁用工具不能通过 Chat 或模型表单绕过限制，详见[训练](manual:training)和[文件](manual:library)。
 
 
 ## 配置官方模型 API
@@ -36,4 +36,4 @@
 
 ## 每日计算额度
 
-线上默认每位浏览器访客每天可启动 **5 次工作流**、提交 **20 次模型推理**。模型广场、Workflow 和 Chat 共享推理额度；工作流开始前会预留其中所有模型步骤的额度。对话额度 key 增加的是对话次数，不改变计算额度。本地模式不设每日计算额度。管理员可在管理后台的环境配置中设置 `WEBUI_V2_ONLINE_DAILY_WORKFLOW_LIMIT` 和 `WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT`，重启服务后生效。
+线上默认每位浏览器访客每天可提交 **20 次模型推理**，由模型广场和 Chat 共享。本地模式不设每日计算额度。管理员可在环境配置中设置 `WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT`。

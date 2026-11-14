@@ -46,7 +46,7 @@ For an existing FRP installation, pass `--frp-executable /path/to/frpc` and
 `--frp-config /private/path/to/frpc.ini`. Only the online port belongs in the public
 web route. Keep the configuration outside Git and readable only by the service
 owner. FRP starts after API/MCP health and Agent, Scientist, Researcher, Model Plaza
-and Workflow catalog checks succeed. Failed checks appear in `pending_checks` in
+and model catalog checks succeed. Failed checks appear in `pending_checks` in
 `runtime/services/deployment.json` with the endpoint and failure type.
 
 Kimi configuration and daemon state live in `runtime/{online,local}/control/kimi`.
