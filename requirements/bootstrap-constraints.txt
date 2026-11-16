@@ -9,7 +9,7 @@ mcp==1.30.0
 transformers==5.10.4
 huggingface-hub==1.5.0
 tokenizers==0.22.2
-peft==0.21.2
+peft==0.21.3
 vplm==0.0.1
 
 # Keep the scientific model ABI while using the patched dataset backend.
