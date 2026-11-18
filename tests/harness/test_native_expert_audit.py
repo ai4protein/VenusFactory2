@@ -554,7 +554,7 @@ async def test_pre_claude_records_remain_readable_without_relaxing_verification(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("historical_revision", ["pre_isolation_v4"], indirect=True)
-@pytest.mark.parametrize("attack", [None, "policy", "source", "artifact"])
+@pytest.mark.parametrize("attack", [None, "policy", "source", "contract_source", "artifact"])
 async def test_explicit_v4_replay_keeps_original_semantics(completed, attack):
     from agent.harness.contracts import digest, file_hash
     from agent.harness.native_expert_audit import LEGACY_V4_SOURCES
@@ -566,10 +566,11 @@ async def test_explicit_v4_replay_keeps_original_semantics(completed, attack):
         result["coordination_policy"] = team.POLICY
     elif attack == "artifact":
         write_json(task.workspace / "probe.json", {"length": 999})
-    elif attack == "source":
+    elif attack in {"source", "contract_source"}:
         path = task.output / "profile.lock.json"
         lock = json.loads(path.read_text())
-        lock["adapter_source"]["native_expert_audit.py"] = "0" * 64
+        source_name = "contracts.py" if attack == "contract_source" else "native_expert_audit.py"
+        lock["adapter_source"][source_name] = "0" * 64
         lock["sha256"] = digest({k: v for k, v in lock.items() if k != "sha256"})
         write_json(path, lock)
         result["profile_sha256"] = lock["sha256"]

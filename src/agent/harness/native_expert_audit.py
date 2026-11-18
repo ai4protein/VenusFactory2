@@ -102,10 +102,6 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
     execution, workspace, capability = map(Path, (execution, workspace, capability))
     lock = read(execution / "profile.lock.json")
     require_equal(lock["sha256"], digest({k: v for k, v in lock.items() if k != "sha256"}), "Profile lock changed")
-    profile = Profile.from_dict(lock["profile"])
-    if profile.harness not in NATIVE_EXPERT_HARNESSES or profile.mode != "science_expert":
-        raise ValueError("Native Scientist profile required")
-    require_equal(lock["gateway_tool_exposure_mode"], "science_agent", "Native tool exposure changed")
     # Only explicitly pinned v4 evidence uses the old handoff semantics. A new
     # v5 run cannot fall back to v4 after failing isolation/source checks.
     result = read(execution / "run.json") if result is None else result
@@ -114,6 +110,17 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
         result.get("coordination_policy") == LEGACY_V4_POLICY
         and lock.get("adapter_source", {}).get("native_expert_team.py") == LEGACY_V4_SOURCES["native_expert_team.py"]
     )
+    profile_type = Profile
+    if legacy:
+        from . import _legacy_v4_contracts
+
+        require_equal(file_hash(Path(_legacy_v4_contracts.__file__)), LEGACY_V4_SOURCES["contracts.py"],
+                      "Historical profile contract changed")
+        profile_type = _legacy_v4_contracts.Profile
+    profile = profile_type.from_dict(lock["profile"])
+    if profile.harness not in NATIVE_EXPERT_HARNESSES or profile.mode != "science_expert":
+        raise ValueError("Native Scientist profile required")
+    require_equal(lock["gateway_tool_exposure_mode"], "science_agent", "Native tool exposure changed")
     if legacy:
         for name, expected in LEGACY_V4_SOURCES.items():
             if name in {"responses_gateway.py", "codex_adapter.py"} and profile.model.protocol != "responses":
@@ -124,7 +131,6 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
         from . import _legacy_v4_events
         require_equal(file_hash(Path(_legacy_v4_events.__file__)), LEGACY_V4_SOURCES["events.py"],
                       "Historical event auditor changed")
-        identity_files = ("contracts.py",)
     else:
         identity_files = ("native_expert_team.py", "events.py", "contracts.py", "role_context.py")
         if any(file_hash(base / name) != lock["adapter_source"].get(name) for name in identity_files):
@@ -133,8 +139,6 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
             from .historical_native_audit import historical_auditor
 
             return historical_auditor(lock)(execution, workspace, capability, result=result)
-    for name in identity_files:
-        require_equal(file_hash(base / name), lock["adapter_source"][name], "Expert audit source incompatible")
     from agent.rsi.layout import source_relative
 
     for name in ("rsi/model_gateway.py", "rsi/scientific_episode.py"):
