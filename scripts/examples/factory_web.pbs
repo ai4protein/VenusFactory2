@@ -11,4 +11,4 @@ PYTHON="${VENUS_SERVICE_PYTHON:-python}"
 cd "$REPOSITORY"
 # Set the queue and resources for your cluster when submitting with qsub.
 # Add --frp-executable and --frp-config only if you use a private reverse tunnel.
-exec "$PYTHON" -u scripts/deploy_services.py --mode both
+exec "$PYTHON" -u scripts/deploy_services.py --mode both --startup-timeout "${VENUS_SERVICE_STARTUP_TIMEOUT:-420}"

@@ -20,6 +20,10 @@ mounted prefix. The PBS template contains no host paths or credentials:
 qsub -q YOUR_QUEUE -v VENUS_SERVICE_PYTHON="$CONDA_PREFIX/bin/python" scripts/examples/factory_web.pbs
 ```
 
+The PBS example allows 420 seconds for both services to pass their readiness checks on a cold node.
+Set `VENUS_SERVICE_STARTUP_TIMEOUT` with `qsub -v` to change this deadline. The launcher
+continues as soon as the checks pass.
+
 The job supervises both modes and exits if a managed service fails. There is no
 interactive shell or fixed sleep after the web process exits. On termination it
 stops its own API processes, MCP services and recorded descendants. PBS resource
