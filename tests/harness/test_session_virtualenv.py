@@ -109,3 +109,18 @@ def test_actual_missing_base_site_packages_does_not_modify_host(tmp_path, monkey
     assert "Read-only file system" in result.stderr
     assert not (stdlib / "site-packages").exists()
     assert not (stdlib / "changed").exists()
+
+
+@pytest.mark.parametrize("inherit", [False, True])
+def test_base_packages_follow_explicit_virtualenv_policy(tmp_path, inherit):
+    from agent.harness.python_runtime_mounts import runtime_mounts
+    venv_root = tmp_path / "venv"
+    base = tmp_path / "base"
+    (base / "lib").mkdir(parents=True)
+    venv_root.mkdir()
+    cfg = venv_root / "pyvenv.cfg"
+    cfg.write_text(f"home = /private/install/path\ninclude-system-site-packages = {str(inherit).lower()}\n")
+    args = runtime_mounts(prefix=venv_root, base_prefix=base, executable=sys.executable, version="3.12")
+    assert ("/opt/venus-runtime/pyvenv.cfg" in args) is inherit
+    assert ("/opt/venus-base/lib" in args) is inherit
+    assert str(cfg) not in args and str(venv_root) not in args and str(base) not in args

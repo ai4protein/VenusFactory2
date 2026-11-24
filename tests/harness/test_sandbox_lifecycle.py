@@ -224,3 +224,27 @@ def test_memory_ceiling_honors_parent_limits_and_is_not_free_memory(tmp_path, mo
     monkeypatch.setattr(Path, 'read_text', read)
     assert resources.memory_ceiling() == 8*1024*resources.MIB
     assert resources.memory_headroom() == 256*resources.MIB
+
+
+def test_shared_control_directory_keeps_node_reservations_separate(tmp_path, monkeypatch):
+    monkeypatch.setattr(resources.socket, "gethostname", lambda: "first")
+    first = resources.Reservations(tmp_path)
+    first.path.write_text("[]")
+    monkeypatch.setattr(resources.socket, "gethostname", lambda: "second")
+    second = resources.Reservations(tmp_path)
+    assert second.path != first.path
+    assert not second.path.exists()
+
+
+def test_default_sandbox_fits_small_allocation_without_reducing_explicit_limits(monkeypatch):
+    for key in ("VENUS_SANDBOX_LOCAL_MEMORY_MB", "VENUS_SANDBOX_ONLINE_MEMORY_MB", "VENUS_SANDBOX_TOTAL_MEMORY_MB"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("VENUS_SANDBOX_MEMORY_RESERVE_MB", "4096")
+    monkeypatch.setattr(resources, "online", lambda: False)
+    monkeypatch.setattr(resources, "memory_ceiling", lambda: 8192 * resources.MIB)
+    limits = resources.Limits.load()
+    assert limits.memory == 2048 * resources.MIB
+    resources.validate_capacity(limits)
+    monkeypatch.setenv("VENUS_SANDBOX_LOCAL_MEMORY_MB", "8192")
+    with pytest.raises(ValueError, match="cannot fit"):
+        resources.validate_capacity(resources.Limits.load())

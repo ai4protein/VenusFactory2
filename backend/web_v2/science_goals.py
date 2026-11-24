@@ -710,6 +710,9 @@ class ScienceGoalService:
                         'VENUS_EXECUTION_CATALOG', 'VENUS_MODEL_RUNTIMES_CONFIG',
                         'VENUS_CAPABILITY_DB', 'VENUS_SANDBOX_BACKEND',
                         'VENUS_SANDBOX_PYTHON', 'VENUS_SANDBOX_BWRAP', 'VENUS_SESSION_SANDBOX',
+                        'VENUS_SANDBOX_CONTROL_ROOT', 'VENUS_SANDBOX_LOCAL_MEMORY_MB', 'VENUS_SANDBOX_ONLINE_MEMORY_MB',
+                        'VENUS_SANDBOX_TOTAL_MEMORY_MB', 'VENUS_SANDBOX_MEMORY_RESERVE_MB', 'VENUS_SANDBOX_DISK_RESERVE_MB',
+                        'VENUS_SANDBOX_MAX_PARALLEL', 'VENUS_SANDBOX_WAIT_SECONDS',
                         'TAVILY_API_KEY', 'SERPAPI_API_KEY', 'SERPAPI_KEY'}
         for name in runtime_keys:
             if os.environ.get(name): env[name] = os.environ[name]

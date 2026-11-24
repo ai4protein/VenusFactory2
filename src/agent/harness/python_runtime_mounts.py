@@ -20,6 +20,18 @@ def runtime_mounts(*, prefix, base_prefix, executable, version):
         if library.is_dir():
             args += ["--ro-bind", str(library.resolve()), "/opt/venus-runtime/" + name]
     if prefix != base:
+        # Mirror CPython's venv policy without mounting the host prefix or its
+        # pyvenv.cfg (which contains host paths). The venv keeps import priority.
+        cfg = prefix / "pyvenv.cfg"
+        if cfg.is_file() and re.search(r"^include-system-site-packages\s*=\s*true\s*$",
+                                       cfg.read_text(), re.IGNORECASE | re.MULTILINE):
+            args += ["--dir", "/opt/venus-base/bin", "--ro-bind", executable, "/opt/venus-base/bin/python"]
+            for name in ("lib", "lib64"):
+                library = base / name
+                if library.is_dir():
+                    args += ["--ro-bind", str(library.resolve()), "/opt/venus-base/" + name]
+            args += ["--ro-bind", str(Path(__file__).with_name("sandbox-venv.cfg")),
+                     "/opt/venus-runtime/pyvenv.cfg"]
         for name in ("lib", "lib64"):
             packages = prefix / name / ("python" + version) / "site-packages"
             if not packages.is_dir():

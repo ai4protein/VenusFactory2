@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import shutil
 import time
+import socket
 import uuid
 
 MIB = 1024**2
@@ -44,11 +45,19 @@ class Limits:
     @classmethod
     def load(cls):
         mode = 'ONLINE' if online() else 'LOCAL'
+        memory_key = 'VENUS_SANDBOX_'+mode+'_MEMORY_MB'
+        reserve_mb = positive('VENUS_SANDBOX_MEMORY_RESERVE_MB', 4096, 256)
+        pool_mb = positive('VENUS_SANDBOX_TOTAL_MEMORY_MB', 16384, 128, 262144)
+        default_mb = 2048 if online() else 8192
+        if memory_key not in os.environ:
+            # Leave room for concurrent workers and preserve the operator's host reserve.
+            available_mb = memory_ceiling() // MIB - reserve_mb
+            default_mb = max(128, min(default_mb, pool_mb, available_mb // 2))
         return cls(
-            positive('VENUS_SANDBOX_'+mode+'_MEMORY_MB', 2048 if online() else 8192, 128)*MIB,
+            positive(memory_key, default_mb, 128)*MIB,
             positive('VENUS_SANDBOX_MAX_PARALLEL', 2, 1, 16),
-            positive('VENUS_SANDBOX_TOTAL_MEMORY_MB', 16384, 128, 262144)*MIB,
-            positive('VENUS_SANDBOX_MEMORY_RESERVE_MB', 4096, 256)*MIB,
+            pool_mb*MIB,
+            reserve_mb*MIB,
             positive('VENUS_SANDBOX_DISK_RESERVE_MB', 2048, 256)*MIB,
             positive('VENUS_SANDBOX_WAIT_SECONDS', 60, 1, 300),
         )
@@ -158,7 +167,9 @@ class Reservations:
         if self.root.is_symlink() or self.root.stat().st_uid!=os.getuid():
             raise ValueError('Invalid sandbox admission directory')
         self.root.chmod(0o700)
-        self.path=self.root/'reservations.json'
+        # PBS nodes share this filesystem, but PID identities and memory limits are host-local.
+        node = hashlib.sha256(socket.gethostname().encode()).hexdigest()
+        self.path = self.root / ('reservations-' + node + '.json')
 
     @contextmanager
     def locked(self):
