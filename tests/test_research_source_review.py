@@ -326,3 +326,15 @@ async def test_first_review_does_not_spend_revision_budget_on_format_retries():
                                          lambda: None, recovery_reserve=2)
     assert progress["model_calls"] == 1
     assert receipts[DOCUMENT["id"]]["status"] != "completed"
+
+
+def test_targeted_author_repair_can_only_replace_unique_flagged_paragraphs():
+    from backend.web_v2.research_source_repair import apply_unit_edits
+    text = "Reviewed. [S1]\n\nNeeds revision. [S2]\n\nAlso reviewed. [S3]"
+    units = [{"id": "topic:2", "text": "Needs revision. [S2]"}]
+    change = {"unit_id": "topic:2", "text": "Revised with evidence. [S2]"}
+    result = apply_unit_edits(text, units, json.dumps({"replacements": [change]}))
+    assert result == text.replace(units[0]["text"], change["text"])
+    for edits in ([], [change, change], [{**change, "unit_id": "topic:1"}]):
+        with pytest.raises(ValueError):
+            apply_unit_edits(text, units, json.dumps({"replacements": edits}))
