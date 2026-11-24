@@ -338,3 +338,26 @@ def test_targeted_author_repair_can_only_replace_unique_flagged_paragraphs():
     for edits in ([], [change, change], [{**change, "unit_id": "topic:1"}]):
         with pytest.raises(ValueError):
             apply_unit_edits(text, units, json.dumps({"replacements": edits}))
+
+
+def test_unverified_source_feedback_reaches_author_without_supplying_a_verdict():
+    state_data = state()
+    unit = sr.units(DOCUMENT, state_data["sources"])[0]
+    request = sr.packet([unit], state_data["sources"])
+    attempt = {"request": request, "reviewer_binding_sha256": "active",
+               "validation_errors": {unit["id"]: "Quote is not in the cited original source passage"}}
+    review = {"units": {}, "attempts": [attempt], "reviewer_binding_sha256": "active"}
+    state_data["source_review"] = review
+    revision = sr.revision_input(state_data, DOCUMENT)
+    assert [row["unit_id"] for row in revision["issues"]] == [unit["id"]]
+    assert sr.document_receipt(DOCUMENT, state_data["sources"], review["units"])["assessed"] == 0
+    assert not sr.feedback(state_data, {**DOCUMENT, "text": "A different assertion. [S1]"})
+    attempt["reviewer_binding_sha256"] = "old"
+    assert not sr.feedback(state_data, DOCUMENT)
+    attempt["reviewer_binding_sha256"] = "active"
+    attempt["validation_errors"][unit["id"]] = "Missing assessment"
+    assert not sr.feedback(state_data, DOCUMENT)
+    attempt["validation_errors"][unit["id"]] = "Factual assertions require original-source evidence"
+    review["units"][unit["id"]] = {"input_sha256": unit["input_sha256"], "passed": True,
+                                   "reviewer_binding_sha256": "active"}
+    assert not sr.feedback(state_data, DOCUMENT)

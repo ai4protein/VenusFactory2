@@ -158,12 +158,34 @@ def document_receipt(document, sources, cached, reviewer_sha256=None):
 
 
 def feedback(state, document):
-    cached = state.get("source_review", {}).get("units", {})
+    review = state.get("source_review", {})
+    cached = review.get("units", {})
+    binding = review.get("reviewer_binding_sha256")
+    # A validator can reject a source anchor before an assessment is saved.
+    # Return that diagnostic to the author without creating a reviewer verdict.
+    source_errors = {}
+    for attempt in review.get("attempts", []):
+        errors = attempt.get("validation_errors", {})
+        if not errors or attempt.get("reviewer_binding_sha256") != binding:
+            continue
+        for item in attempt["request"]["units"]:
+            reason = errors.get(item["id"], "")
+            if reason.startswith(("Quote is not in the cited original source passage",
+                                  "Quoted evidence does not contain the claimed measured value",
+                                  "Factual assertions require original-source evidence",
+                                  "Proposal-only units must contain only explicitly prospective actions",
+                                  "Unknown source citation")):
+                source_errors[item["input_sha256"]] = reason
     bad = []
     for unit in units(document, state.get("sources", [])):
         row = cached.get(unit["id"], {})
-        if row.get("input_sha256") == unit["input_sha256"] and not row.get("passed", True):
-            bad.append((unit, row))
+        if row.get("input_sha256") == unit["input_sha256"] and row.get("reviewer_binding_sha256") == binding:
+            if not row.get("passed", True):
+                bad.append((unit, row))
+        elif unit["input_sha256"] in source_errors:
+            reason = source_errors[unit["input_sha256"]]
+            bad.append((unit, {"unit_id": unit["id"], "issues": [
+                {"claim": unit["text"], "reason": "Source verification is incomplete: " + reason}]}))
     return bad
 
 
