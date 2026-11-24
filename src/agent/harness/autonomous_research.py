@@ -245,7 +245,7 @@ class AutonomousResearch:
         record_context(folder, role, original_context, context)
         if self.consult_override:return await self.consult_override(role,context)
         from .scientist_role_output import specification, request_fields, output_content
-        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False), study_review_policy=context.get('scientific_acceptance',{}).get('study_review_policy'), analysis_review_policy=context.get('scientific_acceptance',{}).get('analysis_review_policy')) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
+        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False), study_review_policy=context.get('scientific_acceptance',{}).get('study_review_policy'), analysis_review_policy=context.get('scientific_acceptance',{}).get('analysis_review_policy'), analysis_review_state=context.get('analysis_review_state')) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
         output_spec = spec
         role_prompt=sc_acceptance.prompt_for_review(context) if role=='SC' else ROLES[role]
         instruction=SCIENTIST_PURPOSE+role_prompt+' Respond in the language of the research objective.'
@@ -253,7 +253,7 @@ class AutonomousResearch:
             from .unattended_research import GUIDANCE as unattended_guidance
             instruction += '\n'+unattended_guidance
         if role=='SC' and context.get('scientific_acceptance',{}).get('analysis_review_policy'):
-            instruction += ' Exact response schema: '+json.dumps(sc_acceptance.analysis_review_schema(context['scientific_acceptance']['analysis_review_policy']),ensure_ascii=False)
+            instruction += ' Exact response schema: '+json.dumps(sc_acceptance.analysis_review_schema(context['scientific_acceptance']['analysis_review_policy'], context.get('analysis_review_state')),ensure_ascii=False)
         elif role=='SC' and context.get('scientific_acceptance',{}).get('models'):
             instruction += ' Exact response schema: '+json.dumps(sc_acceptance.model_schema(),ensure_ascii=False)
         if role=='CB':

@@ -13,7 +13,7 @@ def object_schema(properties):
             "required": list(properties), "additionalProperties": False}
 
 
-def specification(role, protocol, *, model_acceptance=False, study_acceptance=False, study_review_policy=None, analysis_review_policy=None):
+def specification(role, protocol, *, model_acceptance=False, study_acceptance=False, study_review_policy=None, analysis_review_policy=None, analysis_review_state=None):
     text = {"type": "string", "minLength": 1, "maxLength": 2000}
     strings = {"type": "array", "items": {"type": "string"}}
     if role == "PI":
@@ -36,7 +36,7 @@ def specification(role, protocol, *, model_acceptance=False, study_acceptance=Fa
         })
         if analysis_review_policy is not None:
             from .scientific_acceptance import analysis_review_schema
-            schema = analysis_review_schema(analysis_review_policy)
+            schema = analysis_review_schema(analysis_review_policy, analysis_review_state)
         elif model_acceptance:
             from .scientific_acceptance import model_schema
             schema = model_schema()

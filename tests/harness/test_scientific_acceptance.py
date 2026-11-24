@@ -529,3 +529,14 @@ async def test_failed_sc_response_cannot_inherit_an_old_completion(tmp_path, mon
     assert not any(
         row["passed"] for row in runner.evaluate({**store.read(), "progress": result["progress"]})["criteria"].values()
     )
+
+
+def test_interim_review_schema_uses_only_measured_task_ids():
+    from agent.harness import analysis_interim_review, scientific_acceptance
+    def field(ids):
+        return scientific_acceptance.analysis_review_schema(
+            analysis_interim_review.POLICY, {"verified_task_ids": ids})["properties"]["evidence_ids"]
+    assert field([])["maxItems"] == 0
+    measured = ["a" * 32]
+    assert field(measured)["items"]["enum"] == measured
+    assert field(measured)["minItems"] == 1

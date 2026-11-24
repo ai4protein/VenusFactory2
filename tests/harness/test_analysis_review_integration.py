@@ -181,7 +181,9 @@ def test_analysis_candidate_conflict_is_interim_in_schema_prompt_and_assessment(
     assert "model_candidate_conflicts_with_analysis_deliverable" in selected["analysis_review_state"]["reasons"]
     spec = specification("SC", protocol, model_acceptance=True, study_acceptance=True, analysis_review_policy=policy)
     assert spec["schema"] == analysis_interim_review.schema()
-    assert sc.prompt_for_review(selected) == analysis_interim_review.PROMPT
+    prompt = sc.prompt_for_review(selected)
+    assert prompt.startswith(analysis_interim_review.PROMPT)
+    assert all(task in prompt for task in selected["analysis_review_state"]["verified_task_ids"])
     review = {"decision": "needs_revision", "summary": "Resolve the incompatible candidate submission.",
               "issues": ["An analysis deliverable cannot publish this candidate."],
               "evidence_ids": selected["analysis_review_state"]["verified_task_ids"][:1],

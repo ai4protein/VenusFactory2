@@ -99,7 +99,7 @@ def schema():
         "issues": {"type": "array", "minItems": 1, "maxItems": 24, "items": text},
         "evidence_ids": {"type": "array", "maxItems": 12, "uniqueItems": True,
                          "items": {"type": "string", "pattern": "^[a-f0-9]{32}$",
-                                   "description": "Actual verified task_id, not a plan step_id."}},
+                                   "description": "Copy only analysis_review_state.verified_task_ids. When empty, return evidence_ids=[]."}},
         "next_actions": {"type": "array", "minItems": 1, "maxItems": 12, "items": text},
     })
 

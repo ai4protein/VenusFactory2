@@ -43,7 +43,15 @@ def _metric_guidance(context):
 def prompt_for_review(context):
     acceptance = context.get("scientific_acceptance", {})
     if acceptance.get("analysis_review_policy"):
-        return _analysis_policy(acceptance["analysis_review_policy"]).PROMPT
+        from . import analysis_interim_review
+        policy = _analysis_policy(acceptance["analysis_review_policy"])
+        prompt = policy.PROMPT
+        if policy is analysis_interim_review and "verified_task_ids" in context.get("analysis_review_state", {}):
+            ids = context["analysis_review_state"]["verified_task_ids"]
+            prompt += (" Allowed evidence_ids: " + json.dumps(ids) + "." if ids else
+                       ' There are no verified task IDs. Return "evidence_ids": [].')
+            prompt += " Tool-call IDs beginning with call_ are transport identifiers and cannot be cited."
+        return prompt
     if acceptance.get("study_evidence_required") and not acceptance.get("models"):
         return STUDY_PROMPT + (
             " Return revision_requests under the supplied study_review_policy. "
@@ -64,8 +72,18 @@ def _analysis_policy(policy):
     raise ValueError("Unsupported analysis review policy")
 
 
-def analysis_review_schema(policy):
-    return _analysis_policy(policy).schema()
+def analysis_review_schema(policy, review_state=None):
+    from . import analysis_interim_review
+    schema = _analysis_policy(policy).schema()
+    if policy == analysis_interim_review.POLICY and review_state is not None:
+        ids = review_state["verified_task_ids"]
+        field = schema["properties"]["evidence_ids"]
+        if ids:
+            field["minItems"] = 1
+            field["items"]["enum"] = list(ids)
+        else:
+            field["maxItems"] = 0
+    return schema
 
 
 def parse_analysis_review(raw, context):
