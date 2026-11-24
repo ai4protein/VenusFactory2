@@ -248,3 +248,24 @@ def test_default_sandbox_fits_small_allocation_without_reducing_explicit_limits(
     monkeypatch.setenv("VENUS_SANDBOX_LOCAL_MEMORY_MB", "8192")
     with pytest.raises(ValueError, match="cannot fit"):
         resources.validate_capacity(resources.Limits.load())
+
+
+@pytest.mark.asyncio
+async def test_capacity_wait_records_terminal_state_without_rewriting_unchanged_lease(tmp_path, monkeypatch):
+    monkeypatch.setenv("VENUS_SANDBOX_WAIT_SECONDS", "1")
+    store = resources.Reservations()
+    owner = store.acquire(tmp_path, resources.Limits.load())
+    assert owner
+    initial_inode = store.path.stat().st_ino
+    updates = []
+    try:
+        with pytest.raises(TimeoutError, match="Sandbox resources are busy"):
+            async with resources.admission(tmp_path, on_progress=updates.append):
+                pytest.fail("An occupied sandbox cannot be acquired")
+        assert [event["status"] for event in updates] == ["queued", "timeout"]
+        assert updates[-1]["elapsed_seconds"] >= 1
+        assert "not started" in updates[-1]["stderr_tail"]
+        assert store.path.stat().st_ino == initial_inode
+    finally:
+        store.release(owner)
+    empty_reservations()

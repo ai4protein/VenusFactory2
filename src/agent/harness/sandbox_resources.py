@@ -178,7 +178,8 @@ class Reservations:
         with os.fdopen(descriptor,'r+') as lock:
             fcntl.flock(lock,fcntl.LOCK_EX)
             if self.path.is_symlink():raise ValueError('Invalid reservation file')
-            rows=json.loads(self.path.read_text()) if self.path.exists() else []
+            previous = self.path.read_text() if self.path.exists() else '[]'
+            rows = json.loads(previous)
             current=[]
             for row in rows:
                 if process_token(row['pid'])==row['token']:
@@ -193,8 +194,10 @@ class Reservations:
                             if stat.st_uid==os.getuid() and (stat.st_dev,stat.st_ino)==(scratch['device'],scratch['inode']):
                                 shutil.rmtree(path)
             yield current
-            temp=self.root/('reservations.'+uuid.uuid4().hex+'.tmp')
-            temp.write_text(json.dumps(current));temp.chmod(0o600);os.replace(temp,self.path)
+            updated = json.dumps(current)
+            if updated != previous:
+                temp=self.root/('reservations.'+uuid.uuid4().hex+'.tmp')
+                temp.write_text(updated);temp.chmod(0o600);os.replace(temp,self.path)
 
     def acquire(self, workspace, limits):
         from backend.web_v2.job_queue import process_token
@@ -238,15 +241,31 @@ async def admission(workspace, *, on_progress=None):
     limits=Limits.load()
     validate_capacity(limits)
     store=Reservations();identity=None;started=time.monotonic()
+    def progress(status, message=''):
+        if on_progress:
+            on_progress({'status': status, 'tool': 'session_sandbox',
+                         'elapsed_seconds': round(time.monotonic() - started, 1),
+                         'stdout_tail': '', 'stderr_tail': message})
+
+    next_update = started
     try:
         while identity is None:
             assert_active_job()
             identity=store.acquire(workspace,limits)
             if identity is not None:break
-            if time.monotonic()-started>=limits.wait_seconds:
+            now = time.monotonic()
+            if now - started >= limits.wait_seconds:
+                message = 'Timed out waiting for sandbox resources. The program has not started.'
+                progress('timeout', message)
                 raise TimeoutError('Sandbox resources are busy; try again later')
-            if on_progress:on_progress({'status':'queued','tool':'session_sandbox','elapsed_seconds':0,'stdout_tail':'','stderr_tail':''})
-            await asyncio.sleep(.2)
+            if now >= next_update:
+                progress('queued')
+                next_update = now + 2
+            try:
+                await asyncio.sleep(.2)
+            except asyncio.CancelledError:
+                progress('cancelled', 'The wait for sandbox resources ended before execution.')
+                raise
         assert_active_job()
         yield store,identity,limits
     finally:
