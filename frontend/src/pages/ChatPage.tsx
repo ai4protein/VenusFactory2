@@ -14,7 +14,7 @@ import { useFileTransfer } from "../lib/useFileTransfer";
 import { mergeFiles } from "../lib/fileTransfer";
 import { validateUploads } from "../lib/uploadLimits";
 import { QuotaNotice } from "../components/QuotaNotice";
-import { openQuota, QUOTA_CHANGED, quotaRetryLabel, isDailyQuotaMessage } from "../lib/onlineQuota";
+import { openQuota, QUOTA_CHANGED, QUOTA_STORAGE_KEY, quotaRetryLabel, isDailyQuotaMessage } from "../lib/onlineQuota";
 import { SidebarContent, useSidebar } from "../components/AppSidebar";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -475,6 +475,8 @@ type ChatPageProps = {
   workspaceEnabled?: boolean;
 };
 
+const CUSTOM_MODELS_STORAGE_KEY = "vf2_custom_openai_style_models";
+
 export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const { lang, t: translate } = useLang();
   const t = translate(STRINGS);
@@ -532,7 +534,12 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [keyPanelProvider, setKeyPanelProvider] = useState<string>("");
   const [keyPanelValue, setKeyPanelValue] = useState<string>("");
   const [keyPanelSaving, setKeyPanelSaving] = useState(false);
-  const [customModels, setCustomModels] = useState<OpenAIStyleModel[]>([]);
+  const [customModels, setCustomModels] = useState<OpenAIStyleModel[]>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(CUSTOM_MODELS_STORAGE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed.filter(item => item && item.id && item.modelName && item.baseUrl) : [];
+    } catch { return []; }
+  });
   const [showCustomModelModal, setShowCustomModelModal] = useState(false);
   const [customModelLabel, setCustomModelLabel] = useState("");
   const [customModelName, setCustomModelName] = useState("");
@@ -583,23 +590,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [agentCatalogReady, setAgentCatalogReady] = useState(false);
   const { closeOnNarrow } = useSidebar();
   const [pipelineDismissed, setPipelineDismissed] = useState(false);
-  const CUSTOM_MODELS_STORAGE_KEY = "vf2_custom_openai_style_models";
-
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(CUSTOM_MODELS_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as OpenAIStyleModel[];
-      if (Array.isArray(parsed)) {
-        setCustomModels(parsed.filter((item) => item && item.id && item.modelName && item.baseUrl));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(CUSTOM_MODELS_STORAGE_KEY, JSON.stringify(customModels));
+      localStorage.setItem(CUSTOM_MODELS_STORAGE_KEY, JSON.stringify(customModels));
+    } catch { /* The current tab can still use its in-memory settings. */ }
   }, [customModels]);
 
   // Cleanup pass: if any customModel id collides with a built-in registry id,
@@ -856,8 +850,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const changed = () => { void refreshChatQuota(); };
     window.addEventListener(QUOTA_CHANGED, changed);
     window.addEventListener("focus", changed);
-    window.addEventListener("storage", changed);
-    return () => { window.removeEventListener(QUOTA_CHANGED, changed); window.removeEventListener("focus", changed); window.removeEventListener("storage", changed); };
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea === window.localStorage && (event.key === null || event.key === QUOTA_STORAGE_KEY)) changed();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => { window.removeEventListener(QUOTA_CHANGED, changed); window.removeEventListener("focus", changed); window.removeEventListener("storage", onStorage); };
   }, []);
 
   function syncSessionUrl(sid: string, mode: ChatMode | "researcher", replace = false) {

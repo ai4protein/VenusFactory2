@@ -31,12 +31,18 @@ export function useChatSessionHistory(sessionId: string, snapshot: ChatSnapshot 
   useEffect(() => {
     mounted.current = true;
     let pending = false;
-    const timer = window.setInterval(() => {
-      if (pending) return;
+    const refreshVisibleHistory = () => {
+      if (pending || document.visibilityState === "hidden") return;
       pending = true;
       void fetchSessions().catch(() => {}).finally(() => { pending = false; });
-    }, 3000);
-    return () => { mounted.current = false; window.clearInterval(timer); };
+    };
+    const timer = window.setInterval(refreshVisibleHistory, 3000);
+    document.addEventListener("visibilitychange", refreshVisibleHistory);
+    return () => {
+      mounted.current = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshVisibleHistory);
+    };
   }, [fetchSessions]);
 
   useEffect(() => {

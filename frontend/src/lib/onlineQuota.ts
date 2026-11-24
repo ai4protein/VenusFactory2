@@ -1,13 +1,13 @@
 export const QUOTA_EVENT = 'vf:quota-dialog';
 export const QUOTA_CHANGED = 'vf:quota-changed';
-const STORAGE = 'vf_online_quota_v1';
+export const QUOTA_STORAGE_KEY = 'vf_online_quota_v1';
 export type Quota = { compute?: { prediction: { remaining: number; limit: number } }; mode: string; enforced: boolean; limit: number | null; used: number; remaining: number | null; extra_limit?: number; email?: string | null; resets_at?: string; timezone?: string };
 export function savedQuota(): { email: string; key: string } {
-  try { const value = JSON.parse(localStorage.getItem(STORAGE) || '{}'); return { email: typeof value.email === 'string' ? value.email : '', key: typeof value.key === 'string' ? value.key : '' }; }
+  try { const value = JSON.parse(localStorage.getItem(QUOTA_STORAGE_KEY) || '{}'); return { email: typeof value.email === 'string' ? value.email : '', key: typeof value.key === 'string' ? value.key : '' }; }
   catch { return { email: '', key: '' }; }
 }
 export function saveQuota(value: { email: string; key: string } | null) {
-  if (value) localStorage.setItem(STORAGE, JSON.stringify(value)); else localStorage.removeItem(STORAGE);
+  if (value) localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(value)); else localStorage.removeItem(QUOTA_STORAGE_KEY);
   window.dispatchEvent(new Event(QUOTA_CHANGED));
 }
 export function quotaHeaders(): Record<string, string> {
