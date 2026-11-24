@@ -197,7 +197,7 @@ def revision_input(state, document):
     return request
 
 
-async def review_documents(state, payload, documents, model_call, publish, *, recovery_reserve=0):
+async def review_documents(state, payload, documents, model_call, publish, *, recovery_reserve=0, max_calls=None):
     """Audit fresh units only; all calls share the report's existing call budget."""
     binding = state.get("reviewer_binding")
     reviewer_sha = None
@@ -230,7 +230,12 @@ async def review_documents(state, payload, documents, model_call, publish, *, re
     checkpoint()
     publish()
     queue = deque((request, 0, None) for request in packets(pending, sources))
+    stop_at = state["model_call_limit"]
+    if max_calls is not None:
+        stop_at = min(stop_at, state.get("model_calls", 0) + max_calls)
     while queue:
+        if state.get("model_calls", 0) >= stop_at:
+            break
         request, recovery_round, parent_attempt = queue.popleft()
         if recovery_round and state.get("model_calls", 0) + recovery_reserve >= state["model_call_limit"]:
             break

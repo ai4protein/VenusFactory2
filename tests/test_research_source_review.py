@@ -361,3 +361,22 @@ def test_unverified_source_feedback_reaches_author_without_supplying_a_verdict()
     review["units"][unit["id"]] = {"input_sha256": unit["input_sha256"], "passed": True,
                                    "reviewer_binding_sha256": "active"}
     assert not sr.feedback(state_data, DOCUMENT)
+
+
+@pytest.mark.asyncio
+async def test_a_blocked_chapter_cannot_spend_the_next_chapters_review_calls():
+    state_data = state()
+    failing = {**DOCUMENT, "id": "first"}
+    next_doc = {**DOCUMENT, "id": "next"}
+    async def call(model, messages, tokens, **kwargs):
+        state_data["model_calls"] += 1
+        request = json.loads(messages[-1]["content"])
+        if request["units"][0]["document_id"] == "first":
+            return "{}", False
+        return assessment(request), False
+    budget = state_data["model_call_limit"]
+    receipts = await sr.review_documents(state_data, {"model_id":"free"}, [failing], call, lambda: None, max_calls=1)
+    assert receipts["first"]["status"] == "partial" and state_data["model_calls"] == 1
+    receipts = await sr.review_documents(state_data, {"model_id":"free"}, [next_doc], call, lambda: None, max_calls=1)
+    assert receipts["next"]["status"] == "completed" and state_data["model_calls"] == 2
+    assert state_data["model_call_limit"] == budget

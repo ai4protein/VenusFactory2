@@ -46,13 +46,24 @@ async def repair_chapters(state, payload, chapters, model_call, publish):
         normalize_source_citations,
         remember_chapter,
     )
-    for chapter in chapters:
+    to_repair = [chapter for chapter in chapters if feedback(state, chapter_document(chapter))]
+    # Give near-complete chapters a chance to finish without changing publication order.
+    def outstanding(chapter):
+        receipt = chapter.get("source_review") or {}
+        return receipt.get("units", 0) - receipt.get("passed", 0)
+
+    to_repair.sort(key=outstanding)
+    for index, chapter in enumerate(to_repair):
+        if state.get("execution_blocker"):
+            break
         document = chapter_document(chapter)
-        if not feedback(state, document) or state.get("execution_blocker"):
-            continue
         # One author repair + independent recheck; retain capacity for synthesis and its review.
         if state["model_calls"] + 4 > state["model_call_limit"]:
             break
+        # Divide the available author/reviewer calls across the remaining drafts;
+        # leave two for synthesis and its independent review.
+        remaining = state["model_call_limit"] - state["model_calls"] - 2
+        review_calls = max(1, remaining // (len(to_repair) - index) - 1)
         revision = revision_input(state, document)
         targets = revision["units"]
         targeted = bool(targets) and all(document["text"].count(unit["text"]) == 1 for unit in targets)
@@ -88,7 +99,8 @@ async def repair_chapters(state, payload, chapters, model_call, publish):
                            draft_status="completed" if valid else "partial", status="reviewing" if valid else "partial")
             publish()
             if valid:
-                receipts = await review_documents(state, payload, [chapter_document(chapter)], model_call, publish)
+                receipts = await review_documents(state, payload, [chapter_document(chapter)], model_call, publish,
+                                                  max_calls=review_calls)
                 chapter["source_review"] = receipts[chapter["id"]]
                 chapter["status"] = "completed" if receipts[chapter["id"]]["status"] == "completed" else "partial"
         except Exception:
