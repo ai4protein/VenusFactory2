@@ -56,6 +56,17 @@ def resolve_credential(model, credential_toml=None):
     raise ValueError("Selected model credential is unavailable")
 
 
+def ready_default(harness, model_id, combinations, free_ids):
+    """Keep the requested model when possible. Never select a paid fallback."""
+    default = {"harness": harness, "model_id": model_id}
+    candidates = [row for row in combinations if row["ready"] and
+                  (row["model_id"] == model_id or row["model_id"] in free_ids)]
+    if candidates:
+        row = min(candidates, key=lambda pair: (pair["model_id"] != model_id, pair["harness"] != harness))
+        return {"harness": row["harness"], "model_id": row["model_id"]}
+    return default
+
+
 class ExecutionCatalog:
     def __init__(self, root, default_profile, *, path=None, legacy_credential=None, registry=None, free_only=False, include_configured=False, include_unlisted=False):
         self.free_only = free_only
@@ -192,7 +203,8 @@ class ExecutionCatalog:
                 )
         return {
             "mode": self.default_profile.mode,
-            "default": {"harness": self.default_profile.harness, "model_id": self.default_model},
+            "default": ready_default(self.default_profile.harness, self.default_model, combinations,
+                                     {m.id for m in self.models.values() if free_model(m.binding)}),
             "models": [m.public() for m in self.models.values() if not self.hide_nonfree or free_model(m.binding)],
             "harnesses": [
                 {"id": s.id, "modes": list(s.modes), "protocols": list(s.protocols), "status": s.status}

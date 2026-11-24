@@ -103,3 +103,15 @@ def test_incompatible_recovery_binding_disables_only_its_model_option(tmp_path, 
     assert selected.request_recovery == policy
     with pytest.raises(ValueError):
         catalog.select({"harness": "langgraph", "model_id": "b"})
+
+
+def test_new_session_default_uses_a_ready_pair_without_paid_fallback():
+    from agent.harness.catalog import ready_default
+
+    pairs = [
+        {"harness": "codex", "model_id": "free", "ready": False},
+        {"harness": "codex", "model_id": "paid", "ready": True},
+        {"harness": "kimi-code", "model_id": "free", "ready": True},
+    ]
+    assert ready_default("codex", "free", pairs, {"free"}) == {"harness": "kimi-code", "model_id": "free"}
+    assert ready_default("codex", "free", pairs[:2], {"free"}) == {"harness": "codex", "model_id": "free"}

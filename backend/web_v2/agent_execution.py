@@ -8,7 +8,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from agent.harness import Profile
-from agent.harness.catalog import ExecutionCatalog, free_model, resolve_credential
+from agent.harness.catalog import ExecutionCatalog, free_model, ready_default, resolve_credential
 from agent.harness.contracts import digest
 from agent.harness.installation import default_runtimes
 from agent.harness.provider_config import online
@@ -62,7 +62,8 @@ def options():
         {**m, "ready": any(c["ready"] for c in combinations if c["model_id"] == m["id"])} for m in public["models"]
     ]
     return {
-        "default": {"harness": cat.default_profile.harness, "model_id": cat.default_model},
+        "default": ready_default(cat.default_profile.harness, cat.default_model, combinations,
+                                 {m["id"] for m in models if m.get("free")}),
         "models": models,
         "harnesses": harnesses,
         "combinations": combinations,
