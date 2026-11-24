@@ -153,3 +153,15 @@ async def test_python_rejects_function_kwargs_and_runs_the_corrected_entrypoint(
     await writer.ainvoke(prepare_tool_arguments(writer.name, writer, {"path":"src/run.py", "content":source}, workspace))
     result = await runner.ainvoke(prepare_tool_arguments(runner.name, runner, {"path":"src/run.py"}, workspace))
     assert result["exit_code"] == 0 and result["stdout"].strip() == "24"
+
+
+@pytest.mark.asyncio
+async def test_partial_checkpoint_lists_remaining_steps_and_does_not_complete_them(tmp_path):
+    plan = {"steps": [{"id":"inspect","status":"completed"}, {"id":"compute","status":"pending"},
+                      {"id":"report","status":"pending"}]}
+    service = ResearchWorkspace(tmp_path/"work", tmp_path/"control", plan)
+    (service.workspace/"answer.txt").write_text("An intermediate observation")
+    result = await service.submit_research_checkpoint("Computation saved", ["compute"], ["answer.txt"], [])
+    assert result["unclaimed_step_ids"] == ["report"]
+    assert service.checkpoint["completed_steps"] == ["compute"]
+    assert plan["steps"][2]["status"] == "pending"

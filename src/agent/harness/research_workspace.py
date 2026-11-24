@@ -237,7 +237,7 @@ class ResearchWorkspace:
         return self.record('propose_research_capability',{'source':source,'tests':test_inputs},{'id':manifest['id'],'name':name,'validation':manifest['validation']})
 
     async def submit_research_checkpoint(self, summary: str, completed_steps: list[str], artifacts: list[str], needs_input: list[str]) -> dict:
-        """Checkpoint actual work for the Scientific Critic. Cite existing result files, and only step IDs from the current plan. Use needs_input only for specific missing user data. Use an empty list for unfinished work or an iteration budget limit; the goal loop continues automatically. This does not itself complete the goal."""
+        """Checkpoint actual work for the Scientific Critic. Cite actual files and every current step they support, including inspection and reporting when evidenced. A partial checkpoint may have completed steps; use [] only when there are none. Use needs_input only for missing user data. This does not itself complete the goal."""
         validate_input_questions(needs_input)
         ids={s['id'] for s in self.plan['steps']}
         if not summary.strip():
@@ -270,7 +270,10 @@ class ResearchWorkspace:
                     'artifacts': saved, 'error': diagnostic}
         self.checkpoint=checkpoint
         write_json(self.control/'checkpoint.json',self.checkpoint)
-        return {'checkpointed':True,'artifacts':saved}
+        claimed = set(completed_steps)
+        remaining = [step['id'] for step in self.plan['steps']
+                     if step['id'] not in claimed and step.get('status') != 'completed']
+        return {'checkpointed':True,'artifacts':saved, 'unclaimed_step_ids': remaining}
 
     async def get_research_review_requirements(self) -> dict:
         """Get the interface, evaluation and independent Review requirements for reusable tools/models."""
