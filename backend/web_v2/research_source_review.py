@@ -52,13 +52,16 @@ def source_scope(text, sources):
     return {identity:source_digest(index[identity]) if identity in index else None for identity in cited}
 
 
+def is_review_line(line):
+    return bool(line.strip() and not re.fullmatch(r"[\s|:=-]+", line))
+
+
 def units(document, sources):
     """Keep headings with their prose; a long paragraph retains its own citations."""
     result, heading = [], []
     blocks = re.split(r"\n\s*\n", document["text"])
     for index, block in enumerate(blocks):
-        lines = [line for line in block.splitlines() if line.strip()
-                 and not re.fullmatch(r"[\s|:=-]+", line)]
+        lines = [line for line in block.splitlines() if is_review_line(line)]
         if not lines:
             continue
         if all(line.lstrip().startswith("#") or re.fullmatch(r"\s*\*\*[^*]+\*\*\s*", line) for line in lines):

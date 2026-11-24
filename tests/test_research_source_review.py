@@ -395,3 +395,67 @@ def test_packet_alias_must_resolve_to_a_cited_original_passage():
         result["assessments"][0]["evidence"] = [wrong]
         with pytest.raises(ValueError):
             validation.validate_assessments(json.dumps(result), request, sources)
+
+
+def test_markdown_heading_maps_back_to_original_draft_without_rewriting_other_units():
+    from backend.web_v2.research_source_repair import apply_unit_edits
+    draft = "## Context\r\n\r\nKeep this. [S1]\r\n\r\n## Finding\r\n\r\nRevise this. [S1]\r\n\r\nKeep the ending. [S1]"
+    document = {**DOCUMENT, "text": draft}
+    target = sr.units(document, [SOURCE])[1]
+    edits = json.dumps({"replacements": [{"unit_id": target["id"], "text": "## Finding\r\n\r\nCorrected. [S1]"}]})
+    assert apply_unit_edits(draft, [target], edits) == draft.replace("Revise this.", "Corrected.")
+    with pytest.raises(ValueError):
+        apply_unit_edits(draft, [target], "An unrelated replacement for the whole chapter.")
+    assert apply_unit_edits(draft, [target], draft.replace("Revise this.", "Corrected.")) == draft.replace("Revise this.", "Corrected.")
+
+
+def test_legacy_markdown_revision_preserves_intervening_reviewed_blocks():
+    from backend.web_v2.research_source_repair import apply_unit_edits
+
+    draft = "Introduction.\n\nRepair A.\n\nReviewed middle.\n\nRepair B.\n\nConclusion."
+    units = sr.units({**DOCUMENT, "text": draft}, [])
+    targets = [units[1], units[3]]
+    corrected = draft.replace("Repair A.", "Fixed A.").replace("Repair B.", "Fixed B.")
+    assert apply_unit_edits(draft, targets, corrected) == corrected
+    for protected in ("Introduction.", "Reviewed middle.", "Conclusion."):
+        with pytest.raises(ValueError, match="protected paragraph"):
+            apply_unit_edits(draft, targets, corrected.replace(protected, "Altered."))
+
+
+def test_table_divider_can_be_mapped_without_matching_other_equal_paragraphs():
+    from backend.web_v2.research_source_repair import unit_locations
+
+    draft = "| Item | Value |\n|:---|---:|\n| A | 1 |\n\nSame.\n\nSame."
+    first, second, _ = sr.units({**DOCUMENT, "text": draft}, [])
+    start, end = unit_locations(draft, [first])[first["id"]]
+    assert draft[start:end] == draft.split("\n\n")[0]
+    with pytest.raises(ValueError, match="Ambiguous"):
+        unit_locations(draft, [second])
+
+
+@pytest.mark.asyncio
+async def test_long_chapter_sends_only_flagged_text_and_records_author_timeout():
+    from backend.web_v2.research_source_repair import repair_chapters
+
+    draft = "Unsupported sentence. [S1]\n\n" + "Previously reviewed text. " * 1800
+    doc = {**DOCUMENT, "text": draft}
+    state_data = state()
+    unit = sr.units(doc, state_data["sources"])[0]
+    state_data["source_review"] = {"units": {unit["id"]: {
+        "unit_id": unit["id"], "input_sha256": unit["input_sha256"], "passed": False,
+        "issues": [{"claim": "Unsupported sentence.", "reason": "Missing source."}],
+    }}}
+    chapter = {"id": doc["id"], "title": doc["title"], "draft": draft, "source_ids": ["S1"]}
+    requests = []
+
+    async def timed_out(model, messages, tokens, **kwargs):
+        requests.append(json.loads(messages[1]["content"]))
+        raise TimeoutError("private upstream detail")
+
+    await repair_chapters(state_data, {"model_id": "fixture"}, [chapter], timed_out, lambda: None)
+    assert len(requests) == 1
+    assert "draft" not in requests[0]
+    assert [row["id"] for row in requests[0]["units"]] == [unit["id"]]
+    assert requests[0]["sources"] and requests[0]["issues"]
+    assert chapter["draft"] == draft and chapter["status"] == "partial"
+    assert chapter["revision_error"] == {"stage": "author", "type": "TimeoutError"}
