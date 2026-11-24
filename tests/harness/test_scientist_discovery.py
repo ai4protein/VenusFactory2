@@ -19,8 +19,9 @@ def test_scientist_tools_are_discoverable_without_disclosing_schemas(tmp_path):
         assert page["tools"][0]["name"] == name
         assert set(page["tools"][0]) == {"name", "description"}
         misplaced = catalog.search({"category": "rsi", "query": name})
-        assert [c["id"] for c in misplaced["categories"]] == ["training"]
-        assert not misplaced["tools"]
+        assert misplaced["requested_category"] == "rsi"
+        assert misplaced["tools"][0] == page["tools"][0]
+        assert set(misplaced["tools"][0]) == {"name", "description"}
         with pytest.raises(DisclosureError):
             catalog.resolve("call_tool", {"name": name, "arguments": {}})
     enabled.pop("evaluate_research_model")

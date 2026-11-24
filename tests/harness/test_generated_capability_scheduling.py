@@ -1,11 +1,8 @@
-"""Real queue admission and CPU inference for reviewed synthetic RSI models."""
+"""Queue admission and historical resource policies for reviewed RSI models."""
 
-import json
 from functools import partial
-from pathlib import Path
 
 import pytest
-from fastapi import HTTPException
 from test_capability_admission import model_candidate, reviewer
 
 from agent.harness import research_workspace as runtime
@@ -13,16 +10,15 @@ from agent.harness.capability_review import review_proposal
 from agent.harness.curated_publication import publish_candidate
 from backend.web_v2 import compute_access
 from backend.web_v2.job_queue import JobQueue
-from mcp_tools.scheduler import catalog, jobs, worker
+from mcp_tools.scheduler import catalog, jobs
 from mcp_tools.tools import runtime_tool_policy
 from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("online", [False, True], ids=["local", "online"])
-async def test_reviewed_generated_model_runs_in_real_cpu_queue_with_no_gpu_available(tmp_path, monkeypatch, online):
-    # Admission, persisted dispatch, claim, ownership and quotas are real. Only
-    # the independent reviewer is deterministic; model inference uses bubblewrap.
+async def test_reviewed_generated_model_cannot_be_queued_or_charge_a_visitor(tmp_path, monkeypatch, online):
+    # Prepare a reviewed and curated case, then exercise its public admission policy.
     monkeypatch.setenv("WEBUI_V2_MODE", "local")
     monkeypatch.delenv("VENUS_SCIENTIST_ONLINE", raising=False)
     for name in ("VENUS_QUEUE_JOB_ID", "VENUS_QUEUE_OWNER", "VENUS_QUEUE_LEASE_TOKEN"):
@@ -63,62 +59,18 @@ async def test_reviewed_generated_model_runs_in_real_cpu_queue_with_no_gpu_avail
         allowance.admit("previous-model-plaza-runs", "alice", {"prediction": 19})
     queue = JobQueue()
     scheduler = jobs.ToolJobs(queue)
-    # capacity currently clamps zero to one. Occupy its actual GPU capacity as
-    # well, so this regression does not mistake GPU_SLOTS=0 for a disabled GPU.
-    blockers = []
-    claimed = None
-    submitted = None
-    try:
-        for _ in range(queue.capacity("gpu")):
-            identity = queue.submit("gpu-fixture-owner", "fixture", "gpu")
-            queue.bind(identity)
-            assert queue.claim(identity)
-            blockers.append(identity)
-        submitted = scheduler.submit(
-            "run_generated_capability", {"capability_id": card["id"], "inputs": {"sequence": "ACDE"}},
-            owner="alice", session_id="alice-session",
-        )
-        row = queue.get(submitted["id"], "alice")
-        assert row["status"] == "queued" and row["resource"] == "cpu"
-        assert row["kind"] == "mcp:model_prediction" and row["metadata"]["session_id"] == "alice-session"
-        assert queue.claim_next(row["namespace"], "gpu") is None
-        claimed = queue.claim_next(row["namespace"], "cpu")
-        assert claimed and claimed["id"] == submitted["id"] and claimed["lease"]
-        assert scheduler.list("bob") == []
-        with pytest.raises(FileNotFoundError):
-            scheduler.get(submitted["id"], "bob")
-        with pytest.raises(FileNotFoundError):
-            scheduler.get(submitted["job_number"], "bob")
-
-        # Execute the actual worker entrypoint only after a real queue claim.
-        # Its CPU sandbox reuses this lease instead of waiting on its own slot.
-        monkeypatch.setenv("VENUS_QUEUE_JOB_ID", claimed["id"])
-        monkeypatch.setenv("VENUS_QUEUE_OWNER", "alice")
-        monkeypatch.setenv("VENUS_QUEUE_LEASE_TOKEN", claimed["lease"])
-        spec_path = Path(json.loads(row["dispatch"])["command"][-1])
-        result = await worker.execute(json.loads(spec_path.read_text()))
-        assert not result["is_error"] and json.loads(result["value"]) == {"value": 4}
-        jobs.save_json(queue.files(claimed["id"]) / "mcp-result.json", result)
-        queue.finish(claimed["id"], "completed", lease=claimed["lease"])
-        spec_path.unlink()
-        assert scheduler.get(submitted["id"], "alice")["status"] == "completed"
-        assert all(queue.get(identity)["status"] == "running" for identity in blockers)
-        assert allowance.status("alice")["prediction"]["used"] == (20 if online else 0)
-        assert allowance.status("bob")["prediction"]["used"] == 0
-        if online:
-            with pytest.raises(HTTPException) as error:
-                scheduler.submit(
-                    "run_generated_capability", {"capability_id": card["id"], "inputs": {"sequence": "ACDEF"}},
-                    owner="alice", session_id="alice-session",
-                )
-            assert error.value.status_code == 429
-            assert len([item for item in queue.list("alice") if item["kind"].startswith("mcp:")]) == 1
-            assert not list((queue.root / "mcp-inputs").glob("*.json"))
-    finally:
-        if submitted and queue.get(submitted["id"])["status"] in {"running", "queued"}:
-            queue.finish(submitted["id"], "cancelled", lease=claimed["lease"] if claimed else None)
-        for identity in blockers:
-            queue.finish(identity, "completed")
+    # Publication in RSI Plaza never grants an execution entry point. Exercise
+    # the real admission boundary before it can create a job or debit a visitor.
+    before = allowance.status("alice")["prediction"]["used"]
+    with pytest.raises(RuntimeError, match="RSI Plaza"):
+        scheduler.submit("run_generated_capability",
+                         {"capability_id": card["id"], "inputs": {"sequence": "ACDE"}},
+                         owner="alice", session_id="alice-session")
+    assert scheduler.list("alice") == []
+    assert scheduler.list("bob") == []
+    assert allowance.status("alice")["prediction"]["used"] == before
+    assert allowance.status("bob")["prediction"]["used"] == 0
+    assert not list((queue.root / "mcp-inputs").glob("*.json"))
 
 
 def test_generated_inference_remains_metered_and_plugins_can_override_resources():

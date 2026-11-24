@@ -96,6 +96,8 @@ def assert_tool_call_allowed(tool_name: str, arguments=None) -> None:
 def assert_tool_allowed(tool_name: str) -> None:
     from mcp_tools.tools.capability_policy import CapabilityStore
     from mcp_tools.tools.capability_policy import canonical, CapabilityDisabled, unavailable_message
+    if canonical(tool_name) in RSI_TOOL_NAMES:
+        raise RuntimeError(RSI_ARCHIVE_MESSAGE)
     if not CapabilityStore().tool_enabled(tool_name):
         raise CapabilityDisabled(unavailable_message())
     if not is_tool_allowed(tool_name):
