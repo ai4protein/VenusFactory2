@@ -255,3 +255,15 @@ async def test_explicit_partial_retry_can_close_without_claiming_execution(resea
     handoff.save(args, saved)
     assert handoff.closed
     assert service.checkpoint["completed_steps"] == []
+
+
+def test_checkpoint_budget_rejection_does_not_replace_the_fixable_error(tmp_path):
+    tool = "mcp__venusfactory__submit_research_checkpoint"
+    events = []
+    for i, message in enumerate(["Missing signed evidence for compute.", "Error: DisclosureError: Checkpoint allowance reached; finish this iteration."]):
+        events.extend([
+            {"kind": "tool_call_start", "tool_call_id": str(i), "tool_name": tool, "args": {}},
+            {"kind": "tool_result", "tool_call_id": str(i), "is_error": True, "output": message},
+        ])
+    assert feedback_state(events, tmp_path)["pending"][0]["error"] == "Missing signed evidence for compute."
+    assert "Checkpoint allowance" in feedback_state(events[-2:], tmp_path)["pending"][0]["error"]

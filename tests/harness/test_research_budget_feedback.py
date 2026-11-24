@@ -4,6 +4,7 @@ import copy
 import pytest
 
 from agent.harness.research_execution_feedback import (
+    CHECKPOINTS_EXHAUSTED,
     _failure_message,
     feedback_state,
     repair_source_context,
@@ -76,3 +77,9 @@ def test_recorded_r3_zero_budget_error_reaches_next_repair_without_stale_allowan
     legacy = copy.deepcopy(current)
     legacy["pending"][0]["error"] = error + footer(0)
     assert feedback_state([], workspace, legacy)["pending"][0]["error"] == error
+
+
+@pytest.mark.parametrize("separator", ["", "\n"])
+def test_exhausted_checkpoint_hint_does_not_mask_the_actual_failure(tmp_path, separator):
+    error = "ValueError: missing verified computation evidence"
+    assert _failure_message(error + separator + CHECKPOINTS_EXHAUSTED, tmp_path) == error

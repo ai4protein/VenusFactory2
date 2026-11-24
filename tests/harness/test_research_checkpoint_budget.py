@@ -29,7 +29,8 @@ def test_workspace_scan_still_rejects_links_and_special_files(tmp_path, kind):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("broker", [False, True])
-async def test_checkpoint_can_be_repaired_after_execution_allowance(tmp_path, monkeypatch, broker):
+@pytest.mark.parametrize("final_invalid", [False, True])
+async def test_checkpoint_can_be_repaired_after_execution_allowance(tmp_path, monkeypatch, broker, final_invalid):
     monkeypatch.setenv("VENUS_JOB_QUEUE_ROOT", str(tmp_path / "queue"))
     monkeypatch.setattr("mcp_tools.scheduler.catalog.native_tools", lambda: {})
     service = ResearchWorkspace(tmp_path / "work", tmp_path / "tools", {"steps": [{"id": "inspect"}]})
@@ -57,6 +58,15 @@ async def test_checkpoint_can_be_repaired_after_execution_allowance(tmp_path, mo
                     "summary": "Partial work", "completed_steps": ["invented"],
                     "artifacts": ["result.json"], "needs_input": []})
                 assert bad["result"]["isError"] is True and not service.checkpoint
+                if final_invalid:
+                    last = await invoke("submit_research_checkpoint", {
+                        "summary": "Partial work", "completed_steps": ["invented"],
+                        "artifacts": ["result.json"], "needs_input": []})
+                    assert last["result"]["isError"] and not service.checkpoint
+                    content = last["result"]["content"]
+                    assert "Current step IDs" in content[0]["text"]
+                    assert "No checkpoint submissions remain" in content[-1]["text"]
+                    return {"status": "completed", "text": "Unresolved step ID."}
                 saved = await invoke("submit_research_checkpoint", {
                     "summary": "Partial work", "completed_steps": [],
                     "artifacts": ["result.json"], "needs_input": []})

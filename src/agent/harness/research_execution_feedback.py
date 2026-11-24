@@ -6,9 +6,12 @@ from .execution_outcome import EXECUTION_TOOLS, execution_error
 from .tool_diagnostics import bounded_message
 
 
+CHECKPOINTS_EXHAUSTED = "No checkpoint submissions remain in this iteration. End this iteration and summarize the outstanding work."
+
+
 def _failure_message(value, workspace):
     """Keep execution evidence distinct from exact host scheduling footers."""
-    text = str(value)
+    text = str(value).removesuffix(CHECKPOINTS_EXHAUSTED)
     normal = "Save a checkpoint when the current step is ready."
     urgent = "Save submit_research_checkpoint now with actual artifacts and only completed steps."
     # Native transports can concatenate separate MCP text blocks without a
@@ -208,6 +211,12 @@ def feedback_state(events, workspace, previous=None, *, development=None, episod
                 continue
             failure = {"key": key, "tool": name,
                 "error": _failure_message(semantic or event.get("output") or "Tool failed", workspace)}
+            # A request refused before the workspace call cannot replace the
+            # actionable diagnostic from the previous checkpoint attempt.
+            if (_name(name) == "submit_research_checkpoint" and key in failures
+                    and failure["error"].removeprefix("Error: ") ==
+                    "DisclosureError: Checkpoint allowance reached; finish this iteration."):
+                continue
             if source is not None:
                 failure["source_file"] = source
             if request_key is not None:

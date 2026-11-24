@@ -203,10 +203,10 @@ def checkpoint_diagnostic(service, checkpoint):
         "available_evidence": list(unique.values()),
         "message": "Partial work was saved, but the claimed execution steps do not cite verified computation evidence.",
         "repair": (
-            "Inspect the relevant available_evidence file, then call submit_research_checkpoint again "
+            "Inspect the relevant available_evidence file. At the next available checkpoint, submit "
             "with its exact path added to artifacts, keeping your report and other result files. "
             "Keep a step in completed_steps only if its scientific acceptance criteria are actually satisfied. "
-            "If work is unfinished, submit completed_steps=[] to save a partial checkpoint. "
+            "For a partial checkpoint, retain every evidenced step and omit unfinished steps. Use [] only when none qualify. "
             "Do not rerun a valid calculation merely to obtain a missing citation. "
             "These records prove execution, not target relevance, report accuracy or scientific acceptance."
         ),

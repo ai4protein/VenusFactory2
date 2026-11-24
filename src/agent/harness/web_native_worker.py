@@ -198,6 +198,9 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
             remaining = max(0, profile.budget.tool_calls - executions)
             if checkpoint_saved:
                 note = 'Checkpoint saved. End this iteration with a short summary; do not call further tools.'
+            elif checkpoint_calls >= checkpoint_limit:
+                from .research_execution_feedback import CHECKPOINTS_EXHAUSTED
+                note = CHECKPOINTS_EXHAUSTED
             else:
                 note = (f'Execution budget: {remaining} tool calls remain; '
                         f'{max(0, lookup_limit - lookups)} read-only discovery calls remain. '
