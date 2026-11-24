@@ -335,3 +335,19 @@ def test_numeric_quote_cannot_take_part_of_another_numeric_token(make_case, valu
 def test_numeric_quote_preserves_sign_exponent_units_and_markdown(make_case, value, display, report):
     _, _, context, review = make_case(value, display, report=report)
     review_policy.validate(review, context)
+
+
+def test_displayed_unit_requires_the_verified_field_and_the_same_quoted_quantity():
+    from agent.harness.analysis_report_review import _value_matches
+    _value_matches(1122.27, "1122.27 Da", "Measured 1122.27 Da.", reported_unit="Da")
+    for display, quote, unit in [
+        ("1122.27 Da", "Measured 1122.27 Da.", None),
+        ("1122.27 kDa", "Measured 1122.27 kDa.", "Da"),
+        ("1122.27 Da", "Measured 1122.27 kDa.", "Da"),
+        ("1122.27 Da", "Measured 1122.27 Da/s.", "Da"),
+        ("1122.27 Da", "Measured 1122.27 or 21 Da.", "Da"),
+        ("1122.28 Da", "Measured 1122.28 Da.", "Da"),
+        ("1122.27 Da", "Measured -1122.27 Da.", "Da"),
+    ]:
+        with pytest.raises(ValueError):
+            _value_matches(1122.27, display, quote, reported_unit=unit)

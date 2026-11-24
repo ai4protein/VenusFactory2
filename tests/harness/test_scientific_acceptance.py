@@ -558,3 +558,10 @@ def test_final_report_schema_exposes_only_verified_task_ids_and_preserves_qualit
     prompt = scientific_acceptance.prompt_for_review(
         {"scientific_acceptance": {"analysis_review_policy": policy}, "analysis_review_state": {"verified_task_ids": []}})
     assert "claims=[]" in prompt and "insufficient_evidence" in prompt
+    state = {"verified_task_ids": ids, "report_paths": ["reports/results.txt"]}
+    schema = scientific_acceptance.analysis_review_schema(policy, state)
+    paths = schema["properties"]["claims"]["items"]["properties"]["report_path"]["enum"]
+    assert paths == ["reports/results.txt"]
+    prompt = scientific_acceptance.prompt_for_review(
+        {"scientific_acceptance": {"analysis_review_policy": policy}, "analysis_review_state": state})
+    assert "reports/results.txt" in prompt and "computation receipt" in prompt

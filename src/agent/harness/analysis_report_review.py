@@ -18,7 +18,8 @@ objective, registered materials, actual arguments, result fields and report cont
 computation alone does not show that the requested subject was studied or the results were reported.
 For positive computational claims cite the actual task_id and result JSON pointer, the checkpointed
 report path, an exact quote from that report, and display_value as a string preserving its displayed
-precision. Do not substitute a preview, infer units, or call an absent report value reported.
+precision. For numeric fields, display_value is the number alone: "12.5", never "12.5 Da".
+Keep the original unit in report_quote. Never convert units. Do not substitute a preview or infer an absent value.
 Assess every cited task's input provenance: registered_input needs recorded identity evidence;
 derived_input needs a recorded ordered chain of output hashes to input hashes from registered
 materials; new_subject is permitted for exploration but requires your explicit judgment that it
@@ -189,7 +190,7 @@ NUMBER_TOKEN = re.compile(
 )
 
 
-def _value_matches(value, display, quote):
+def _value_matches(value, display, quote, *, reported_unit=None):
     if isinstance(value, bool):
         equal = display.lower() == ("true" if value else "false")
     elif value is None:
@@ -198,7 +199,13 @@ def _value_matches(value, display, quote):
         equal = display == value
     elif type(value) in (int, float):
         equal = False
+        unit_suffix = None
         numeric_display = display.replace("−", "-")
+        if isinstance(reported_unit, str) and 0 < len(reported_unit) <= 64 and display.endswith(" " + reported_unit):
+            # Keep an explicitly supplied unit only when the host field and quoted
+            # quantity both use that exact spelling. No unit conversion or inference.
+            unit_suffix = reported_unit
+            numeric_display = display[:-(len(reported_unit) + 1)].replace("−", "-")
         if len(display) <= 100 and NUMBER.fullmatch(numeric_display):
             try:
                 actual, shown = Decimal(str(value)), Decimal(numeric_display)
@@ -214,12 +221,17 @@ def _value_matches(value, display, quote):
     else:
         raise ValueError("Cite a complete scalar result field, not an object, array or truncated field.")
     if not equal:
-        raise ValueError("display_value must equal the recorded value or its explicitly displayed decimal rounding; no unit conversion.")
+        raise ValueError("display_value must equal the recorded value or its explicitly displayed decimal rounding; use only the numeric literal, keep its unit in report_quote, and do not convert units.")
     if isinstance(value, str):
         present = display in quote
     elif type(value) in (int, float):
-        present = any(token.group().replace("−", "-") == numeric_display
-                      for token in NUMBER_TOKEN.finditer(quote))
+        matches = (token for token in NUMBER_TOKEN.finditer(quote)
+                   if token.group().replace("−", "-") == numeric_display)
+        if unit_suffix is None:
+            present = any(matches)
+        else:
+            quoted_unit = re.compile(r"[ \t]+" + re.escape(unit_suffix) + r"(?=$|[\s,;:!?)]|\.(?=\s|$))")
+            present = any(quoted_unit.match(quote, token.end()) for token in matches)
     else:
         present = re.search(r"(?<![A-Za-z0-9_.])" + re.escape(display) + r"(?![A-Za-z0-9_.])", quote) is not None
     if not present:
@@ -304,7 +316,9 @@ def validate(review, context):
         if len(fields) != 1 or "value" not in fields[0] or fields[0].get("truncated"):
             raise ValueError("Claim result_pointer is missing, ambiguous or truncated.")
         quote = _report(claim, context, index)
-        _value_matches(fields[0]["value"], claim["display_value"], quote)
+        field = fields[0]
+        _value_matches(field["value"], claim["display_value"], quote,
+                       reported_unit=field.get("unit") if field.get("unit_status") == "reported" else None)
     materials = index.get("materials", {}).get("records", [])
     for identity, assessment in inputs.items():
         if identity not in tasks:

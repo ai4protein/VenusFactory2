@@ -57,6 +57,10 @@ def prompt_for_review(context):
                        ' No verified computation task IDs exist. Return claims=[] and input_assessments=[]. '
                        'For computational steps use insufficient_evidence with claim_ids=[] and request '
                        'a queued analysis with a verifiable result. A script log or a plan step ID cannot replace it.')
+            paths = context["analysis_review_state"].get("report_paths")
+            if paths:
+                prompt += (" Use only these checkpointed report_path values: " + json.dumps(paths) +
+                           ". Quote the submitted report itself. The analysis/<task_id>.json file is a computation receipt.")
         return prompt
     if acceptance.get("study_evidence_required") and not acceptance.get("models"):
         return STUDY_PROMPT + (
@@ -93,6 +97,8 @@ def analysis_review_schema(policy, review_state=None):
         ids = review_state["verified_task_ids"]
         fields = schema["properties"]
         claims, inputs = fields["claims"], fields["input_assessments"]
+        if review_state.get("report_paths"):
+            claims["items"]["properties"]["report_path"]["enum"] = list(review_state["report_paths"])
         if ids:
             claims["items"]["properties"]["task_id"]["enum"] = list(ids)
             input_fields = inputs["items"]["properties"]
