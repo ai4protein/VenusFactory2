@@ -299,3 +299,29 @@ def test_locked_analysis_artifact_is_not_changed_by_a_replan(verification):
     value["steps"][0]["verification"] = verification
     result = parse_plan(json.dumps(value), previous)
     assert result["steps"][0]["verification"] == "artifact"
+
+
+@pytest.mark.asyncio
+async def test_model_plan_after_exposed_table_stops_before_another_call(tmp_path):
+    prof = profile()
+    store = create(tmp_path / "goal", prof, "Summarize the supplied data",
+                   {"max_cycles": 4, "model_calls": 48, "tool_calls": 48, "wall_seconds": 480})
+    work = store.root / "workspace"
+    (work / "inputs").mkdir()
+    (work / "inputs/data.csv").write_text("x,y\n1,3\n")
+
+    def prior_analysis(state):
+        state["cycles"].append({"index": 0, "status": "needs_revision", "summary": "Summarized the data"})
+        state["progress"].update(inputs=[{"path": "inputs/data.csv"}], plan={"deliverable": "model"})
+
+    store.mutate(prior_analysis)
+    runner = AutonomousResearch(store, "", {}, tools=[])
+    state = await runner.run()
+    assert state["status"] == "waiting_for_input" and len(state["cycles"]) == 2
+    outcome = state["cycles"][-1]
+    assert outcome["needs_input"] and outcome["error_code"] == "previously_exposed_table"
+    assert state["progress"]["questions"] == [outcome["summary"]]
+    assert state["progress"]["research_completed"] is False
+    assert state["usage"]["model_calls"] == state["usage"]["tool_calls"] == 0
+    failure = json.loads((store.root / "episodes/cycle_001/failure.json").read_text())
+    assert failure["message"] == outcome["summary"] and "new model-development goal" in outcome["summary"]

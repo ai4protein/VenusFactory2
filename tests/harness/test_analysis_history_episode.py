@@ -80,7 +80,7 @@ async def test_next_episode_reuses_calculation_but_requires_actual_report(tmp_pa
             assert feedback["next_actions"] == ["Cite the existing calculation in a complete report."]
             assert feedback["cited_analysis_task_ids"] == captures
             assert feedback["cited_experiment_ids"] == []
-            assert context["progress"]["last_review"]["summary"].startswith("Execution needs revision:")
+            assert "last_review" not in context["progress"]  # Only the structured SC handoff reaches these roles.
         if role == "PI":
             return "Preserve the actual supplied sequence and report the measured result."
         if role == "CB":

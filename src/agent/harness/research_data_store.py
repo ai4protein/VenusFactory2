@@ -20,6 +20,10 @@ PROVENANCE_TEXT_FIELDS = {
 }
 
 
+class PreviouslyExposedTable(ValueError):
+    """A previously visible input cannot supply a blind evaluation."""
+
+
 def provenance_only(raw):
     """Recognize a bounded source descriptor, never a table or evaluation JSON."""
     if len(raw) > MAX_PROVENANCE_BYTES:
@@ -200,7 +204,7 @@ class ResearchDataStore:
                 self.restore_view(path)
             else:
                 if prior_agent_execution:
-                    raise ValueError("This table was available in earlier execution; start a fresh research goal for held-out evaluation")
+                    raise PreviouslyExposedTable("This table was available in earlier execution. Start a new model-development goal and upload the table before execution so test labels can be protected.")
                 self.ingest_file(path, self.workspace, path, item.get("sha256"))
             protected.append(path)
         return protected

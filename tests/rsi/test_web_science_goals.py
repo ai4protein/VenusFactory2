@@ -280,7 +280,12 @@ def test_selected_profile_is_frozen_across_catalog_change_and_resume(service, tm
     frozen = service.frozen_profile(folder)
     assert frozen.harness == "role-graph" and frozen.model == alternative
     assert goal["execution"]["profile_sha256"] == digest(frozen.public())
+    from agent.harness.installation import ENV_KEYS
+    for key in ENV_KEYS.values():
+        monkeypatch.setenv(key, str(tmp_path / key))
     env = service.environment(frozen)
+    for key in ENV_KEYS.values():
+        assert env[key] == str(tmp_path / key)
     assert env["TEST_GOAL_B_KEY"] == "selected-private-key"
     assert "UNRELATED_SECRET" not in env
     assert "selected-private-key" not in json.dumps(goal)

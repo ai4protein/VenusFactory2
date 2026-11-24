@@ -147,3 +147,14 @@ def test_initial_partition_plan_is_canonical_without_claiming_evidence(verificat
     assert result["steps"][0]["verification"] == "data_partition"
     assert result["steps"][0]["status"] == "pending" and result["steps"][0]["evidence"] == []
     assert value == original
+
+
+def test_new_live_plans_must_disambiguate_data_verification():
+    proposal = plan("data")
+    proposal["deliverable"] = "analysis"
+    with pytest.raises(ValueError, match="execution for a descriptive calculation"):
+        ar.parse_plan(json.dumps(proposal), live_proposal=True)
+    old = ar.parse_plan(json.dumps(proposal))
+    assert ar.parse_plan(json.dumps(proposal), old, live_proposal=True)["steps"][0]["verification"] == "data_partition"
+    proposal["steps"][0]["verification"] = "execution"
+    assert ar.parse_plan(json.dumps(proposal), live_proposal=True)["steps"][0]["verification"] == "execution"

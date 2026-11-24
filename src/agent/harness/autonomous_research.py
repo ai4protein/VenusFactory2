@@ -126,7 +126,7 @@ ROLES={
  'SC':sc_acceptance.PROMPT,
 }
 
-def parse_plan(text, previous=None, *, objective=''):
+def parse_plan(text, previous=None, *, objective='', live_proposal=False):
     text=text.strip()
     if text.startswith('```') and text.endswith('```'):text='\n'.join(text.splitlines()[1:-1])
     try:
@@ -146,6 +146,7 @@ def parse_plan(text, previous=None, *, objective=''):
     if not isinstance(value,dict) or set(value)-{'summary','steps','needs_input','deliverable'} or not {'summary','steps','needs_input'}<=set(value) or not isinstance(value['summary'],str) or not isinstance(value['steps'],list) or not 1<=len(value['steps'])<=24 or not isinstance(value['needs_input'],list) or any(not isinstance(x,str) for x in value['needs_input']):raise ValueError('Invalid research plan')
     validate_input_questions(value['needs_input'])
     if 'deliverable' in value and value['deliverable'] not in {'analysis','tool','model'}:raise ValueError('Invalid research deliverable')
+    existing_steps = {row['id'] for row in (previous or {}).get('steps', [])}
     ids=set()
     for index, row in enumerate(value['steps']):
         required={'id','title','acceptance'}
@@ -158,6 +159,9 @@ def parse_plan(text, previous=None, *, objective=''):
             raise ValueError('Each research step requires unique id, title and acceptance strings; status and evidence are managed by the host')
         if 'approach' in row and (not isinstance(row['approach'],str) or not row['approach'].strip() or len(row['approach'])>2000):
             raise ValueError('A research approach must be a concise method description')
+        if live_proposal and row.get('verification') == 'data' and row['id'] not in existing_steps:
+            raise ValueError("Choose execution for a descriptive calculation, artifact for saved results, "
+                             "or data_partition for an actual train/test split. The legacy 'data' kind is ambiguous.")
         if 'verification' in row:
             row['verification']=canonical_verification(row['verification'])
         if row.get('verification','artifact') not in VERIFICATION_KINDS:
@@ -397,10 +401,22 @@ class AutonomousResearch:
         if isinstance(progress.get('execution_feedback'), dict):
             progress['execution_feedback'] = {**progress['execution_feedback'],
                 **feedback_state([], workspace, progress['execution_feedback'], episode_index=index)}
-        from .research_data_store import store_for_goal
-        data_store=store_for_goal(self.store.root)
+        from .research_data_store import PreviouslyExposedTable, store_for_goal
+        data_store = store_for_goal(self.store.root)
+
+        def input_conflict(exc):
+            failure = {'error_type': type(exc).__name__, 'code': 'previously_exposed_table', 'message': str(exc)}
+            progress.update(questions=[failure['message']], research_completed=False)
+            write_json(folder / 'failure.json', failure)
+            return {'status': 'needs_revision', 'summary': failure['message'], 'error_code': failure['code'],
+                    'needs_input': True}
+
         if data_store is not None:
-            data_store.protect_inputs(progress.get('inputs',[]),prior_agent_execution=bool(state.get('cycles')))
+            try:
+                data_store.protect_inputs(progress.get('inputs', []), prior_agent_execution=bool(state.get('cycles')))
+            except PreviouslyExposedTable as exc:
+                return {**input_conflict(exc), 'progress': progress,
+                        'usage': {'model_calls': 0, 'tool_calls': 0, 'wall_seconds': time.monotonic() - started}}
         context={'objective':state['definition']['goal']['objective'],'progress':progress,'previous_episodes':[{k:r.get(k) for k in ['summary','status']} for r in state['cycles'][-4:]],'workspace_files':[str(p.relative_to(workspace)) for p in workspace.rglob('*') if p.is_file()][:200]}
         from .research_input_index import input_descriptions
         context['supplied_materials'] = input_descriptions(workspace, progress.get('inputs', []),source_reader=data_store.input_bytes if data_store else None)
@@ -491,7 +507,7 @@ class AutonomousResearch:
                 phase('PI')
                 context['PI']=await self.structured('PI',context,profile,relay,folder,lambda value:value)
                 phase('CB')
-                plan=await self.structured('CB',context,profile,relay,folder,lambda raw:parse_plan(raw,progress.get('plan'),objective=context['objective']))
+                plan=await self.structured('CB',context,profile,relay,folder,lambda raw:parse_plan(raw,progress.get('plan'),objective=context['objective'],live_proposal=True))
                 changes = method_changes(progress.get('plan'), plan, index)
                 context['plan']=plan;progress['plan']=plan
                 write_json(folder/'plan.json',plan)
@@ -798,6 +814,8 @@ class AutonomousResearch:
             progress['research_completed']=False
             result.update(status='needs_revision',summary=error['message'],error_type='StudyReviewInconsistent')
             write_json(folder/'review_evidence_error.json',error)
+        except PreviouslyExposedTable as exc:
+            result.update(input_conflict(exc))
         except AwaitUser:
             result.update(status='needs_revision',summary='Waiting for your response',needs_input=True)
         except asyncio.CancelledError:

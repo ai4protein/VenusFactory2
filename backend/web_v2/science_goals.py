@@ -705,7 +705,8 @@ class ScienceGoalService:
         # In particular its scheduler URL and signing-key directory must agree;
         # otherwise every queued tool fails before reaching the public service.
         from backend.web_v2.runtime_paths import AREAS
-        runtime_keys = {*AREAS, 'VENUS_RUNTIME_ROOT', 'WEBUI_V2_MODE', 'MCP_HTTP_PORT',
+        from agent.harness.installation import ENV_KEYS
+        runtime_keys = {*AREAS, *ENV_KEYS.values(), 'VENUS_RUNTIME_ROOT', 'WEBUI_V2_MODE', 'MCP_HTTP_PORT',
                         'VENUS_EXECUTION_CATALOG', 'VENUS_MODEL_RUNTIMES_CONFIG',
                         'VENUS_CAPABILITY_DB', 'VENUS_SANDBOX_BACKEND',
                         'VENUS_SANDBOX_PYTHON', 'VENUS_SANDBOX_BWRAP', 'VENUS_SESSION_SANDBOX',
