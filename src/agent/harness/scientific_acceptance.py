@@ -51,6 +51,12 @@ def prompt_for_review(context):
             prompt += (" Allowed evidence_ids: " + json.dumps(ids) + "." if ids else
                        ' There are no verified task IDs. Return "evidence_ids": [].')
             prompt += " Tool-call IDs beginning with call_ are transport identifiers and cannot be cited."
+        elif "verified_task_ids" in context.get("analysis_review_state", {}):
+            ids = context["analysis_review_state"]["verified_task_ids"]
+            prompt += (" Allowed computation task IDs: " + json.dumps(ids) + "." if ids else
+                       ' No verified computation task IDs exist. Return claims=[] and input_assessments=[]. '
+                       'For computational steps use insufficient_evidence with claim_ids=[] and request '
+                       'a queued analysis with a verifiable result. A script log or a plan step ID cannot replace it.')
         return prompt
     if acceptance.get("study_evidence_required") and not acceptance.get("models"):
         return STUDY_PROMPT + (
@@ -83,6 +89,18 @@ def analysis_review_schema(policy, review_state=None):
             field["items"]["enum"] = list(ids)
         else:
             field["maxItems"] = 0
+    elif review_state is not None and "verified_task_ids" in review_state:
+        ids = review_state["verified_task_ids"]
+        fields = schema["properties"]
+        claims, inputs = fields["claims"], fields["input_assessments"]
+        if ids:
+            claims["items"]["properties"]["task_id"]["enum"] = list(ids)
+            input_fields = inputs["items"]["properties"]
+            input_fields["task_id"]["enum"] = list(ids)
+            input_fields["source_task_ids"]["items"]["enum"] = list(ids)
+        else:
+            claims["maxItems"] = inputs["maxItems"] = 0
+            fields["step_assessments"]["items"]["properties"]["claim_ids"]["maxItems"] = 0
     return schema
 
 

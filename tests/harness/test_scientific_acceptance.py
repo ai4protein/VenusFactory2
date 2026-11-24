@@ -540,3 +540,21 @@ def test_interim_review_schema_uses_only_measured_task_ids():
     measured = ["a" * 32]
     assert field(measured)["items"]["enum"] == measured
     assert field(measured)["minItems"] == 1
+
+
+def test_final_report_schema_exposes_only_verified_task_ids_and_preserves_qualitative_steps():
+    from agent.harness import analysis_report_review, scientific_acceptance
+    policy = analysis_report_review.POLICY
+    def fields(ids):
+        return scientific_acceptance.analysis_review_schema(policy, {"verified_task_ids": ids})["properties"]
+    empty = fields([])
+    assert empty["claims"]["maxItems"] == empty["input_assessments"]["maxItems"] == 0
+    assert empty["step_assessments"]["items"]["properties"]["claim_ids"]["maxItems"] == 0
+    assert "ready_for_host_validation" in empty["decision"]["enum"]
+    ids = ["b" * 32]
+    populated = fields(ids)
+    assert populated["claims"]["items"]["properties"]["task_id"]["enum"] == ids
+    assert populated["input_assessments"]["items"]["properties"]["source_task_ids"]["items"]["enum"] == ids
+    prompt = scientific_acceptance.prompt_for_review(
+        {"scientific_acceptance": {"analysis_review_policy": policy}, "analysis_review_state": {"verified_task_ids": []}})
+    assert "claims=[]" in prompt and "insufficient_evidence" in prompt

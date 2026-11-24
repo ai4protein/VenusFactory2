@@ -23,7 +23,10 @@ def test_actual_analysis_capture_selects_typed_policy_and_fresh_packet(make_case
     context["execution"]["report"] = "Executor endorsement must not be treated as SC truth."
     selected = packet(context)
     assert selected["scientific_acceptance"]["analysis_review_policy"] == analysis.POLICY
-    assert sc.prompt_for_review(selected) == analysis.PROMPT
+    prompt = sc.prompt_for_review(selected)
+    assert prompt.startswith(analysis.PROMPT)
+    for task_id in selected["analysis_review_state"]["verified_task_ids"]:
+        assert task_id in prompt
     assert "report" not in selected["execution"]
     assert selected["analysis_evidence"] == context["analysis_evidence"]
     assert selected["analysis_evidence"] is not context["analysis_evidence"]
