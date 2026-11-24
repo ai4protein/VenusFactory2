@@ -38,7 +38,7 @@ Return JSON only: {"assessments":[{"unit_id":"...","classification":"factual" or
 "evidence":[{"passage_id":"S1:..."}]}]}.
 Cover each unit exactly once. For a supported factual unit, select passages that jointly support ALL its factual assertions.
 A passage ID is a locator, not proof by itself. Read its content and reject unsupported assertions.
-Return only passage IDs in evidence; source identities and exact text are resolved by the host.
+Passage IDs may be returned as strings or as objects with passage_id. Use the whole unit verbatim for claim if narrowing the quoted issue is difficult.
 Use proposal only for an explicitly proposed future action containing no claimed observations.
 If any assertion lacks support, mark the unit unsupported or uncertain and identify that assertion.
 A correction field contains validator feedback on the previous attempt. Correct only the supplied
@@ -175,7 +175,7 @@ def revision_input(state, document):
     return request
 
 
-async def review_documents(state, payload, documents, model_call, publish):
+async def review_documents(state, payload, documents, model_call, publish, *, recovery_reserve=0):
     """Audit fresh units only; all calls share the report's existing call budget."""
     binding = state.get("reviewer_binding")
     reviewer_sha = None
@@ -210,6 +210,8 @@ async def review_documents(state, payload, documents, model_call, publish):
     queue = deque((request, 0, None) for request in packets(pending, sources))
     while queue:
         request, recovery_round, parent_attempt = queue.popleft()
+        if recovery_round and state.get("model_calls", 0) + recovery_reserve >= state["model_call_limit"]:
+            break
         if state.get("execution_blocker") or state.get("model_calls", 0) >= state["model_call_limit"]:
             break
         attempt = {"started": time.time(), "request": request, "status": "running",

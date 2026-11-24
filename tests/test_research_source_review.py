@@ -298,3 +298,31 @@ def test_compact_evidence_requires_an_explicit_string_identity(identity):
     response["assessments"][0]["evidence"][0]["passage_id"] = identity
     with pytest.raises(ValueError, match="source anchor"):
         validation.validate_assessments(json.dumps(response), request, [SOURCE])
+
+
+def test_bare_passage_id_resolves_against_original_source():
+    request = sr.packet(sr.units(DOCUMENT, [SOURCE]), [SOURCE])
+    response = json.loads(assessment(request))
+    row = response["assessments"][0]
+    passage = row["evidence"][0]
+    row["evidence"] = [passage["passage_id"]]
+    resolved = validation.validate_assessments(json.dumps(response), request, [SOURCE])
+    assert resolved[0]["evidence"][0]["quote"] == passage["quote"]
+    row["evidence"] = ["S1:missing"]
+    with pytest.raises(ValueError):
+        validation.validate_assessments(json.dumps(response), request, [SOURCE])
+
+
+@pytest.mark.asyncio
+async def test_first_review_does_not_spend_revision_budget_on_format_retries():
+    progress = state()
+    progress["model_call_limit"] = 3
+
+    async def invalid(*args, **kwargs):
+        progress["model_calls"] += 1
+        return "{}", False
+
+    receipts = await sr.review_documents(progress, {"model_id": "fixture"}, [DOCUMENT], invalid,
+                                         lambda: None, recovery_reserve=2)
+    assert progress["model_calls"] == 1
+    assert receipts[DOCUMENT["id"]]["status"] != "completed"

@@ -132,6 +132,8 @@ def _validate_assessment_rows(rows, request, sources):
             raise ValueError("Invalid evidence list")
         evidence = []
         for item in row["evidence"]:
+            if isinstance(item, str):
+                item = {"passage_id": item}
             if (not isinstance(item, dict)
                     or set(item) not in ({"passage_id"}, {"source_id", "passage_id", "quote"})
                     or not isinstance(item["passage_id"], str)):

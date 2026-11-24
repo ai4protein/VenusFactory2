@@ -295,6 +295,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
             system = ('You are an independent protein research specialist. Write only your assigned chapter in ' + ('Chinese' if lang == 'zh' else 'English') +
                 '. Produce a detailed scholarly chapter: 1,500–2,200 Chinese characters or 700–1,100 English words when evidence permits. '
                 'Use descriptive subsections, quantitative evidence tables, mechanisms, assay conditions, conflicting findings and specific gaps. '
+                'Group related observations into cohesive paragraphs. Explain only measurements, mechanisms and conditions actually described by the supplied sources. Use shorter chapters when evidence is sparse. '
                 'Do not pad missing evidence. Distinguish observed biology, database annotations, sequence calculations, model predictions and hypotheses. '
                 'Sequence/structure similarity, functional association and predictions do not validate function or physical binding. Preserve database, query chain, coverage and evidence codes. Empty or truncated searches do not establish absence. Cite each evidence-based paragraph using the exact square-bracket form [S1], replacing 1 with its supplied source number. Do not use parenthetical author/title references or bare S1 labels. Remove unsupported claims rather than attaching an unrelated source. Do not infer that a missing source means a study does not exist. '
                 'Explain residue numbering and organism/isoform scope. Refer to the verified FASTA input for the sequence; never write a full amino-acid sequence or generate residue strings. Do not give clinical advice. Do not invent measurements, references, datasets, licenses or tools run. '
@@ -330,7 +331,8 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
     await asyncio.gather(*(specialist(i, spec) for i, spec in enumerate(CHAPTERS)))
     state['phase'] = 'reviewing'; publish()
     candidates = [c for c in state["chapters"] if c.get("draft_status") == "completed" or chapter_ready(c, state["sources"])]
-    receipts = await review_documents(state, payload, [chapter_document(c) for c in candidates], model_call, publish)
+    receipts = await review_documents(state, payload, [chapter_document(c) for c in candidates], model_call, publish,
+                                     recovery_reserve=min(12, state["model_call_limit"] // 4))
     for chapter in candidates:
         chapter["source_review"] = receipts[chapter["id"]]
         chapter["status"] = "completed" if receipts[chapter["id"]]["status"] == "completed" else "partial"

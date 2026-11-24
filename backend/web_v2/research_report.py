@@ -14,6 +14,7 @@ from mcp_tools.tools.runtime_tool_policy import is_online_mode
 from mcp_tools.tools.search import web_provider
 from mcp_tools.tools.research import services as public_services
 from backend.web_v2 import research_predictions
+from .research_uniprot_cache import selected_entries
 from .research_documents import MINIMUM_CHAPTERS, cite_report
 
 SCOPES = [
@@ -163,7 +164,17 @@ async def resolve_protein(query):
     # Quoted text protects the public query service from accidental query-language operators.
     term = 'accession:' + query if ACCESSION.fullmatch(query) else ' AND '.join('"' + w + '"' for w in re.findall(r'[\w.-]+', query)[:16])
     obj = await get_json('https://rest.uniprot.org/uniprotkb/search', {'query': term, 'format': 'json', 'size': 8})
-    return [protein_card(e) for e in obj.get('results', [])]
+    entries = obj.get('results', [])
+    cards = [protein_card(entry) for entry in entries]
+    await asyncio.to_thread(selected_entries, save=entries)
+    return cards
+
+
+async def selected_uniprot_entry(accession):
+    entry = await asyncio.to_thread(selected_entries, accession=accession)
+    if entry is not None:
+        return entry
+    return await get_json('https://rest.uniprot.org/uniprotkb/' + accession + '.json')
 
 
 def safe_url(value):
@@ -516,7 +527,7 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
             step('identity', 'completed', card['pdb_id'] + ' · chain ' + source_chain)
         elif payload.get('accession'):
             try:
-                entry = await get_json('https://rest.uniprot.org/uniprotkb/' + payload['accession'] + '.json')
+                entry = await selected_uniprot_entry(payload['accession'])
                 card = protein_card(entry)
                 protein = card['name'] + ' (' + card['organism'] + ')'
                 sequence = clean_sequence(entry['sequence']['value'])
