@@ -131,6 +131,11 @@ def prepare_tool_arguments(name, tool, arguments, workspace):
             host_fields = {"workspace", "workspace_root", "session_id", "session_dir", "root", "cwd", "mounts", "mount", "backend", "control"}
             if isinstance(arguments, dict) and host_fields.intersection(arguments):
                 raise ToolArgumentError(str(exc) + " The session workspace is assigned by the server.") from None
+            if (name in {"run_session_python", "run_research_python"} and isinstance(arguments, dict)
+                    and "path" in arguments and {"arguments", "args", "kwargs"}.intersection(arguments)):
+                raise ToolArgumentError(str(exc) + " This tool runs the saved script from top to bottom. "
+                                        "Edit the script to call its function with the session input path and "
+                                        "print the result or write the requested file. Then pass only path and optional timeout_seconds.") from None
             raise
         args = relative_workspace_arguments(arguments)
         validate_tool_arguments(tool, args)

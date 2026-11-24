@@ -162,7 +162,7 @@ class ResearchWorkspace:
 
     @guard_operation('run_research_python')
     async def run_research_python(self, path: str, timeout_seconds: int=120) -> dict:
-        """Execute a saved .py script, not a data file, in an isolated, memory-bounded single process without networking or subprocesses. Scientific Python packages are available. Use n_jobs=1; model training needing subprocesses uses queued MCP tools. Save relative outputs; inspect exit_code."""
+        """Execute a saved .py script, not a data file, in an isolated, memory-bounded single process without networking or subprocesses. Call your functions in the script and print or save their results. Scientific Python packages are available. Use n_jobs=1; model training needing subprocesses uses queued MCP tools. Save relative outputs; inspect exit_code."""
         from .session_sandbox import validate_execution
         validate_execution('python', path, timeout_seconds)
         source_hash=workspace_hash(self.workspace,path)

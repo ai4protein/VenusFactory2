@@ -96,7 +96,7 @@ async def test_write_rejects_read_metadata_with_actionable_fields(tmp_path):
         prepare_tool_arguments(tool.name, tool, bad, workspace)
     message = str(error.value)
     assert "Unexpected fields." in message
-    assert "Allowed fields: content, path" in message
+    assert "Allowed fields: content, expected_sha256, path" in message
     assert "assigned by the server" not in message
     assert source not in message and not (workspace/"src/analysis.py").exists()
     args = prepare_tool_arguments(tool.name, tool, {"path":bad["path"], "content":source},
@@ -136,3 +136,20 @@ def test_model_data_and_source_arguments_follow_the_virtual_path_contract(tmp_pa
     for value in ("/etc/passwd", "/workspace/../other-session/data.csv", "/workspace/.env"):
         with pytest.raises(ValueError):
             prepare_tool_arguments(name, tool, {**arguments, field:value}, service.workspace)
+
+
+@pytest.mark.asyncio
+async def test_python_rejects_function_kwargs_and_runs_the_corrected_entrypoint(tmp_path):
+    workspace = tmp_path / "work"
+    service = ResearchWorkspace(workspace, tmp_path / "control", {"steps": []})
+    tools = {tool.name: tool for tool in service.workspace_tools()}
+    runner = tools["run_session_python"]
+    with pytest.raises(ValueError, match="Edit the script to call its function") as exc:
+        prepare_tool_arguments(runner.name, runner, {"path": "src/run.py",
+                               "arguments": {"file_path": "private-sample.csv"}}, workspace)
+    assert "private-sample" not in str(exc.value)
+    writer = tools["write_session_file"]
+    source = "def size():\n    return 24\nprint(size())\n"
+    await writer.ainvoke(prepare_tool_arguments(writer.name, writer, {"path":"src/run.py", "content":source}, workspace))
+    result = await runner.ainvoke(prepare_tool_arguments(runner.name, runner, {"path":"src/run.py"}, workspace))
+    assert result["exit_code"] == 0 and result["stdout"].strip() == "24"
