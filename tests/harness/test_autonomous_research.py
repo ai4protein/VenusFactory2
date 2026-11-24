@@ -183,6 +183,10 @@ async def test_native_path_adapter_supports_existing_files_and_live_python_progr
         tool = tools[name]
         prepared = prepare_tool_arguments(name, tool, args, service.workspace)
         return await tool.ainvoke(prepared)
+    content = "# /src/ is literal in file contents"
+    await invoke("write_session_file", {"path": "/src/helper.py", "content": content})
+    assert (service.workspace / "src/helper.py").read_text() == content
+    assert (await invoke("read_session_file", {"path": "/workspace/src/helper.py"}))["text"] == content
     await invoke("write_session_file", {"path": "helper.py", "content": "value=1\n"})
     await invoke("write_session_file", {"path": "helper.py", "content": "value=2\n"})
     assert (await invoke("read_session_file", {"path": "helper.py"}))["text"] == "value=2\n"

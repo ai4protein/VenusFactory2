@@ -62,6 +62,10 @@ def relative_workspace_arguments(arguments):
         if isinstance(value, str) and value:
             if value.startswith('/workspace/'):
                 value = value[len('/workspace/'):]
+            elif value.startswith('/src/'):
+                # Native coding agents sometimes use /src as their project source root.
+                # Map this namespace to the session directory before validating the components.
+                value = value[1:]
             parts(value)
         return value
 
@@ -71,8 +75,9 @@ def relative_workspace_arguments(arguments):
     for key in ('path', 'source', 'source_file', 'data_file', 'unlabeled_file', 'evaluation_file', 'proposal_file', 'output_file'):
         if key in result:
             result[key] = relative(result[key])
-    if isinstance(result.get('files'), list):
-        result['files'] = [relative(value) for value in result['files']]
+    for key in ('files', 'artifacts'):
+        if isinstance(result.get(key), list):
+            result[key] = [relative(value) for value in result[key]]
     return result
 
 

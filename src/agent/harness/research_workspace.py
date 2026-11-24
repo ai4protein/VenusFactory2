@@ -45,7 +45,7 @@ RESEARCH_TOOLS = ('get_research_strategy_guide', 'get_research_baseline', 'prepa
 def safe_file(root, name, *, exists=True):
     parts(name)
     if not isinstance(name, str) or not name or Path(name).is_absolute() or any(p in {'..', ''} or p.startswith('.') for p in Path(name).parts):
-        raise ValueError('Use a relative workspace filename')
+        raise ValueError('Use a relative workspace filename, for example src/analysis.py. Omit the leading slash.')
     root = Path(root).resolve()
     path = root / name
     path.resolve().relative_to(root)
@@ -138,7 +138,7 @@ class ResearchWorkspace:
 
     async def write_research_file(self, path: str, content: str,
             expected_sha256: Annotated[str, Field(description="Optional full-file SHA256 from read_session_file or repair_source. Supply it to replace the entire unchanged file; omit when creating a file. Never use a slice hash.")] = '') -> dict:
-        """Create or revise a workspace file. For whole-file repair, supply complete content and expected_sha256 to reject stale writes. This writes only; it does not train or validate a model."""
+        """Create or revise a workspace file at a relative path such as src/analysis.py. For whole-file repair, supply complete content and expected_sha256 to reject stale writes. This writes only; it does not train or validate a model."""
         if (expected_sha256 != '' and (not isinstance(expected_sha256,str)
                 or re.fullmatch(r'[0-9a-f]{64}',expected_sha256) is None)):
             raise ValueError('Use the full-file SHA256 returned by read_session_file or repair_source')

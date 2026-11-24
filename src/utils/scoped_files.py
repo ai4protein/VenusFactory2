@@ -13,10 +13,10 @@ import uuid
 
 def parts(relative):
     if not isinstance(relative, str) or not relative or '\\' in relative or '\0' in relative:
-        raise ValueError('Use a relative workspace filename')
+        raise ValueError('Use a relative workspace filename, for example src/analysis.py. Omit the leading slash.')
     value = PurePosixPath(relative)
     if value.is_absolute() or not value.parts or any(p.startswith('.') or ':' in p for p in value.parts):
-        raise ValueError('Use a relative workspace filename')
+        raise ValueError('Use a relative workspace filename, for example src/analysis.py. Omit the leading slash.')
     return value.parts
 
 
