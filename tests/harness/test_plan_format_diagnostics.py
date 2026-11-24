@@ -32,7 +32,7 @@ async def test_step_level_needs_input_reports_its_location_and_keeps_evidence(tm
 
     runner = AutonomousResearch(None, "fixture", {}, consult=consult)
     request = runner.structured("CB", {"objective": "Train a protein predictor"},
-                               SimpleNamespace(budget=SimpleNamespace(model_calls=12)),
+                               SimpleNamespace(budget=SimpleNamespace(model_calls=12), model=SimpleNamespace(protocol="chat_completions")),
                                SimpleNamespace(calls=0), tmp_path, parse_plan)
     if repair:
         result = await request
@@ -65,7 +65,7 @@ async def test_analysis_package_requirement_gets_one_cb_repair(tmp_path, verific
     async def consult(role, current):
         observed.append((role, current))
         assert current["objective"] == original_context["objective"]
-        assert current["PI"] == original_context["PI"]
+        assert "PI" not in current and current["role_context"]["fresh_session"] is True
         if len(observed) == 1:
             return invalid
         hint = current["format_repair"]
@@ -79,7 +79,7 @@ async def test_analysis_package_requirement_gets_one_cb_repair(tmp_path, verific
 
     runner = AutonomousResearch(None, "fixture", {}, consult=consult)
     pending = runner.structured("CB", context,
-                                SimpleNamespace(budget=SimpleNamespace(model_calls=12)),
+                                SimpleNamespace(budget=SimpleNamespace(model_calls=12), model=SimpleNamespace(protocol="chat_completions")),
                                 SimpleNamespace(calls=0), tmp_path, parse_plan)
     if repair:
         result = await pending

@@ -120,7 +120,7 @@ async def test_next_scientist_iteration_reuses_host_verified_preparation(tmp_pat
     requests = []
     research_plan = {"summary": "Prepare observations and fit a predictor",
                      "deliverable": "model", "needs_input": [], "steps": [
-        {"id": "data", "title": "Prepare measured data", "acceptance": "Verified group splits", "verification": "data"},
+        {"id": "data", "title": "Prepare measured data", "acceptance": "Verified group splits", "verification": "data_partition"},
         {"id": "model", "title": "Fit predictor", "acceptance": "Measured trained model", "verification": "model"}]}
 
     async def consult(role, context):

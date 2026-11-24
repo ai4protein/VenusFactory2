@@ -236,7 +236,7 @@ async def test_actual_sc_request_distinguishes_progress_from_final_acceptance(tm
             "models": [{"candidate_id": "candidate"}] if submitted else [],
         }
     }
-    runner = ar.AutonomousResearch(SimpleNamespace(root=tmp_path), "fixture", {}, tools=[])
+    runner = ar.AutonomousResearch(SimpleNamespace(root=tmp_path, read=lambda: {"definition": {"admission": {}}}), "fixture", {}, tools=[])
     with pytest.raises(CapturedRequest):
         await runner.consult("SC", context, profile, relay, tmp_path)
     instructions = captured[0]["instructions"]

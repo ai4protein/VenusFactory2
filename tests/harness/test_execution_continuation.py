@@ -96,7 +96,7 @@ async def test_prepared_data_refreshed_in_same_iteration_without_repeating_prepa
     async def consult(role,context):
         if role=="PI":return "Prepare data and train the predictor."
         if role=="CB":return json.dumps({"summary":"Train from measurements","deliverable":"model","needs_input":[],
-            "steps":[{"id":"data","title":"Prepare measured data","acceptance":"Verified split","verification":"data"},
+            "steps":[{"id":"data","title":"Prepare measured data","acceptance":"Verified split","verification":"data_partition"},
                      {"id":"fit","title":"Fit a model","acceptance":"Host-measured predictor","verification":"model"}]})
         return json.dumps({"decision":"needs_revision","summary":"Dataset prepared; fitting remains.","issues":[]})
     async def executor(request,service,events):

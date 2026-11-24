@@ -78,7 +78,13 @@ async def test_actual_native_task_keeps_one_authoritative_copy_and_security(tmp_
         assert runtime.task.instructions.count(GUIDANCE) == 1
         assert runtime.task.instructions.count(SECURITY_INSTRUCTIONS) == 1
         actual = json.loads(runtime.task.prompt.rsplit("## Current user request\n", 1)[1])
-        expected = copy.deepcopy(source)
+        if case == "agent":
+            expected = copy.deepcopy(source)
+        else:
+            from agent.harness.web_research_role_context import project_role_context
+            expected = project_role_context("MLS", source)
+            assert actual["role_context"]["fresh_session"] is True
+            assert "sc_revision" not in actual["progress"]
         if case == "research_identical":
             expected["available_tools"].pop("discovery")
         assert actual == expected

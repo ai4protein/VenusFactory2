@@ -36,7 +36,7 @@ def test_echoed_completion_metadata_is_discarded_before_schema_validation():
 @pytest.mark.asyncio
 async def test_transport_schema_error_receives_one_bounded_format_repair(tmp_path):
     relay=SimpleNamespace(calls=0)
-    profile=SimpleNamespace(budget=SimpleNamespace(model_calls=12))
+    profile=SimpleNamespace(budget=SimpleNamespace(model_calls=12), model=SimpleNamespace(protocol="chat_completions"))
     seen=[]
     async def consult(role,context):
         relay.calls+=1;seen.append(context)
@@ -58,6 +58,6 @@ async def test_wrong_model_transport_error_is_not_treated_as_format_repair(tmp_p
         raise ValueError("Scientific role response identity mismatch")
     driver=AutonomousResearch(None,"",{},consult=consult)
     with pytest.raises(ValueError,match="identity mismatch"):
-        await driver.structured("CB",{},SimpleNamespace(budget=SimpleNamespace(model_calls=12)),
+        await driver.structured("CB",{},SimpleNamespace(budget=SimpleNamespace(model_calls=12), model=SimpleNamespace(protocol="chat_completions")),
                                 SimpleNamespace(calls=1),tmp_path,parse_plan)
     assert len(calls)==1
