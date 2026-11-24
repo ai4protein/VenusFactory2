@@ -237,7 +237,7 @@ class ResearchWorkspace:
         return self.record('propose_research_capability',{'source':source,'tests':test_inputs},{'id':manifest['id'],'name':name,'validation':manifest['validation']})
 
     async def submit_research_checkpoint(self, summary: str, completed_steps: list[str], artifacts: list[str], needs_input: list[str]) -> dict:
-        """Checkpoint actual work for the Scientific Critic. Cite actual files and every current step they support, including inspection and reporting when evidenced. A partial checkpoint may have completed steps; use [] only when there are none. Use needs_input only for missing user data. This does not itself complete the goal."""
+        """Checkpoint actual work for the Scientific Critic. List the report and each supporting computation receipt path as separate entries in artifacts. Cite every current step those files support, including inspection and reporting when evidenced. A partial checkpoint may have completed steps; use [] only when there are none. Use needs_input only for missing user data. This does not itself complete the goal."""
         validate_input_questions(needs_input)
         ids={s['id'] for s in self.plan['steps']}
         if not summary.strip():

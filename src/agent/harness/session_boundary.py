@@ -108,7 +108,10 @@ def mcp_input_schema(tool):
     steps = metadata.get("plan_step_ids")
     field = schema.get("properties", {}).get("completed_steps")
     if isinstance(steps, list) and isinstance(field, dict):
-        field["description"] = "List every plan step ID completed with evidence in this checkpoint. One artifact can support multiple steps. Omit unfinished steps and use [] only if none are complete."
+        field["description"] = (
+            "List exact IDs for all evidenced steps; never include titles or descriptions. "
+            "One artifact can support multiple steps. Omit unfinished steps and use [] only if none are complete."
+        )
         if steps:
             field.setdefault("items", {})["enum"] = list(steps)
         else:

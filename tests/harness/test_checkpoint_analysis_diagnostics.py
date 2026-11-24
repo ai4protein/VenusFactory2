@@ -57,6 +57,8 @@ def request(completed=None, artifacts=None):
 @pytest.mark.asyncio
 async def test_missing_analysis_citation_preserves_draft_and_permits_same_turn_repair(research):
     service, artifact = research
+    assert artifact["path"] in artifact["instruction"]
+    assert "separate entry in submit_research_checkpoint.artifacts" in artifact["instruction"]
     original = request()
     result = await service.submit_research_checkpoint(**original)
     failed, _ = _tool_output_indicates_failure(result)

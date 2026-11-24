@@ -126,7 +126,10 @@ def capture(service, *, job, name, arguments, value, owner, parent_job, session_
     inputs = sequence_input_feedback(service.workspace, getattr(service, "registered_inputs", []), arguments)
     return {**artifact, "tool": name, "job_number": job.get("job_number"),
             **({"input_check": inputs} if inputs is not None else {}),
-            "instruction": "Inspect this result and cite its path in the research checkpoint."}
+            "instruction": (
+                f"Inspect this result. To claim this computation, include {artifact['path']} "
+                "as a separate entry in submit_research_checkpoint.artifacts alongside your report."
+            )}
 
 
 def checkpointed(receipts, workspace, artifacts, *, budget=None):
