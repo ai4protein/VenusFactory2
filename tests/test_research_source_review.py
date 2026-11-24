@@ -380,3 +380,18 @@ async def test_a_blocked_chapter_cannot_spend_the_next_chapters_review_calls():
     receipts = await sr.review_documents(state_data, {"model_id":"free"}, [next_doc], call, lambda: None, max_calls=1)
     assert receipts["next"]["status"] == "completed" and state_data["model_calls"] == 2
     assert state_data["model_call_limit"] == budget
+
+
+def test_packet_alias_must_resolve_to_a_cited_original_passage():
+    sources = [SOURCE, {**SOURCE, "id": "S2", "title": "Another entry"}]
+    other = {**DOCUMENT, "id":"other", "text":"Information about another entry. [S2]"}
+    request = sr.packet([*sr.units(DOCUMENT, sources), *sr.units(other, sources)], sources)
+    result = json.loads(assessment(request))
+    for row in result["assessments"]:
+        row["evidence"] = [request["unit_refs"][row["unit_id"]][0]]
+    checked = validation.validate_assessments(json.dumps(result), request, sources)
+    assert checked[0]["evidence"][0]["passage_id"] == request["sources"][0]["passages"][0]["id"]
+    for wrong in ("S2.1", "S1.99", "S1"):
+        result["assessments"][0]["evidence"] = [wrong]
+        with pytest.raises(ValueError):
+            validation.validate_assessments(json.dumps(result), request, sources)

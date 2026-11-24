@@ -30,12 +30,12 @@ A protein name in a source cannot support claims about its function, stability, 
 A source value of 1.8 does not support a claimed value of 1.7; matching the protein name is insufficient.
 For "Protein X is stable at 80 C" with only "Protein X" in the source, return uncertain,
 issues=[{"claim":"Protein X is stable at 80 C","reason":"No temperature or stability observation is supplied."}],
-evidence=[]. Select only the IDs of supplied source passages. The host resolves their original text; do not copy or invent quotes.
+evidence=[]. Choose only references listed for this unit in unit_refs, such as S4.1. Read that passage first. The host resolves its original text; do not copy quotes or use a bare source ID.
 An excerpt's silence is not evidence of absence. Mixed factual/proposed blocks are factual.
 Return JSON only: {"assessments":[{"unit_id":"...","classification":"factual" or "proposal",
 "verdict":"supported" or "unsupported" or "uncertain",
 "issues":[{"claim":"exact substring of the unit","reason":"brief source-specific explanation"}],
-"evidence":[{"passage_id":"S1:..."}]}]}.
+"evidence":[{"passage_id":"S1.1"}]}]}.
 Cover each unit exactly once. For a supported factual unit, select passages that jointly support ALL its factual assertions.
 A passage ID is a locator, not proof by itself. Read its content and reject unsupported assertions.
 Passage IDs may be returned as strings or as objects with passage_id. Use the whole unit verbatim for claim if narrowing the quoted issue is difficult.
@@ -90,7 +90,15 @@ def packet(selected, sources):
         if identity not in index:continue
         query = "\n".join(unit["text"] for unit in selected if identity in unit["citations"])
         evidence.append(selected_passages(index[identity],query,max(160,8000//max(1,len(cited)))))
-    return {"policy":VERSION,"units":selected,"sources":evidence}
+    refs = {}
+    for source in evidence:
+        refs[source["id"]] = []
+        for index, passage in enumerate(source["passages"], start=1):
+            passage["ref"] = f'{source["id"]}.{index}'
+            refs[source["id"]].append(passage["ref"])
+    allowed = {unit["id"]: [ref for source_id in unit["citations"] for ref in refs.get(source_id, [])]
+               for unit in selected}
+    return {"policy":VERSION,"units":selected,"sources":evidence,"unit_refs":allowed}
 
 
 def packets(pending,sources):

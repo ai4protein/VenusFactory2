@@ -113,6 +113,9 @@ def _validate_assessment_rows(rows, request, sources):
         raise ValueError("Every requested unit must be assessed exactly once")
     originals = {row["id"]: row for row in sources}
     passages = {p["id"]: p for s in request["sources"] for p in s["passages"]}
+    # Aliases are scoped to this saved request. Resolve them to canonical IDs
+    # before applying the source, citation, value and original-text checks.
+    aliases = {p["ref"]: p["id"] for p in passages.values() if "ref" in p}
     checked = []
     for row in rows:
         if set(row) != {"unit_id", "classification", "verdict", "issues", "evidence"}:
@@ -138,6 +141,8 @@ def _validate_assessment_rows(rows, request, sources):
                     or set(item) not in ({"passage_id"}, {"source_id", "passage_id", "quote"})
                     or not isinstance(item["passage_id"], str)):
                 raise ValueError("Invalid source anchor")
+            if set(item) == {"passage_id"} and item["passage_id"] in aliases:
+                item = {"passage_id": aliases[item["passage_id"]]}
             passage = passages.get(item["passage_id"])
             if set(item) == {"passage_id"}:
                 if not passage:
