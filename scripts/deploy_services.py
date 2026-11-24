@@ -114,7 +114,7 @@ API_READINESS_CONTRACTS = (
     ("/api/chat/science-goals/catalog?view=composer", {"drivers": list, "execution": dict}),
     ("/api/report/options", {"models": list, "analyses": list, "chapters": list}),
     ("/api/model-platform/catalog?limit=1", {"items": list, "categories": dict, "total": int}),
-    ("/api/model-platform/workflow-components?limit=1", {"items": list, "categories": dict, "kinds": dict, "total": int}),
+    ("/api/rsi-plaza/cases?limit=1", {"items": list, "total": int}),
 )
 _MAX_READINESS_BYTES = 1024 * 1024
 

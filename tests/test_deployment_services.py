@@ -71,7 +71,7 @@ def readiness_server():
         "/api/chat/science-goals/catalog?view=composer": (200, {"drivers": [], "execution": {}}),
         "/api/report/options": (200, {"models": [], "analyses": [], "chapters": []}),
         "/api/model-platform/catalog?limit=1": (200, {"items": [], "categories": {}, "total": 0}),
-        "/api/model-platform/workflow-components?limit=1": (200, {"items": [], "categories": {}, "kinds": {}, "total": 0}),
+        "/api/rsi-plaza/cases?limit=1": (200, {"items": [], "total": 0}),
     }
     requests = []
 
@@ -105,7 +105,7 @@ def readiness_server():
     "/api/chat/science-goals/catalog?view=composer",
     "/api/report/options",
     "/api/model-platform/catalog?limit=1",
-    "/api/model-platform/workflow-components?limit=1",
+    "/api/rsi-plaza/cases?limit=1",
 ])
 def test_health_success_does_not_hide_broken_workspace_catalog(readiness_server, endpoint):
     port, responses, requests = readiness_server
@@ -129,7 +129,7 @@ def test_initial_installation_can_start_before_api_keys_are_configured(readiness
     ("/api/chat/science-goals/catalog?view=composer", None),
     ("/api/report/options", {"models": [], "analyses": [], "chapters": {}}),
     ("/api/model-platform/catalog?limit=1", {"items": [], "categories": {}, "total": True}),
-    ("/api/model-platform/workflow-components?limit=1", {"items": [], "categories": {}, "total": 0}),
+    ("/api/rsi-plaza/cases?limit=1", {"items": [], "total": "0"}),
 ])
 def test_malformed_catalog_is_not_ready(readiness_server, endpoint, body):
     port, responses, _ = readiness_server

@@ -33,13 +33,15 @@ from backend.web_v2.quick_tools_api import MutationRunBody
 from pydantic import ValidationError
 # Do not enter lifespan: MCP, harness daemons and inference stay stopped.
 client = TestClient(app)
-paths = ['/health', '/api/chat/agent-execution-options',
-         '/api/chat/science-goals/catalog?view=composer', '/api/report/options',
-         '/api/model-platform/catalog?limit=1', '/api/rsi-plaza/cases?limit=1']
+from scripts.deploy_services import API_READINESS_CONTRACTS
+paths = ['/health', *(path for path, _ in API_READINESS_CONTRACTS)]
 for path in paths:
     response = client.get(path)
     assert response.status_code == 200, (path, response.status_code, response.text[:1000])
-    assert isinstance(response.json(), dict)
+    body = response.json()
+    assert isinstance(body, dict)
+    for key, kind in dict(API_READINESS_CONTRACTS).get(path, {}).items():
+        assert type(body.get(key)) is kind, (path, key)
 detail = client.get('/api/model-platform/tools/tool:query_pubmed')
 assert detail.status_code == 200 and 'query' in detail.json()['contract']['properties']
 for retired in ('/api/model-platform/workflow-components', '/api/model-platform/workflows'):
