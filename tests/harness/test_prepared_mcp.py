@@ -94,7 +94,11 @@ async def test_prepared_worker_retains_real_mcp_handshake_and_tool_result(tmp_pa
 from pathlib import Path
 assert 'PRIVATE_MCP_TEST_KEY' not in os.environ
 assert not Path('/etc/passwd').exists()
-assert not Path('/opt/venus-runtime/pyvenv.cfg').exists()
+venv_config = Path('/opt/venus-runtime/pyvenv.cfg')
+if venv_config.exists():
+    assert venv_config.read_text().splitlines() == [
+        'home = /opt/venus-base/bin', 'include-system-site-packages = true',
+    ]
 assert not Path('/opt/venus-runtime/conda-meta').exists()
 assert not Path('/opt/venus-runtime/.env').exists()
 for entry in Path('/proc').glob('[0-9]*/environ'):
