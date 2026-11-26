@@ -12,6 +12,28 @@ from .contracts import digest
 from .events import audit_trace
 
 
+def checkpoint_confirmation(metadata, arguments, result):
+    """Give the executor one chance to reconcile a report checkpoint with its open plan."""
+    if not isinstance(result, dict) or not result.get("checkpointed") or arguments.get("needs_input"):
+        return None
+    claimed = arguments.get("completed_steps") or []
+    remaining = set(result.get("unclaimed_step_ids", []))
+    pending = [(key, title) for key, title in (metadata or {}).get("pending_steps", []) if key in remaining]
+    paths = [row["path"] for row in result.get("artifacts", [])]
+    if not claimed or not pending or not any(p.startswith("analysis/") for p in paths):
+        return None
+    if not any(p.lower().endswith((".md", ".txt")) and not p.startswith("inputs/") for p in paths):
+        return None
+    return {
+        "pending_steps": [{"id": key, "title": title} for key, title in pending],
+        "instruction": (
+            "Your files are saved. Review these pending steps against the work you actually performed. "
+            "Submit the checkpoint once more with all evidenced IDs and the same files. If the remaining "
+            "steps are genuinely unfinished, confirm the same partial checkpoint. Do not repeat the calculation."
+        ),
+    }
+
+
 class NativeTurnFailure(RuntimeError):
     """Known native runtime termination; only the host may bind cleanup evidence."""
 

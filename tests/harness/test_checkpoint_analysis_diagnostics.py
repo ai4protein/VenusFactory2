@@ -290,3 +290,16 @@ async def test_next_analysis_step_carries_only_unchanged_report_for_same_computa
     assert [r["path"] for r in (await submit("next.md", receipt["path"]))["artifacts"]] == ["next.md", receipt["path"]]
     (service.workspace / "report.md").write_text("Modified since the accepted step.")
     assert [r["path"] for r in (await submit(receipt["path"]))["artifacts"]] == [receipt["path"]]
+
+
+def test_report_checkpoint_confirmation_proposes_no_scientific_verdict():
+    from agent.harness.research_handoff import checkpoint_confirmation
+    metadata = {"pending_steps": [("calculate", "Calculate"), ("report", "Write report")]}
+    args = {"completed_steps": ["calculate"], "needs_input": []}
+    result = {"checkpointed": True, "unclaimed_step_ids": ["report"],
+              "artifacts": [{"path": "report.md"}, {"path": "analysis/receipt.json"}]}
+    assert checkpoint_confirmation(metadata, args, result)["pending_steps"] == [
+        {"id": "report", "title": "Write report"}]
+    assert args["completed_steps"] == ["calculate"]
+    assert checkpoint_confirmation(metadata, {**args, "needs_input": ["Missing data"]}, result) is None
+    assert checkpoint_confirmation(metadata, args, {**result, "unclaimed_step_ids": []}) is None

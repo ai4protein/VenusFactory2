@@ -19,7 +19,8 @@ computation alone does not show that the requested subject was studied or the re
 For positive computational claims cite the actual task_id and result JSON pointer, the checkpointed
 report path, an exact quote from that report, and display_value as a string preserving its displayed
 precision. For numeric fields, display_value is the number alone: "12.5", never "12.5 Da".
-Keep the original unit in report_quote. Never convert units. Do not substitute a preview or infer an absent value.
+For report_quote you may select a complete line with @line:1 (one-based line number in the verified report,
+counting blank lines). The host resolves this before checking the value. Keep the original unit. Never convert units. Do not substitute a preview or infer an absent value.
 Assess every cited task's input provenance: registered_input needs recorded identity evidence;
 derived_input needs a recorded ordered chain of output hashes to input hashes from registered
 materials; new_subject is permitted for exploration but requires your explicit judgment that it
@@ -46,7 +47,7 @@ def schema():
         "result_pointer": {"type": "string", "maxLength": 1000,
                            "description": "Copy an actual scalar result_fields[].pointer from the cited computation; do not rename fields."},
         "report_path": {"type": "string", "minLength": 1, "maxLength": 1000},
-        "report_quote": {**text, "description": "An exact substring of the checkpointed report preview, including its displayed value; not a paraphrase or tool result."},
+        "report_quote": {**text, "description": "An exact substring of the verified report, or @line:N to select its Nth line (one-based, including blank lines). Select the line that contains the reported value."},
         "display_value": {"type": "string", "minLength": 1, "maxLength": 800,
                           "description": "Exact displayed scalar as text; preserve decimal places. For numbers omit units and prose from this field; put those in report_quote. No unit conversion."},
     })
@@ -98,6 +99,9 @@ def parse_review(raw, context):
     except (ValueError, TypeError, RecursionError) as exc:
         raise ValueError("Return a complete SC JSON object with unique fields and finite numbers.") from exc
     validate(review, context)
+    for claim in review["claims"]:
+        if claim["report_quote"].startswith("@line:"):
+            claim["report_quote"] = _report(claim, context, _index(context))
     return review
 
 
@@ -191,6 +195,13 @@ def _report(claim, context, index):
             or indexed[0].get("sha256") != expected
             or hashlib.sha256(text.encode()).hexdigest() != expected):
         raise ValueError("The report preview is missing, truncated or differs from its checkpoint hash.")
+    ref = re.fullmatch(r"@line:([1-9][0-9]{0,4})", claim["report_quote"])
+    if ref:
+        lines = text.splitlines()
+        number = int(ref[1])
+        if number > len(lines) or not lines[number - 1].strip() or len(lines[number - 1]) > 2000:
+            raise ValueError("Select a nonempty verified report line of at most 2000 characters.")
+        return lines[number - 1]
     if claim["report_quote"] not in text:
         raise ValueError("report_quote must occur exactly in the verified report.")
     return claim["report_quote"]

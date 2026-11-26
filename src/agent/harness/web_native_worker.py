@@ -422,9 +422,17 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                         if not isinstance(value, dict) or value.get("file_sha256") != reference_hashes[reference]:
                             raise ValueError("Research context reference changed while reading; its content is unavailable")
                     if canonical_name == 'submit_research_checkpoint' and not _tool_output_indicates_failure(value)[0]:
-                        if checkpoint_handoff is not None:
-                            checkpoint_handoff.save(arguments, public_value(value, workspace))
-                        checkpoint_saved = True
+                        confirmation = None
+                        if checkpoint_handoff is not None and checkpoint_calls < checkpoint_limit:
+                            from .research_handoff import checkpoint_confirmation
+                            receipt = json.loads(value) if isinstance(value, str) else value
+                            confirmation = checkpoint_confirmation(getattr(tool, "metadata", None), arguments, receipt)
+                        if confirmation:
+                            value = {**receipt, "checkpoint_confirmation": confirmation}
+                        else:
+                            if checkpoint_handoff is not None:
+                                checkpoint_handoff.save(arguments, public_value(value, workspace))
+                            checkpoint_saved = True
                     if canonical_name == "predict_with_evolved_model" and not _tool_output_indicates_failure(value)[0]:
                         from mcp_tools.models.evolved.result_delivery import deliver_prediction
                         card = deliver_prediction(workspace, value, args, session_id=request.get("session_id"))

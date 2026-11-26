@@ -228,3 +228,16 @@ def test_independent_computation_cannot_offer_itself_as_an_upstream_input(make_c
     props = sc.analysis_review_schema(analysis.POLICY, state)["properties"]["input_assessments"]["items"]["properties"]
     assert "derived_input" not in props["kind"]["enum"]
     assert props["source_task_ids"]["maxItems"] == 0
+
+
+def test_verified_line_locator_preserves_exact_quote_and_rejects_missing_line(make_case):
+    _, _, context, review = make_case()
+    claim = review["claims"][0]
+    preview = next(r for r in context["artifact_previews"] if r["path"] == claim["report_path"])
+    number, line = next((i, s) for i, s in enumerate(preview["content"].splitlines(), 1)
+                        if claim["report_quote"] in s)
+    claim["report_quote"] = f"@line:{number}"
+    assert analysis.parse_review(json.dumps(review), context)["claims"][0]["report_quote"] == line
+    claim["report_quote"] = "@line:99999"
+    with pytest.raises(ValueError, match="verified report line"):
+        analysis.parse_review(json.dumps(review), context)
