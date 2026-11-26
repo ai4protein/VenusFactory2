@@ -18,6 +18,8 @@ mcp_tools/                      Shared scientific capability service
   tools/                        Search, databases, files, sandbox, calculations
   common/                       Shared input/output and scientific helpers
 src/agent/                      Agent, Scientist, Researcher orchestration
+  graph/                        Conversation and research graph nodes
+    pi_retrieval.py             PI literature, web and database retrieval for reports
   harness/                      Harness adapters and session sandbox adapters
   rsi/                          Research lifecycle, evaluation and admission
     engine/                     Reusable execution and evaluation primitives

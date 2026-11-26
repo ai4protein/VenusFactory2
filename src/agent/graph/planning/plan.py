@@ -9,7 +9,8 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
-from agent.chat_agent_utils import PI_SEARCH_TOOL_NAMES, _parse_cb_plan
+from agent.chat_agent_utils import _parse_cb_plan
+from agent.graph.pi_retrieval import PI_SEARCH_TOOL_NAMES
 from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.common.streaming import _ensure_trace, _stream_text
 from agent.graph.helpers.plan_helpers import (

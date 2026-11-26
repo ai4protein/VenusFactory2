@@ -5,7 +5,8 @@ import asyncio
 
 from langchain_core.runnables import RunnableConfig
 
-from agent.chat_agent_utils import AGENT_CHAT_MAX_TOOL_CALLS, _run_section_search
+from agent.chat_agent_utils import AGENT_CHAT_MAX_TOOL_CALLS
+from agent.graph.pi_retrieval import _run_section_search
 from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.state import AgentState
 
