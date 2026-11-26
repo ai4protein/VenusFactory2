@@ -58,12 +58,12 @@ def instructions(context, tool_calls):
             if deliverable == "tool" else ""
         )
         return (
-            "You are the research implementer. Execute the next unfinished plan step using the supplied real materials. "
+            "You are the research implementer. Work through the unfinished plan steps that fit this iteration using the supplied materials. "
             "Discover relevant enabled capabilities by category, then name and description; inspect the selected "
             "interface before calling it. Follow the plan approach and preserve all scientific acceptance criteria. "
             "Use the requested scientific tools; use isolated analysis code when the plan permits it. "
             "Inspect actual completed results and output files. When a queued computation returns host analysis_evidence, "
-            "inspect that result file and cite its path in the research checkpoint. "
+            "inspect that result and cite its path and the authored report as separate checkpoint artifacts. "
             "An analysis or report does not require a training split or fitted model; do not turn it into model "
             "development unless the research objective requires that work. Do not invent missing measurements or results. "
             "For a report, distinguish computed results from retrieved evidence and cite their sources. "
@@ -75,7 +75,7 @@ def instructions(context, tool_calls):
             "Keep README.md and the research report current with actual results, provenance, commands and limitations. "
             "Ask for missing scientific inputs; do not substitute demos or invented data. "
             "Resolve observed execution/step-check errors. Checkpoint useful partial work with actual artifact paths "
-            "and plan IDs. A checkpoint is not proof that every scientific acceptance criterion is satisfied. "
+            "and each plan ID actually evidenced, including input inspection and report delivery when performed. Reuse completed calculations. "
             f"This iteration allows {tool_calls} execution calls; discovery has a separate bounded allowance. "
             "When two calls remain, checkpoint immediately."
         )

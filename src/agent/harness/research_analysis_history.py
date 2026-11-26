@@ -155,3 +155,35 @@ def merge_receipts(history, current_receipts, workspace, *, checkpoint=None):
     current = [copy.deepcopy(row) for row in current_receipts if row.get("tool") != "queued_analysis"]
     return {"receipts": [*current, *verified], "issues": issues, "task_provenance": provenance,
             "history_sources": copy.deepcopy(history.get("sources", []))}
+
+
+def previous_report(workspace, plan, submitted, registered_inputs):
+    """Recover one unchanged report for the same explicitly resubmitted computation."""
+    if plan.get("deliverable") != "analysis":
+        return None
+    def is_report(path):
+        return Path(path).suffix.lower() in {".md", ".txt"}
+    inputs = {row.get("path") for row in registered_inputs}
+    hashes = {row.get("sha256") for row in registered_inputs}
+    if any(is_report(row["path"]) and row["path"] not in inputs for row in submitted):
+        return None
+    cited = {(r["path"], r["sha256"]) for r in submitted if r["path"].startswith("analysis/")}
+    if not cited:
+        return None
+    candidates = set()
+    for step in plan.get("steps", []):
+        evidence = step.get("evidence", [])
+        if step.get("status") != "completed" or not any((r.get("path"), r.get("sha256")) in cited for r in evidence):
+            continue
+        candidates.update((r["path"], r["sha256"]) for r in evidence
+                          if is_report(r["path"]) and r["path"] not in inputs and r["sha256"] not in hashes)
+    if len(candidates) != 1:
+        return None
+    path, expected = candidates.pop()
+    try:
+        data = read_bytes(workspace, path, max_bytes=40000)
+    except (ValueError, OSError):
+        return None
+    if hashlib.sha256(data).hexdigest() == expected:
+        return {"path": path, "sha256": expected, "bytes": len(data)}
+    return None

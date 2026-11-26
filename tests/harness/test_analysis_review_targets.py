@@ -197,3 +197,22 @@ def test_multiple_claims_of_one_task_share_one_input_assessment(make_case):
     review["input_assessments"].append(copy.deepcopy(review["input_assessments"][0]))
     with pytest.raises(ValueError, match="Multiple claims for the same task share one input assessment"):
         analysis.validate(review, context)
+
+
+def test_final_review_schema_requires_all_claimed_step_ids():
+    from agent.harness import analysis_report_review, scientific_acceptance
+    schema = scientific_acceptance.analysis_review_schema(analysis_report_review.POLICY, {
+        "verified_task_ids": [], "completed_step_ids": ["inspect", "compute", "report"]})
+    field = schema["properties"]["step_assessments"]
+    assert field["minItems"] == field["maxItems"] == 3
+    assert field["items"]["properties"]["step_id"]["enum"] == ["inspect", "compute", "report"]
+
+
+def test_current_and_upstream_task_choices_remain_distinct():
+    bound, upstream = "1" * 32, "2" * 32
+    schema = sc.analysis_review_schema(analysis.POLICY, {
+        "verified_task_ids": [upstream, bound], "checkpoint_task_ids": [bound]})["properties"]
+    assert schema["claims"]["items"]["properties"]["task_id"]["enum"] == [bound]
+    field = schema["input_assessments"]["items"]["properties"]
+    assert field["task_id"]["enum"] == [bound]
+    assert field["source_task_ids"]["items"]["enum"] == [upstream, bound]

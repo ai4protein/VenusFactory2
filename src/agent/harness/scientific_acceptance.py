@@ -97,12 +97,18 @@ def analysis_review_schema(policy, review_state=None):
         ids = review_state["verified_task_ids"]
         fields = schema["properties"]
         claims, inputs = fields["claims"], fields["input_assessments"]
+        step_ids = review_state.get("completed_step_ids")
+        if step_ids:
+            steps = fields["step_assessments"]
+            steps["minItems"] = steps["maxItems"] = len(step_ids)
+            steps["items"]["properties"]["step_id"]["enum"] = list(step_ids)
         if review_state.get("report_paths"):
             claims["items"]["properties"]["report_path"]["enum"] = list(review_state["report_paths"])
         if ids:
-            claims["items"]["properties"]["task_id"]["enum"] = list(ids)
+            primary_ids = review_state.get("checkpoint_task_ids") or ids
+            claims["items"]["properties"]["task_id"]["enum"] = list(primary_ids)
             input_fields = inputs["items"]["properties"]
-            input_fields["task_id"]["enum"] = list(ids)
+            input_fields["task_id"]["enum"] = list(primary_ids)
             input_fields["source_task_ids"]["items"]["enum"] = list(ids)
         else:
             claims["maxItems"] = inputs["maxItems"] = 0
@@ -366,6 +372,8 @@ def evidence_context(context, proposals, development):
         if state["stage"] == "final":
             result["scientific_acceptance"]["analysis_review_policy"] = analysis_report_review.POLICY
             result["analysis_review_targets"] = analysis_report_review.review_targets(result)
+            state["completed_step_ids"] = list(result["execution"]["checkpoint"]["completed_steps"])
+            state["checkpoint_task_ids"] = result["analysis_review_targets"]["checkpoint_task_ids"]
         else:
             result["scientific_acceptance"]["analysis_review_policy"] = analysis_interim_review.POLICY
     facts = {"evaluated_experiment_ids": [row["id"] for row in history],

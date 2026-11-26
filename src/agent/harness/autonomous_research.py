@@ -374,6 +374,14 @@ class AutonomousResearch:
                         'Preserve the objective and legitimate scientific concerns; do not invent results or force acceptance. '
                         'Return one valid JSON object. Do not execute tools.')
                 repair_instruction += ' ' + PAIRING_GUIDANCE
+            if role == 'SC' and context.get('analysis_review_state', {}).get('stage') == 'final':
+                step_ids = context['analysis_review_targets']['completed_step_ids']
+                repair_instruction = (
+                    'Reassess the rejected fields using the host evidence. Return one step_assessment '
+                    'for each of these step IDs: ' + json.dumps(step_ids) + '. Use insufficient_evidence '
+                    'for unsupported steps. For registered_input return source_task_ids=[]; never list '
+                    'the computation as its own ancestor. Preserve the independent scientific verdict.'
+                )
             from .research_role_outputs import repair_feedback
             current={**context,'format_repair':repair_feedback(raw,problem,repair_instruction)}
         raise AssertionError('Bounded structured request')
@@ -713,7 +721,19 @@ class AutonomousResearch:
                 if sc_context['scientific_acceptance'].get('analysis_review_policy'):
                     def validator(raw):
                         return sc_acceptance.parse_analysis_review(raw,sc_context)
-                review=await self.structured('SC',sc_context,profile,relay,folder,validator)
+                try:
+                    review=await self.structured('SC',sc_context,profile,relay,folder,validator)
+                except (ValueError, KeyError, TypeError) as error:
+                    # Preserve previous verdicts in their original episodes. A malformed
+                    # current assessment must not present an older verdict as the latest.
+                    for key in ('scientific_acceptance', 'host_review', 'sc_revision', 'last_review'):
+                        progress.pop(key, None)
+                    progress["review_evidence_error"] = {
+                        "code": "invalid_review_response", "episode": index,
+                        "message": "The current review did not pass response validation.",
+                        "validation_error": str(error)[:500],
+                    }
+                    raise
                 progress.pop('review_evidence_error',None)
                 write_json(folder/'review.json',review)
                 acceptance=sc_acceptance.record(folder,review,sc_context,goal_root=self.store.root)

@@ -112,6 +112,10 @@ def mcp_input_schema(tool):
             "List exact IDs for all evidenced steps; never include titles or descriptions. "
             "One artifact can support multiple steps. Omit unfinished steps and use [] only if none are complete."
         )
+        pending = metadata.get("pending_steps")
+        if pending:
+            field["description"] += " Pending steps: " + ", ".join(f"{key} ({title})" for key, title in pending)
+            field["description"] += ". Claim each one whose evidence you inspected or produced."
         if steps:
             field.setdefault("items", {})["enum"] = list(steps)
         else:

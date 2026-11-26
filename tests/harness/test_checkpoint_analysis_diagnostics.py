@@ -269,3 +269,24 @@ def test_checkpoint_budget_rejection_does_not_replace_the_fixable_error(tmp_path
         ])
     assert feedback_state(events, tmp_path)["pending"][0]["error"] == "Missing signed evidence for compute."
     assert "Checkpoint allowance" in feedback_state(events[-2:], tmp_path)["pending"][0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_next_analysis_step_carries_only_unchanged_report_for_same_computation(research):
+    service, receipt = research
+    saved = await service.submit_research_checkpoint(**request(artifacts=["report.md", receipt["path"]]))
+    step = service.plan["steps"][0]
+    step.update(status="completed", evidence=saved["artifacts"])
+
+    async def submit(*paths):
+        return await service.submit_research_checkpoint(**request(["report"], list(paths)))
+
+    result = await submit(receipt["path"])
+    assert [r["path"] for r in result["artifacts"]] == [receipt["path"], "report.md"]
+    assert service.checkpoint["carried_report"] == "report.md"
+    assert service.checkpoint["completed_steps"] == ["report"]
+    assert [r["path"] for r in (await submit("input.fasta"))["artifacts"]] == ["input.fasta"]
+    (service.workspace / "next.md").write_text("A revised report.")
+    assert [r["path"] for r in (await submit("next.md", receipt["path"]))["artifacts"]] == ["next.md", receipt["path"]]
+    (service.workspace / "report.md").write_text("Modified since the accepted step.")
+    assert [r["path"] for r in (await submit(receipt["path"]))["artifacts"]] == [receipt["path"]]

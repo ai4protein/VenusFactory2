@@ -42,7 +42,7 @@ def schema():
     ids = {"type": "array", "maxItems": 64, "uniqueItems": True, "items": identity}
     claim = object_schema({
         "id": {**identity, "description": "A local identifier for this claim, referenced by step_assessments.claim_ids."},
-        "task_id": task,
+        "task_id": dict(task),
         "result_pointer": {"type": "string", "maxLength": 1000,
                            "description": "Copy an actual scalar result_fields[].pointer from the cited computation; do not rename fields."},
         "report_path": {"type": "string", "minLength": 1, "maxLength": 1000},
@@ -57,10 +57,11 @@ def schema():
         "reason": text, "claim_ids": ids,
     })
     inputs = object_schema({
-        "task_id": task,
+        "task_id": dict(task),
         "kind": {"enum": ["registered_input", "derived_input", "new_subject", "unverified"]},
         "addresses_objective": {"type": "boolean"}, "reason": text,
-        "source_task_ids": {"type": "array", "maxItems": 12, "uniqueItems": True, "items": task},
+        "source_task_ids": {"type": "array", "maxItems": 12, "uniqueItems": True, "items": dict(task),
+                            "description": "Use [] for registered_input, new_subject or unverified. Only derived_input lists upstream task IDs."},
     })
     return object_schema({
         "decision": {"enum": ["ready_for_host_validation", "needs_revision"]},
@@ -118,13 +119,20 @@ def review_targets(context):
     task_ids = list(dict.fromkeys(row["task_id"] for row in index.get("computations", [])
                                  if row.get("status") == "verified" and
                                  isinstance(row.get("task_id"), str) and re.fullmatch(r"[a-f0-9]{32}", row["task_id"])))
+    current_artifacts = {(r.get("path"), r.get("sha256")) for r in checkpoint.get("artifacts", [])}
+    cited_ids = [
+        row["task_id"] for row in index.get("computations", [])
+        if row.get("task_id") in task_ids and row.get("status") == "verified" and row.get("artifact")
+        and (row["artifact"].get("path"), row["artifact"].get("sha256")) in current_artifacts
+    ]
     return {
+        "checkpoint_task_ids": list(dict.fromkeys(cited_ids)),
         "completed_step_ids": completed[:24],
         "completed_step_ids_omitted": max(0, len(completed) - 24),
         "unclaimed_plan_step_ids": [identity for identity in plan_ids if identity not in completed][:24],
         "computation_task_ids": task_ids[:64],
         "computation_task_ids_omitted": max(0, len(task_ids) - 64),
-        "instruction": "Assess only completed_step_ids. Claims cite computation_task_ids, not step IDs. "
+        "instruction": "Assess only completed_step_ids. Use checkpoint_task_ids for the submitted measurements when present. Earlier computations can establish input history. "
                        "input_assessments must match distinct claims.task_id: one entry per task, not per claim; "
                        "source_task_ids alone need no separate entry. These IDs do not establish scientific validity. "
                        "needs_revision may leave both claims and input_assessments empty, but must still "

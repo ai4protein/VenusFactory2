@@ -249,8 +249,14 @@ class ResearchWorkspace:
         saved=[]
         for name in artifacts:
             data=read_bytes(self.workspace,name);saved.append({'path':name,'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)})
+        from .research_analysis_history import previous_report
+        carried = previous_report(self.workspace, self.plan, saved, self.registered_inputs) if completed_steps else None
+        if carried:
+            saved.append(carried)
         checkpoint={'summary':summary[:6000],'completed_steps':completed_steps,'artifacts':saved,'needs_input':needs_input}
         from .research_analysis_evidence import checkpoint_diagnostic
+        if carried:
+            checkpoint['carried_report'] = carried['path']
         diagnostic = checkpoint_diagnostic(self, checkpoint)
         if completed_steps and not artifacts and diagnostic is None:
             raise ValueError('Completed steps require existing artifact filenames. '
@@ -380,7 +386,21 @@ class ResearchWorkspace:
 
         from mcp_tools.tools.capability_policy import guard_tool
         from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
-        return self.workspace_tools() + [guard_tool(StructuredTool.from_function(coroutine=getattr(self,name),name=name,metadata={"workspace_relative_paths": True, "discovery_category": "training", **({"plan_step_ids": [step["id"] for step in self.plan["steps"]]} if name == "submit_research_checkpoint" else {})})) for name in RESEARCH_TOOLS if is_tool_allowed(name)]
+        tools = self.workspace_tools()
+        for name in RESEARCH_TOOLS:
+            if not is_tool_allowed(name):
+                continue
+            metadata = {"workspace_relative_paths": True, "discovery_category": "training"}
+            if name == "submit_research_checkpoint":
+                steps = self.plan["steps"]
+                metadata["plan_step_ids"] = [step["id"] for step in steps]
+                metadata["pending_steps"] = [
+                    (step["id"], step.get("title", "")[:150])
+                    for step in steps if step.get("status") != "completed"
+                ]
+            tool = StructuredTool.from_function(coroutine=getattr(self, name), name=name, metadata=metadata)
+            tools.append(guard_tool(tool))
+        return tools
 
 def log_tail(path, limit=10000):
     with Path(path).open('rb') as f:

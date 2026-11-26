@@ -226,6 +226,16 @@ def validate_output(raw, spec):
     except ValidationError as exc:
         from .study_review_state import POLICY, request_pair_diagnostic
         location = list(exc.absolute_path)
+        if location[:1] == ["step_assessments"] and exc.validator in {"enum", "minItems", "maxItems"}:
+            field = spec["schema"]["properties"]["step_assessments"]
+            expected = field["items"]["properties"]["step_id"].get("enum", [])
+            supplied = parsed.get("step_assessments")
+            if expected and isinstance(supplied, list):
+                missing = [key for key in expected if not any(
+                    isinstance(row, dict) and row.get("step_id") == key for row in supplied)]
+                if missing:
+                    raise RoleOutputError("Missing step_ids: " + json.dumps(missing) +
+                                          ". Assess each checkpoint step once.", raw) from exc
         if (spec.get("study_review_policy") == POLICY and exc.validator == "anyOf"
                 and len(location) == 2 and location[0] == "revision_requests"):
             diagnostic = request_pair_diagnostic(exc.instance)
