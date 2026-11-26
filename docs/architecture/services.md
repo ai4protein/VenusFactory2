@@ -96,7 +96,7 @@ python scripts/serve.py --mode online --check
 ```
 
 Local and online use the same `frontend/dist` by default. Only policy differs:
-online quota, 10 MB uploads, free models, restricted Scientist budget, ESM2 8M
+online quota, 10 MB uploads, free models, local-only Scientist execution, ESM2 8M
 training and disabled expensive tools. Explicit legacy path overrides in `.env`
 are respected: check effective paths with `--check` and never point two modes at
 the same session/queue/database directories. Reverse-proxy only the API; keep MCP

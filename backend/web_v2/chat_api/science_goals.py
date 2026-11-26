@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from backend.web_v2.chat_api._hooks_runtime import _get_lock, _session_store
 from backend.web_v2.chat_api._shared import _assert_session_access, _get_session_or_404, _redact_obj, _runtime_mode
 from backend.web_v2.science_goals import GoalConflict, service
-from backend.web_v2.online_access import SCIENCE_LIMITS, AccessStore, identities, admit
+from backend.web_v2.online_access import AccessStore, require_local_scientist
 from backend.web_v2.job_access import require_same_origin
 
 router = APIRouter()
@@ -64,13 +64,7 @@ async def call(fn, *args):
 @router.get("/science-goals/catalog")
 async def catalog(response: Response, view: Literal["full", "composer"] = "full"):
     response.headers["Cache-Control"] = "no-store"
-    data = await call(service.catalog) if view == "full" else await call(service.catalog, False)
-    if _runtime_mode() != "local":
-        data.update(default_budget=SCIENCE_LIMITS, maximum_budget=SCIENCE_LIMITS, online_limited=True)
-        data["drivers"] = [d for d in data["drivers"] if d["id"] == "autonomous_research.v1"]
-        data["available"] = bool(data["available"] and data["drivers"])
-        for d in data["drivers"]: d["maximum_budget"] = SCIENCE_LIMITS
-    return data
+    return await call(service.catalog, view == "full")
 
 
 @router.get("/sessions/{session_id}/science-goals")
@@ -93,6 +87,7 @@ async def generated_steps(session_id: str, case: str, request: Request, response
 @router.post("/sessions/{session_id}/science-goals/uploads")
 async def upload_research_inputs(session_id: str, request: Request, files: list[UploadFile] = File(...)):
     await access(session_id, request)
+    require_local_scientist()
     from backend.web_v2.research_files import save_inputs, MAX_BATCH
     from backend.web_v2.upload_limits import read_upload, preflight_uploads, upload_limit
     try:
@@ -114,30 +109,14 @@ async def upload_research_inputs(session_id: str, request: Request, files: list[
 @router.post("/sessions/{session_id}/science-goals")
 async def create_goal(session_id: str, payload: CreateGoal, request: Request):
     await access(session_id, request)
-    if _runtime_mode() != "local":
-        if payload.driver != "autonomous_research.v1" or payload.parameters:
-            raise HTTPException(400, "Online Scientist supports autonomous research only")
-        if any(payload.budget.model_dump()[k] > v for k,v in SCIENCE_LIMITS.items()):
-            raise HTTPException(400, "Online Scientist allows 2 iterations and 15 minutes")
+    require_local_scientist()
     lock = await _get_lock(session_id)
     if lock.locked():
         raise HTTPException(409, "This session is running a conversation turn.")
     async with lock:
         state = await access(session_id, request)
-        from functools import partial
-        def before_start():
-            if _runtime_mode() == "local": return
-            store = AccessStore()
-            scope = "chat:" + session_id
-            store.science_slot(scope, *identities(request))
-            try: admit(request, scope, "scientist")
-            except BaseException:
-                store.release_science(scope)
-                raise
-        creator = service.create if _runtime_mode() == "local" else partial(
-            service.create, before_start=before_start, online_owner=identities(request)[0])
         result = await call(
-            creator,
+            service.create,
             session_id,
             payload.model_dump(exclude={"request_id"}, exclude_none=True),
             payload.request_id,
@@ -165,6 +144,7 @@ class ResearchInput(BaseModel):
 @router.post("/sessions/{session_id}/science-goals/{goal_id}/input")
 async def provide_input(session_id: str, goal_id: str, payload: ResearchInput, request: Request):
     await access(session_id, request)
+    require_local_scientist()
     lock = await _get_lock(session_id)
     if lock.locked():
         raise HTTPException(409, "This session is busy.")
@@ -177,16 +157,13 @@ async def control_goal(
     session_id: str, goal_id: str, action: Literal["pause", "resume", "cancel", "publish"], request: Request
 ):
     await access(session_id, request)
+    if action == "resume":
+        require_local_scientist()
     lock = await _get_lock(session_id)
     if lock.locked():
         raise HTTPException(409, "This session is busy; retry after the current operation.")
     async with lock:
         await access(session_id, request)
-        if _runtime_mode() != "local" and action == "resume":
-            goal = await call(service.public, session_id, goal_id)
-            if goal["driver"] != "autonomous_research.v1" or any(goal["budget"].get(k, v+1) > v for k,v in SCIENCE_LIMITS.items()):
-                raise HTTPException(403, "This study exceeds online run limits")
-            AccessStore().science_slot("chat:" + session_id, *identities(request))
         return await call(service.control, session_id, goal_id, action)
 
 

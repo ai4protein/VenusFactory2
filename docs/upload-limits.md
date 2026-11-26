@@ -11,6 +11,6 @@ The shared `web_v2.upload_limits` policy covers chat attachments, Scientist inpu
 
 The browser validates file sizes before transfer. The server independently counts bytes and returns HTTP 413 for an oversized online upload; it never saves a truncated file. Failed replacements preserve the previous file.
 
-Scientist retains its existing 32-file count limit and online 80 MB batch budget. Local mode does not impose the old 20 MB single-file or 80 MB batch limits. File formats, sequence validity, job budgets and online ESM2-8M training restrictions are unchanged.
+Scientist accepts up to 32 files per batch on local deployments, with no application-level size limit. Scientist runs are available only in local mode.
 
 Reverse-proxy body limits are separate deployment settings. A local reverse proxy must not impose a body-size ceiling if unrestricted local uploads are needed. For online multipart requests, the proxy must allow multiple valid files plus multipart overhead; a 10 MB total-request ceiling would incorrectly reject batches of smaller files.

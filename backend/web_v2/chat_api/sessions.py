@@ -32,6 +32,8 @@ from backend.web_v2.chat_api._shared import (
 from backend.web_v2.science_goals import service as goal_service
 from backend.web_v2.chat_history import include_research_content
 
+from backend.web_v2.online_access import require_local_scientist
+
 router = APIRouter()
 
 
@@ -50,10 +52,13 @@ def visible_run_status(session_id, status, queue=None):
 @router.post("/sessions", response_model=CreateSessionResponse)
 async def create_session(request: Request, payload: CreateSessionRequest | None = None):
     _record_access_event(request, "/api/chat/sessions:create")
+    chat_mode = (payload or CreateSessionRequest()).chat_mode
+    if chat_mode == "science_expert":
+        require_local_scientist()
     from backend.web_v2.online_access import check_new_conversation
     await asyncio.to_thread(check_new_conversation, request)
     state = initialize_session_state()
-    state["chat_mode"] = (payload or CreateSessionRequest()).chat_mode
+    state["chat_mode"] = chat_mode
     token, token_expires_at = _issue_session_access_token(state, request)
     state["client_ip"] = _extract_client_ip(request)
     state["owner_key"] = _session_owner_key_for_request(request)

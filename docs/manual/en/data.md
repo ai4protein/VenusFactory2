@@ -29,8 +29,7 @@ For example:
 > Retrieve caffeine from PubChem, including its SMILES and molecular properties.
 
 These database queries do not need a language-model or search-provider key of their own.
-They work in local and online modes when enabled in Administration. Agent and Scientist
-can discover them by task. Researcher uses the same Europe PMC tool for literature;
+They work in local and online modes when enabled in Administration. Agent can discover them by task. Scientist can also use them on local deployments. Researcher uses the same Europe PMC tool for literature;
 when UniProt gives an unambiguous Ensembl gene mapping it also collects gene annotations,
 and for human proteins adds relevant Open Targets associations and drug candidates.
 

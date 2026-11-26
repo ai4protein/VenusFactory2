@@ -20,7 +20,7 @@ import { QuotaNotice } from "../components/QuotaNotice";
 import { openQuota, QUOTA_CHANGED, QUOTA_STORAGE_KEY, quotaRetryLabel, isDailyQuotaMessage } from "../lib/onlineQuota";
 import { SidebarContent, useSidebar } from "../components/AppSidebar";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { chatSessionLocation, chatRouteKey } from "../lib/chatSessionRoute";
 import { ResearcherPanel, type ResearcherPanelHandle } from "../components/ResearcherPanel";
 import "../researcher.css";
@@ -94,12 +94,25 @@ type OpenAIStyleModel = {
 };
 
 type ChatPageProps = {
-  workspaceEnabled?: boolean;
+  runtimeMode: "unknown" | "local" | "online";
 };
 
 const CUSTOM_MODELS_STORAGE_KEY = "vf2_custom_openai_style_models";
 
-export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
+export function ChatPage({ runtimeMode }: ChatPageProps) {
+  const { lang } = useLang();
+  const [params] = useSearchParams();
+  const { sessionId } = useParams();
+  if (!sessionId && params.get("mode") === "scientist") {
+    if (runtimeMode === "unknown") return <PageLoading/>;
+    if (runtimeMode === "online") {
+      return <Navigate replace to={newChatLocation(lang, "science_agent", params.get("new") || crypto.randomUUID())} />;
+    }
+  }
+  return <ChatWorkspace workspaceEnabled={runtimeMode === "local"} />;
+}
+
+function ChatWorkspace({ workspaceEnabled }: { workspaceEnabled: boolean }) {
   const { lang, t: translate } = useLang();
   const t = translate(chatMessages);
   useDocumentMeta({ title: t.docTitle, description: t.docDescription });
@@ -1234,9 +1247,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           </div>
           <div className="timeline-column">
             <div className="timeline-wrap" ref={timelineRef} onScroll={e => { scrollPositions.current[`${sessionId}:${chatMode}`] = e.currentTarget.scrollTop; }}>
-            {isNewChat && <NewChatStart mode={routeMode} lang={lang} onChange={next => navigate(newChatLocation(lang, next, freshDraftId || crypto.randomUUID()), { replace: true })}/>}
+            {isNewChat && <NewChatStart scientistAvailable={workspaceEnabled} mode={routeMode} lang={lang} onChange={next => navigate(newChatLocation(lang, next, freshDraftId || crypto.randomUUID()), { replace: true })}/>}
             <ResearcherPanel onHistoryActivity={onHistoryActivity} ref={researcherPanelRef} freshDraftId={freshDraftId} onHistoryChange={setResearchReports} routeJobId={researcherMode ? routeSessionId : undefined} onJobChange={(id, replace = false) => { if (visibleModeRef.current === "researcher") syncSessionUrl(id, "researcher", replace); }} noticeTarget={noticeTarget} online={chatQuota?.mode === "online"} active={researcherMode} lang={lang} toolbarTarget={researchToolbar} composerTarget={scienceComposer} actionsTarget={scienceActions} footerTarget={scienceFooter} onRunning={setResearcherRunning}/>
-            <ScienceGoalPanel onHistoryActivity={onHistoryActivity} noticeTarget={noticeTarget} online={!isLocalMode} toolbarTarget={researchToolbar} composerTarget={scienceComposer} actionsTarget={scienceActions} footerTarget={scienceFooter} sessionId={chatMode === "science_expert" ? sessionId : scientistSessionId} draftRevision={scientistDraftRevision} science={!researcherMode && chatMode === "science_expert"} busy={running}
+            <ScienceGoalPanel onHistoryActivity={onHistoryActivity} noticeTarget={noticeTarget} readOnly={!workspaceEnabled} toolbarTarget={researchToolbar} composerTarget={scienceComposer} actionsTarget={scienceActions} footerTarget={scienceFooter} sessionId={chatMode === "science_expert" ? sessionId : scientistSessionId} draftRevision={scientistDraftRevision} science={!researcherMode && chatMode === "science_expert"} busy={running}
               ensureSession={ensureGoalSession} onRunning={setGoalRunning}
               onGoalStatus={(sid, status) => setGoalStatuses(previous => previous[sid] === status ? previous : { ...previous, [sid]: status })}
               onChanged={async (sid) => { if (visibleModeRef.current !== "researcher" && activeModeRef.current === "science_expert" && sid === scientistSessionId) void refreshCurrentSession(sid, { syncComposer: false }); await fetchSessions(); }} />
@@ -1270,7 +1283,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             )}
             </div>
           </div>
-          <div className="composer" ref={setComposerElement} data-science={!researcherMode && chatMode === "science_expert"}>
+          {(researcherMode || chatMode === "science_agent" || workspaceEnabled) && <div className="composer" ref={setComposerElement} data-science={!researcherMode && chatMode === "science_expert"}>
             <div className="scientist-composer-input" ref={setScienceComposer} />
             {!researcherMode && chatMode === "science_agent" && (<div className="composer-textarea-wrap">
               <textarea
@@ -1384,7 +1397,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 workspaceSuffix={t.workspaceSuffix} onRemoveFile={index => setFiles(previous => previous.filter((_, i) => i !== index))}
                 onRemoveWorkspaceFile={id => setWorkspaceFiles(previous => previous.filter(file => file.id !== id))} />
             )}
-          </div>
+          </div>}
         </section>
 
         {researcherMode && <div className="chat-file-actions">{quotaPill}</div>}

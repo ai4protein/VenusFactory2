@@ -38,6 +38,8 @@ from backend.web_v2.chat_api._stream_kimi import (
 )
 from backend.web_v2.chat_api._stream_resume import _stream_graph_resume
 
+from backend.web_v2.online_access import require_local_scientist
+
 router = APIRouter()
 _logger = get_logger("chat_api.interactive")
 
@@ -48,6 +50,7 @@ _APPROVE_LABELS = frozenset({
 
 
 def _require_expert_session(state: dict) -> None:
+    require_local_scientist()
     if _is_agent_session(state):
         raise HTTPException(
             status_code=400,
@@ -194,6 +197,7 @@ async def stream_clarification_response(
     _record_access_event(request, "/api/chat/sessions/{id}/clarification/respond/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
+    require_local_scientist()
     await _set_cancel(session_id, False)
 
     if _is_agent_session(state) or state.get("waiting_for") in ("kimi_question", "kimi_approval"):
@@ -325,8 +329,8 @@ async def stream_plan_confirmation(
     _record_access_event(request, "/api/chat/sessions/{id}/plan/confirm/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
-    await _set_cancel(session_id, False)
     _require_expert_session(state)
+    await _set_cancel(session_id, False)
 
     if state.get("waiting_for") != "plan_confirmation" and state.get("status") != "waiting_for_plan_confirmation":
         raise HTTPException(status_code=400, detail="Session is not waiting for plan confirmation.")
@@ -437,8 +441,8 @@ async def stream_step_decide(
     _record_access_event(request, "/api/chat/sessions/{id}/step/decide/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
-    await _set_cancel(session_id, False)
     _require_expert_session(state)
+    await _set_cancel(session_id, False)
 
     if state.get("waiting_for") != "step_review" and state.get("status") != "waiting_for_step_review":
         raise HTTPException(status_code=400, detail="Session is not waiting for step review.")
@@ -481,8 +485,8 @@ async def stream_sub_report_decide(
     _record_access_event(request, "/api/chat/sessions/{id}/sub-report/decide/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
-    await _set_cancel(session_id, False)
     _require_expert_session(state)
+    await _set_cancel(session_id, False)
 
     if state.get("waiting_for") != "sub_report_review" and state.get("status") != "waiting_for_sub_report_review":
         raise HTTPException(status_code=400, detail="Session is not waiting for sub-report review.")

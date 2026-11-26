@@ -24,7 +24,7 @@ measurements and papers.
 | Mode | Example request | What you get |
 | --- | --- | --- |
 | **Agent · Ask and analyse** | “Find homologues of this protein and explain its annotated domains.” | An answer supported by searches, tool results and downloadable files |
-| **Scientist · Develop and improve** | “Use my solubility measurements to develop and evaluate a predictor.” | A project with code, test and evaluation results, a report, and model artifacts when trained |
+| **Scientist · Develop and improve (local only)** | “Use my solubility measurements to develop and evaluate a predictor.” | A project with code, test and evaluation results, a report, and model artifacts when trained |
 | **Researcher · Investigate a protein** | “Investigate this enzyme, focusing on substrate specificity and engineering opportunities.” | A multi-section report combining literature, protein information and predictions |
 
 To explore first, use Agent's suggested questions or open a **completed example**

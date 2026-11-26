@@ -178,6 +178,7 @@ def api_client(service, monkeypatch, tmp_path):
 
     monkeypatch.setenv("VENUSFACTORY_SESSION_DB_PATH", str(tmp_path / "sessions.sqlite"))
     api = importlib.import_module('backend.web_v2.chat_api.science_goals')
+    interactive = importlib.import_module('backend.web_v2.chat_api.interactive')
     shared = importlib.import_module('backend.web_v2.chat_api._shared')
     sessions = importlib.import_module('backend.web_v2.chat_api.sessions')
     messages = importlib.import_module('backend.web_v2.chat_api.messages')
@@ -205,14 +206,14 @@ def api_client(service, monkeypatch, tmp_path):
     monkeypatch.setattr(shared, "_runtime_mode", lambda: "online")
     monkeypatch.setattr(shared, "_session_owner_key_for_request", lambda req: "owner")
     monkeypatch.setattr(shared, "_build_owner_fingerprint", lambda req: "owner")
-    for module in [api, sessions, messages]:
+    for module in [api, sessions, messages, interactive]:
         monkeypatch.setattr(module, "_get_session_or_404", get)
     monkeypatch.setattr(api, "_session_store", Store())
     monkeypatch.setattr(sessions, "_session_store", Store())
     monkeypatch.setattr(sessions, "goal_service", service)
     monkeypatch.setattr(messages, "goal_service", service)
     app = FastAPI()
-    for router in [api.router, sessions.router, messages.router]:
+    for router in [api.router, sessions.router, messages.router, interactive.router]:
         app.include_router(router, prefix="/api/chat")
     with TestClient(app) as client:
         yield client, api, state
@@ -245,14 +246,33 @@ def test_api_online_restrictions_and_untrusted_fields_are_rejected(api_client, s
     url = "/api/chat/sessions/web-owner/science-goals"
     payload = {**request(), "request_id": "api-request-02", "command": "arbitrary shell"}
     assert client.post(url, json=payload).status_code == 422
-    monkeypatch.setattr(api, "_runtime_mode", lambda: "online")
+    from backend.web_v2 import online_access
+    monkeypatch.setattr(online_access, "online", lambda: True)
     catalog = client.get("/api/chat/science-goals/catalog").json()
-    assert catalog["available"] is False  # Fixture driver is not online-admitted.
-    assert catalog["maximum_budget"]["max_cycles"] == 2
-    assert catalog["maximum_budget"]["wall_seconds"] == 900
+    assert catalog["available"] is False and catalog["reason"] == "local_only"
+    assert catalog["drivers"] == [] and catalog["execution"]["combinations"] == []
     payload.pop("command")
-    assert client.post(url, json=payload).status_code == 400
+    assert client.post(url, json=payload).status_code == 403
+    assert client.post(url + "/existing/input", json={"text": "Update the plan"}).status_code == 403
+    assert client.post(url + "/existing/resume").status_code == 403
+    assert client.post(url + "/uploads", files={"files": ("note.txt", b"hello")}).status_code == 403
+    assert client.get(url).status_code == 200
     assert not service.children
+
+
+@pytest.mark.parametrize("checkpoint", [
+    "clarification/respond/stream", "plan/confirm/stream", "iteration/decide",
+    "step/decide/stream", "sub-report/decide/stream",
+])
+def test_online_legacy_checkpoints_do_not_resume_research(api_client, monkeypatch, checkpoint):
+    from backend.web_v2 import online_access
+    client, _, state = api_client
+    monkeypatch.setattr(online_access, "online", lambda: True)
+    state["chat_mode"] = "science_expert"
+    client.headers["x-session-access-token"] = "valid-test-token"
+    response = client.post(f"/api/chat/sessions/web-owner/{checkpoint}", json={})
+    assert response.status_code == 403
+    assert state["history"] == []
 
 
 def test_selected_profile_is_frozen_across_catalog_change_and_resume(service, tmp_path, monkeypatch):

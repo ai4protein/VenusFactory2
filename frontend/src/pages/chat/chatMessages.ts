@@ -60,7 +60,7 @@ export const chatMessages = {
     checkpointIteration: "Next step",
     composerPlaceholder: "Ask anything about AI protein engineering...",
     quotaPillTitle: (remaining: number, limit: number) =>
-      `${remaining} of ${limit} new conversations left today, shared by Agent, Scientist and Researcher. Follow-ups and retries do not use another conversation.`,
+      `${remaining} of ${limit} new conversations left today, shared by Agent and Researcher. Follow-ups and retries do not use another conversation.`,
     quotaPillLabel: (remaining: number, limit: number) => `${remaining} left / ${limit}`,
     quotaPillExhausted: (used: number, limit: number) => `${used}/${limit} used`,
     modelAria: "Model",
@@ -144,7 +144,7 @@ export const chatMessages = {
     checkpointIteration: "下一步",
     composerPlaceholder: "随时提问 AI 蛋白质工程相关的任何问题……",
     quotaPillTitle: (remaining: number, limit: number) =>
-      `今日还可开启 ${remaining}/${limit} 个新对话，三个模式共享；补充消息和重试不重复占用。`,
+      `今日还可开启 ${remaining}/${limit} 个新对话，Agent 和 Researcher 共享；补充消息和重试不重复占用。`,
     quotaPillLabel: (remaining: number, limit: number) => `剩余 ${remaining}/${limit}`,
     quotaPillExhausted: (used: number, limit: number) => `已用 ${used}/${limit}`,
     modelAria: "模型",

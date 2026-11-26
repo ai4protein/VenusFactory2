@@ -267,9 +267,7 @@ def test_real_mode_routes_share_admission_and_retries(tmp_path,store,monkeypatch
     monkeypatch.setattr(science_goals,'_get_session_or_404',state)
     monkeypatch.setattr(science_goals,'_assert_session_access',lambda *_:None)
     monkeypatch.setattr(science_goals,'_session_store',SimpleNamespace(save=noop))
-    def create_goal(sid,spec,rid,*,before_start,online_owner):
-        before_start();return {'id':rid,'status':'active'}
-    monkeypatch.setattr(science_goals.service,'create',create_goal)
+    monkeypatch.setattr(science_goals.service,'create',lambda *_: pytest.fail('Online Scientist must be refused before job creation'))
     monkeypatch.setenv('VENUS_REPORT_ROOT',str(tmp_path/'reports'))
     monkeypatch.setenv('VENUS_JOB_QUEUE_ROOT',str(tmp_path/'queue'))
     monkeypatch.setattr(research_jobs,'model_option',lambda *_:None)
@@ -281,34 +279,41 @@ def test_real_mode_routes_share_admission_and_retries(tmp_path,store,monkeypatch
     app.include_router(messages.router,prefix='/api/chat');app.include_router(science_goals.router,prefix='/api/chat');app.include_router(sessions.router,prefix='/api/chat');app.include_router(report_api.router)
     client=TestClient(app)
     assert client.post('/api/chat/sessions/agent-one/messages/stream',json={'text':'Explain this protein'}).status_code==200
-    assert client.post('/api/chat/sessions/science-one/science-goals',json={'request_id':'goal-12345','objective':'Analyze my protein','budget':online_access.SCIENCE_LIMITS}).status_code==200
+    assert client.post('/api/chat/sessions/science-one/science-goals',json={'request_id':'goal-12345','objective':'Analyze my protein'}).status_code==403
+    assert client.post('/api/chat/sessions',json={'chat_mode':'science_expert'}).status_code==403
     report={'request_id':'report-12345','model_id':'free','reviewer_model_id':'dmx-glm4-free','accession':'P69905','analyses':['properties']}
     created=client.post('/api/report/jobs',json=report)
     assert created.status_code==202,created.text
     again=client.post('/api/report/generate',json=report)
     assert again.status_code==202 and again.json()['id']==created.json()['id']
-    exceeded=client.post('/api/chat/sessions/agent-two/messages/stream',json={'text':'A new protein'})
+    assert client.post('/api/chat/sessions/agent-two/messages/stream',json={'text':'A new protein'}).status_code==200
+    exceeded=client.post('/api/chat/sessions/agent-three/messages/stream',json={'text':'Another protein'})
     assert exceeded.status_code==429 and exceeded.json()['detail']['code']=='CHAT_DAILY_LIMIT_REACHED'
     assert client.post('/api/chat/sessions/agent-one/messages/retry/stream',json={}).status_code==200
     assert client.post('/api/report/jobs',json={**report,'request_id':'report-67890'}).status_code==429
     assert client.post('/api/report/generate/stream',json={**report,'request_id':'report-stream'}).status_code==429
     assert client.post('/api/chat/sessions',json={}).status_code==429
-    assert client.post('/api/chat/sessions/legacy/messages/stream',json={'text':'Bypass','chat_mode':'science_expert'}).status_code==409
+    assert client.post('/api/chat/sessions/legacy/messages/stream',json={'text':'Bypass','chat_mode':'science_expert'}).status_code==403
 
 
-def test_scientist_server_budget_rejects_unbounded_specs(tmp_path,monkeypatch):
+def test_online_service_rejects_scientist_before_state_or_execution(tmp_path,monkeypatch):
     from backend.web_v2 import online_access
     from backend.web_v2.science_goals import ScienceGoalService
     monkeypatch.setattr(online_access,'online',lambda:True)
     service=ScienceGoalService(state_root=tmp_path/'goals')
-    base=dict(driver='autonomous_research.v1',parameters={},objective='Train a protein model',budget=dict(online_access.SCIENCE_LIMITS))
-    with pytest.raises(ValueError):service.create('s',{**base,'driver':'paper_campaign.v1'},'request-1234')
-    for key in online_access.SCIENCE_LIMITS:
-        with pytest.raises(ValueError):service.create('s',{**base,'budget':{**base['budget'],key:base['budget'][key]+1}},'request-1234')
+    for operation, args in (
+        (service.create, ('session', {}, 'request-1234')),
+        (service.spawn, (tmp_path / "historical-goal", None, "resume")),
+        (service.control, ('session', 'old-goal', 'resume')),
+        (service.provide_input, ('session', 'old-goal', 'Continue')),
+    ):
+        with pytest.raises(HTTPException) as error:
+            operation(*args)
+        assert error.value.status_code == 403
     assert not (tmp_path/'goals').exists()
 
 
-def test_online_scientist_can_train_small_cpu_model_in_queue(tmp_path,monkeypatch):
+def test_online_sandbox_limits_small_cpu_model_in_queue(tmp_path,monkeypatch):
     import asyncio, json, shutil
     from pathlib import Path
     if not shutil.which('bwrap'):pytest.skip('Bubblewrap is required on the research host')

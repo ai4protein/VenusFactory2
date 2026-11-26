@@ -53,6 +53,40 @@ def test_concurrent_submit_is_idempotent_and_conflicts_are_rejected(q):
     with pytest.raises(SubmissionConflict):enqueue(q,key='other-request')
 
 
+@pytest.mark.parametrize(('worker_mode', 'job_mode', 'kind', 'expected'), [
+    ('online', 'online', 'scientist', 'cancelled'),
+    ('online', 'local', 'scientist', 'cancelled'),
+    ('local', 'online', 'scientist', 'cancelled'),
+    ('local', 'local', 'scientist', 'completed'),
+    ('online', 'online', 'researcher', 'completed'),
+])
+def test_worker_applies_mode_to_persisted_jobs(q, tmp_path, monkeypatch, worker_mode, job_mode, kind, expected):
+    import config
+    from backend.web_v2.worker_pool import execute
+    from backend.web_v2.online_access import AccessStore
+
+    monkeypatch.setenv('WEBUI_V2_MODE', worker_mode)
+    monkeypatch.setattr(config, '_config', None)
+    released = []
+    monkeypatch.setattr(AccessStore, 'release_science', lambda self, scope: released.append(scope))
+    monkeypatch.setenv('VENUS_ACCESS_DB', str(tmp_path / 'access.sqlite3'))
+    marker = tmp_path / 'executed'
+    spec = {
+        'command': [sys.executable, '-c', 'from pathlib import Path; import sys; Path(sys.argv[1]).touch()', str(marker)],
+        'cwd': str(tmp_path), 'timeout': 30, 'environment': {'WEBUI_V2_MODE': job_mode},
+        'credential_refs': [],
+    }
+    metadata = {'quota_scope': 'chat:old-goal'} if kind == 'scientist' and job_mode == 'online' else {}
+    identity, _ = q.enqueue('owner', kind, 'research', spec, 'previous-version', metadata=metadata)
+    execute(q, q.claim_next('previous-version', 'research'))
+    row = q.get(identity)
+    assert row['status'] == expected
+    assert marker.exists() == (expected == 'completed')
+    if expected == 'cancelled':
+        assert 'local' in row['message']
+    assert released == (['chat:old-goal'] if metadata else [])
+
+
 def test_queued_commands_are_not_orphaned_or_bound_to_waiter_processes(q):
     identity,_=enqueue(q)
     with q.connection(True) as c:c.execute('UPDATE jobs SET created=created-900 WHERE id=?',(identity,))

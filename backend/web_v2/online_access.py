@@ -22,12 +22,17 @@ from backend.web_v2.http_security import client_ip, secure_request
 COOKIE = 'vf_online_visitor'
 ADMIN_COOKIE = 'vf_admin_session'
 CONTACT = 'tanyang.august@sjtu.edu.cn'
-SCIENCE_LIMITS = dict(max_cycles=2, model_calls=48, tool_calls=24, wall_seconds=900)
+SCIENTIST_LOCAL_ONLY = "Scientist runs are available only in local deployments."
 
 
 def online():
     from config import get_config
     return get_config().server.is_online
+
+
+def require_local_scientist():
+    if online():
+        raise HTTPException(403, SCIENTIST_LOCAL_ONLY)
 
 
 def fingerprint(value):

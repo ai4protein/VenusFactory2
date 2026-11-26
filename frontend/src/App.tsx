@@ -171,7 +171,7 @@ function LocalizedApp() {
   if (isLanding) {
     return (
       <Routes>
-        <Route path="" element={<HomePage />} />
+        <Route path="" element={<HomePage scientistAvailable={localFeaturesEnabled} />} />
       </Routes>
     );
   }
@@ -189,7 +189,7 @@ function LocalizedApp() {
           <Route path="chat" element={<LangNavigate to="/agent/chat" replace />} />
           <Route path="agent" element={<AgentShellPage />}>
             <Route index element={<LangNavigate to="/agent/chat" replace />} />
-            <Route path="chat/:sessionId?" element={<ChatPage workspaceEnabled={workspaceEnabled} />} />
+            <Route path="chat/:sessionId?" element={<ChatPage runtimeMode={runtimeMode} />} />
             <Route path="workspace" element={<LangNavigate to="/library" replace />} />
           </Route>
           <Route path="library" element={runtimeMode === "online" ? <OnlineLibraryPage /> : <WorkspacePage workspaceEnabled={workspaceEnabled} />} />

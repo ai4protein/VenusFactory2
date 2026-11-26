@@ -137,9 +137,10 @@ const PUBLICATIONS = [
   }
 ];
 
-export function HomePage() {
+export function HomePage({ scientistAvailable }: { scientistAvailable: boolean }) {
   const { lang, t: translate } = useLang();
   const t = translate(COPY);
+  const localScientist = lang === "zh" ? "仅限本地部署" : "Available in local deployments";
   useDocumentMeta({ title: `VenusFactory2 — ${t.title}`, description: t.lede, keywords: "RSI, recursive self-improvement, protein engineering, AI agents, VenusFactory2, ProSST, VenusREM, VenusVaccine, ProtSolM, VenusX" });
   const modes = [
     { name: "Agent", title: t.agentTitle, lead: t.agentLead, mode: "agent", icon: "chat" },
@@ -180,9 +181,16 @@ export function HomePage() {
       </section>
       <section className="landing-modes landing-wrap" aria-labelledby="landing-modes-title">
         <div className="landing-section-heading"><div><p className="landing-eyebrow">{t.modeLabel}</p><h2 id="landing-modes-title">{t.modeTitle}</h2></div><span className="landing-section-index" aria-hidden="true">01 — 03</span></div>
-        <div className="landing-mode-grid">{modes.map((mode, i) => <LangLink key={mode.name} to={`/agent/chat?mode=${mode.mode}`} className={`landing-mode${mode.mode === "scientist" ? " is-scientist" : ""}`}>
-          <div className="landing-mode-top"><ModeIcon type={mode.icon} /><span>{mode.name}</span><span className="landing-mode-number">{mode.mode === "scientist" ? "RSI" : `0${i + 1}`}</span></div><h3>{mode.title}</h3><p>{mode.lead}</p><span className="landing-mode-open">{t.enter} {mode.name}<Arrow /></span>
-        </LangLink>)}</div>
+        <div className="landing-mode-grid">{modes.map((mode, i) => {
+          const localOnly = mode.mode === "scientist" && !scientistAvailable;
+          const content = <>
+            <div className="landing-mode-top"><ModeIcon type={mode.icon} /><span>{mode.name}</span><span className="landing-mode-number">{mode.mode === "scientist" ? "RSI" : `0${i + 1}`}</span></div>
+            <h3>{mode.title}</h3><p>{mode.lead}</p><span className="landing-mode-open">{localOnly ? localScientist : <>{t.enter} {mode.name}<Arrow /></>}</span>
+          </>;
+          const className = `landing-mode${mode.mode === "scientist" ? " is-scientist" : ""}`;
+          return localOnly ? <article key={mode.name} className={className} aria-disabled="true">{content}</article>
+            : <LangLink key={mode.name} to={`/agent/chat?mode=${mode.mode}`} className={className}>{content}</LangLink>;
+        })}</div>
       </section>
       <section className="landing-models landing-wrap" aria-labelledby="landing-models-title">
         <div><p className="landing-eyebrow">{t.modelLabel}</p><h2 id="landing-models-title">{t.modelTitle}</h2><p>{t.modelLead}</p><LangLink to="/models" className="landing-text-link">{t.browse}<Arrow /></LangLink></div>
@@ -191,7 +199,7 @@ export function HomePage() {
       <section className="landing-loop" aria-labelledby="landing-loop-title"><div className="landing-wrap">
         <div className="landing-loop-head"><div><p className="landing-eyebrow">{t.loopLabel}</p><h2 id="landing-loop-title">{t.loopTitle}</h2></div><p>{t.loopLead}</p></div>
         <ol className="landing-steps">{t.steps.map((step, i) => <li key={step}><span className="landing-step-number">0{i + 1}</span><h3>{step}</h3><p>{t.stepNotes[i]}</p></li>)}</ol>
-        <LangLink to="/agent/chat?mode=scientist" className="landing-text-link">{t.enter} Scientist<Arrow /></LangLink>
+        {scientistAvailable ? <LangLink to="/agent/chat?mode=scientist" className="landing-text-link">{t.enter} Scientist<Arrow /></LangLink> : <span>{localScientist}</span>}
       </div></section>
       <PublicationCarousel lang={lang} title={t.pubTitle} label={t.pubLabel} />
       <section className="landing-close landing-wrap"><div><h2>{t.closeTitle}</h2><p>{t.closeLead}</p></div><LangLink to="/agent/chat" className="landing-button">{t.start}<Arrow /></LangLink></section>

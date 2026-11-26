@@ -1,6 +1,6 @@
 # Scientist: start an RSI research topic
 
-Scientist is the platform's RSI workflow. Sending a research goal starts a topic that continues through planning, implementation, experiments, criticism and revision. The web interface shows this same process and its outputs.
+Scientist runs on local deployments and uses the platform's RSI workflow. Sending a research goal starts a topic that continues through planning, implementation, experiments, criticism and revision. The web interface shows this same process and its outputs.
 
 ## Bring a goal and your materials
 
@@ -36,7 +36,7 @@ reserve measured support examples for adapting to a new task. Upload genuinely
 unlabeled observations as a separate table with matching feature columns. The
 query measurements used for validation and final testing stay protected.
 
-Scientist can implement statistical models, custom neural models, few-shot adaptation, semi-supervised learning, meta-learning or other justified methods. It may use enabled training MCP tools or develop a custom model in the session sandbox. PLM training is not required; online PLM training is restricted to ESM2-8M and all work follows deployment budgets and tool availability.
+Scientist can implement statistical models, custom neural models, few-shot adaptation, semi-supervised learning, meta-learning or other justified methods. It may use enabled training MCP tools or develop a custom model in the session sandbox. The local deployment determines which training tools and resources are available.
 
 Model research requires a measured baseline and a revised experiment on matched validation data. The system can retain a baseline when a revision does not help. Advanced method names, repeated iterations or a better validation score alone do not establish novelty, statistical significance or biological effectiveness. Final testing and independent review are distinct from feedback used to revise a model.
 

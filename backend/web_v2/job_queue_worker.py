@@ -5,7 +5,7 @@ import signal
 import subprocess
 import sys
 import time
-from .job_queue import JobQueue, QueueCancelled, process_token, stop_process_tree, TERMINAL
+from .job_queue import JobQueue, QueueCancelled, check_execution_mode, process_token, stop_process_tree, TERMINAL
 
 def run(identity):
     q=JobQueue();q.bind(identity)
@@ -26,6 +26,7 @@ def run(identity):
     status,message,code='failed','Worker stopped',None
     queued_at=time.monotonic()
     try:
+        check_execution_mode(row['kind'], spec.get('environment', {}))
         while not q.claim(identity):
             wait_limit=int(os.getenv("VENUS_QUEUE_WAIT_TIMEOUT","0"))
             if wait_limit and time.monotonic()-queued_at > wait_limit:raise TimeoutError("Queue waiting limit reached")
@@ -45,7 +46,7 @@ def run(identity):
             time.sleep(.25)
         code=proc.returncode
         status,message=('completed','Completed') if code==0 else ('failed','Process exited unsuccessfully')
-    except QueueCancelled:status,message='cancelled','Cancelled'
+    except QueueCancelled as exc:status,message='cancelled',str(exc)
     except TimeoutError as e:status,message='failed',str(e)
     finally:
         if proc:

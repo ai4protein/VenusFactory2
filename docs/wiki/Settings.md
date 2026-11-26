@@ -8,7 +8,7 @@ Open Settings at the lower left to change language or open Manual. Online users 
 
 ## Conversation credits
 
-The online default is **three new conversations per browser visitor per day**, shared by Agent, Scientist and Researcher. Visitors on the same laboratory or campus network have separate daily balances. A persistent browser cookie keeps your balance when you refresh or change networks. IP addresses support separate short-term abuse protection; they do not pool daily credits. This counts new conversations, not each message in an existing conversation. Effective limits can change with deployment settings or an assigned credit key. The quota indicator and reset time shown by the running site take precedence over the default described here.
+The online default is **three new conversations per browser visitor per day**, shared by Agent and Researcher. Visitors on the same laboratory or campus network have separate daily balances. A persistent browser cookie keeps your balance when you refresh or change networks. IP addresses support separate short-term abuse protection; they do not pool daily credits. This counts new conversations, not each message in an existing conversation. Effective limits can change with deployment settings or an assigned credit key. The quota indicator and reset time shown by the running site take precedence over the default described here.
 
 When the limit is reached, wait until the displayed reset time or apply for extra credit at **tanyang.august@sjtu.edu.cn**. Include your name, institution, email, contact information and intended use. Enter an issued email/key pair in Settings. A key does not unlock disabled compute tools or larger online training models.
 
@@ -30,4 +30,4 @@ Environment values are managed in Administration, not as a separate public Setti
 
 The default daily compute allowance is **20 model inference jobs** per browser visitor, shared by Model Plaza and Chat. Local mode has no daily compute allowance. Operators configure `WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT` in Administration → Environment.
 
-Uploads are at most 10 MB per file; custom training is restricted to ESM2-8M; local VenusMine is disabled. Scientist has bounded research budgets. Disabled tools remain unavailable through Chat and model forms. See [training](./Training.md) and [files](./Library.md).
+Uploads are at most 10 MB per file; custom training is restricted to ESM2-8M; local VenusMine is disabled. Scientist runs on local deployments only. Disabled tools remain unavailable through Chat and model forms. See [training](./Training.md) and [files](./Library.md).

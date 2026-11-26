@@ -1,6 +1,6 @@
 # Online conversations and administration
 
-Online admission is shared by Agent, Scientist and Researcher. The default pool is **three new conversations per calendar day**, using `Asia/Shanghai` as the day boundary. A draft, an upload or a mode switch does not consume a conversation. The first accepted submission does. Agent follow-ups/retries and Scientist updates/resumes reuse the same admission. A new Researcher report is a new conversation; its stable request ID deduplicates retries across `/jobs`, `/generate` and `/generate/stream`. Deleting a conversation does not refund it. Admission survives server restarts and uses a SQLite write transaction, so simultaneous requests cannot exceed the allowance.
+Agent and Researcher share online admission. The default pool is **three new conversations per calendar day**, using `Asia/Shanghai` as the day boundary. A draft, an upload or a mode switch does not consume a conversation. The first accepted submission does. Agent follow-ups and retries reuse the same admission. A new Researcher report is a new conversation; its stable request ID deduplicates retries across `/jobs`, `/generate` and `/generate/stream`. Deleting a conversation does not refund it. Admission survives server restarts and uses a SQLite write transaction, so simultaneous requests cannot exceed the allowance.
 
 Anonymous users share the free allowance for their IP and retain a separate browser identity. Both checks must pass. IPv6 addresses are grouped by /64. This approximates a person without requiring registration; it cannot prove a real person's identity, and people behind the same institution NAT share the free pool. A person who changes both network and browser cannot be reliably identified without login/verification.
 
@@ -31,18 +31,16 @@ Relevant environment settings:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `WEBUI_V2_MODE` | existing deployment setting | `online` enforces admission and Scientist restrictions |
+| `WEBUI_V2_MODE` | existing deployment setting | `online` enforces admission and disables Scientist execution |
 | `WEBUI_V2_ONLINE_DAILY_CHAT_LIMIT` | `3` | Shared free new-conversation pool |
 | `VENUS_QUOTA_TIMEZONE` | `Asia/Shanghai` | Calendar day boundary |
 | `VENUS_ACCESS_DB` | checkout-scoped path above | Persistent credentials and ledger |
 | `VENUS_TRUSTED_PROXIES` | empty | Proxies allowed to supply forwarded client addresses |
 
-## Restricted online Scientist
+## Scientist runs locally
 
-Online Scientist accepts natural-language goals and uploaded data with a server-enforced maximum of **two iterations, 48 model requests, 24 tool calls and 900 seconds**. Only the autonomous research driver is accepted. A conversation can create one study; another study requires a new conversation. One study per IP/browser/key can be active; it also uses the existing shared research queue. Queue waiting is bounded to one hour. Pause/resume does not replenish the study budget. Free model selection remains enforced by the execution catalog; the quota key never grants access to paid model routes.
-
-The online executor exposes a small allowlist of public literature/web search tools (PubMed, arXiv, bioRxiv, Semantic Scholar, Tavily/SerpAPI when configured), plus the goal workspace tools: read/write files, isolated Python, replay a candidate model, and submit a checkpoint. Python jobs go through the CPU queue; each run is limited to 60 seconds and 2 GiB address space and has no GPU devices, network, host project or credentials mounted. Host tools that dispatch GPU mining/training are not exposed to the online Scientist executor. This restricted release is suitable for uploaded tabular data, small CPU models and reports; larger reproductions remain a local-mode capability. Online candidate programs stay in that study's private capability directory rather than publishing uploaded data or weights into the public library automatically. Existing online ESM2 8M training and VenusMine restrictions remain in place.
+Start or resume Scientist studies in a local deployment. Online access to existing studies and artifacts remains subject to session ownership. Online users can start Agent conversations and Researcher reports.
 
 ## Verification
 
-`tests/web/test_online_access.py` exercises atomic concurrent admission, shared modes and aliases, retry idempotency, calendar reset, IP/browser identity, email key sharing, expiration/rotation/revocation, administrator authentication/CSRF/throttling and server-side Scientist budget enforcement. It does not call external models. Existing report, Scientist supervisor and Agent transport regressions must also pass before publishing a preview.
+`tests/web/test_online_access.py` exercises atomic concurrent admission, shared modes and aliases, retry idempotency, calendar reset, IP/browser identity, email key sharing, expiration/rotation/revocation, administrator authentication/CSRF/throttling and online admission enforcement. It does not call external models. Existing report, Scientist supervisor and Agent transport regressions must also pass before publishing a preview.

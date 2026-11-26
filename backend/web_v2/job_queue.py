@@ -38,6 +38,14 @@ def process_token(pid):
 class QueueCancelled(RuntimeError): pass
 
 
+def check_execution_mode(kind, environment):
+    """Apply current deployment policy even to previously queued commands."""
+    if kind == 'scientist':
+        from .online_access import SCIENTIST_LOCAL_ONLY, online
+        if online() or environment.get('WEBUI_V2_MODE', '').strip().lower() == 'online':
+            raise QueueCancelled(SCIENTIST_LOCAL_ONLY)
+
+
 def stop_process_tree(pid, token):
     """Signal only processes whose recorded Linux start identities still match."""
     if not token or process_token(pid) != token: return

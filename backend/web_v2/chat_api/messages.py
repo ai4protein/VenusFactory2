@@ -31,6 +31,8 @@ from backend.web_v2.chat_api._stream_agent import _stream_agent
 from backend.web_v2.chat_api._stream_kimi import _stream_kimi
 from backend.web_v2.science_goals import service as goal_service
 
+from backend.web_v2.online_access import require_local_scientist
+
 router = APIRouter()
 
 
@@ -72,9 +74,10 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
     _record_access_event(request, "/api/chat/sessions/{id}/messages/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
+    if payload.chat_mode in {"science_expert", "scientist"} or state.get("chat_mode") == "science_expert":
+        require_local_scientist()
+        raise HTTPException(409, "Use Start research in Scientist mode")
     await _assert_no_goal(session_id)
-    if payload.chat_mode == "science_expert" or state.get("chat_mode") == "science_expert":
-        raise HTTPException(409, "Use Start research in Scientist mode for a bounded online study")
     if payload.execution is not None or state.get("agent_execution") or _resolve_chat_mode(_resolve_engine(payload.engine, payload.model, payload.chat_mode), payload.chat_mode) == "science_agent":
         return await selected_agent_response(state, request, payload)
     raise HTTPException(409, "Use Start research in Scientist mode")
@@ -85,9 +88,10 @@ async def stream_retry(session_id: str, request: Request):
     _record_access_event(request, "/api/chat/sessions/{id}/messages/retry/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
-    await _assert_no_goal(session_id)
     if state.get("chat_mode") == "science_expert":
+        require_local_scientist()
         raise HTTPException(409, "Use the Scientist study controls to continue research")
+    await _assert_no_goal(session_id)
     return await selected_agent_response(state, request, retry=True)
 
 
@@ -96,7 +100,9 @@ async def respond_interaction(session_id: str, payload: InteractionResponse, req
     from backend.web_v2.chat_runs import submit
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
-    await _assert_no_goal(session_id)
     if state.get("chat_mode") != "science_agent":
+        if state.get("chat_mode") == "science_expert":
+            require_local_scientist()
         raise HTTPException(409, "Use the research input endpoint for Scientist")
+    await _assert_no_goal(session_id)
     return await submit(state, request, interaction=payload)

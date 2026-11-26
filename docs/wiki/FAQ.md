@@ -4,7 +4,7 @@
 
 ## Which mode should I choose?
 
-Agent answers questions and uses existing tools. Scientist develops new methods/models through experiments and review. Researcher investigates a target protein and writes an evidence-based report. A protein report does not automatically create a reusable model.
+Agent answers questions and uses existing tools. On local deployments, Scientist develops new methods and models through experiments and review. Researcher investigates a target protein and writes an evidence-based report. A protein report does not automatically create a reusable model.
 
 ## Why is a model grey or missing?
 
@@ -28,7 +28,7 @@ Online files must fit within 10 MB each. Check the requested file type and requi
 
 ## How do I get more conversations?
 
-Use the reset time shown by the site or apply for an extra-credit key as described in [Settings](./Settings.md). Agent, Scientist and Researcher share the online daily allowance.
+Use the reset time shown by the site or apply for an extra-credit key as described in [Settings](./Settings.md). Agent and Researcher share the online daily allowance.
 
 ## Need help with the platform?
 

@@ -30,6 +30,7 @@ from agent.rsi.engine.reproduction_goal_contract import CASES, CRITERIA, allocat
 from agent.rsi.engine.storage import atomic_json, file_lock
 from agent.rsi.engine.versions import VersionStore
 from agent.science_goal import GoalStore
+from backend.web_v2 import online_access
 from backend.web_v2.paper_step_goals import available_steps, public_step
 from backend.web_v2.paper_step_goals import drivers as paper_step_drivers
 
@@ -479,6 +480,15 @@ class ScienceGoalService:
         return self.credential_path  # Goals created before per-goal configuration.
 
     def catalog(self, include_cases=True):
+        if online_access.online():
+            return {
+                "default_driver": None, "model": None, "available": False, "reason": "local_only", "drivers": [],
+                "execution": {
+                    "mode": "science_expert", "readiness": "local_only",
+                    "default": {"harness": "", "model_id": ""},
+                    "models": [], "harnesses": [], "combinations": [],
+                },
+            }
         execution = None
         try:
             execution = self.execution_catalog().public(self.runtime_paths())
@@ -696,11 +706,6 @@ class ScienceGoalService:
                 env[name] = os.environ[name]
         if os.environ.get("VENUS_EXECUTION_CATALOG"):
             env["VENUS_EXECUTION_CATALOG"] = os.environ["VENUS_EXECUTION_CATALOG"]
-        from backend.web_v2.online_access import online
-        if online():
-            env.update(WEBUI_V2_MODE="online", VENUS_SCIENTIST_ONLINE="1", CUDA_VISIBLE_DEVICES="", VENUS_QUEUE_WAIT_TIMEOUT="3600")
-            for name in ('TAVILY_API_KEY', 'SERPAPI_API_KEY', 'SERPAPI_KEY'):
-                if os.environ.get(name): env[name] = os.environ[name]
         # A detached Scientist is a backend worker in the SAME deployment.
         # In particular its scheduler URL and signing-key directory must agree;
         # otherwise every queued tool fails before reaching the public service.
@@ -723,6 +728,7 @@ class ScienceGoalService:
         return env
 
     def spawn(self, folder, driver, action):
+        online_access.require_local_scientist()
         if self.live(folder):
             raise GoalConflict("Goal worker is still running")
         # The child inherits this lease before exec, closing the PID-record gap.
@@ -733,27 +739,20 @@ class ScienceGoalService:
             except BlockingIOError as exc:
                 raise GoalConflict("Goal worker is still running") from exc
             from backend.web_v2.job_queue import launch
-            from backend.web_v2.online_access import online, SCIENCE_LIMITS
-            limited = online()
             meta = json.loads((folder.parent / (folder.name + ".json")).read_text())
             queue_id, proc = launch(driver.run_command(self, folder, action),owner=meta.get("online_owner") or str(folder.parent.name),
                 kind='scientist',resource='research',cwd=self.root,env=self.environment(self.frozen_profile(folder)),
-                stdout=log,pass_fds=(lease.fileno(),),timeout=SCIENCE_LIMITS['wall_seconds'] if limited else int(os.getenv('VENUS_QUEUE_RESEARCH_TIMEOUT','2419200')),
+                stdout=log,pass_fds=(lease.fileno(),),timeout=int(os.getenv('VENUS_QUEUE_RESEARCH_TIMEOUT','2419200')),
                 session_key='chat:'+meta['session_id'],
-                metadata={'goal_id':folder.name, 'goal_folder':str(folder), 'session_id':meta['session_id'], 'mode':'scientist', 'harness':self.frozen_profile(folder).harness, **({'quota_scope':'chat:'+meta['session_id']} if limited else {})})
+                metadata={'goal_id':folder.name, 'goal_folder':str(folder), 'session_id':meta['session_id'], 'mode':'scientist', 'harness':self.frozen_profile(folder).harness})
             atomic_json(folder/'queue.json',{'id':queue_id})
         self.children[str(folder)] = proc
         identity = process_identity(proc.pid) if not getattr(proc, 'identity', None) else None
         if identity:
             atomic_json(folder / "worker.json", identity)
 
-    def create(self, session_id, spec, request_id, *, before_start=None, online_owner=None):
-        from backend.web_v2.online_access import SCIENCE_LIMITS, online
-        limited = online()
-        if limited and (spec.get("driver", "autonomous_research.v1") != "autonomous_research.v1" or spec.get("parameters")):
-            raise ValueError("Online Scientist supports autonomous research only")
-        if limited and any(type(spec["budget"].get(k)) is not int or not 1 <= spec["budget"][k] <= v for k,v in SCIENCE_LIMITS.items()):
-            raise ValueError("Online Scientist allows 2 iterations, 48 model calls, 24 tools and 15 minutes")
+    def create(self, session_id, spec, request_id):
+        online_access.require_local_scientist()
         if not re.fullmatch(r"[a-zA-Z0-9_-]{8,80}", request_id):
             raise ValueError("A stable request identity is required")
         spec = {"driver": "autonomous_research.v1", "parameters": {}, **spec}
@@ -783,8 +782,6 @@ class ScienceGoalService:
                 if digest(old["spec"]) != digest(spec):
                     raise GoalConflict("Request identity already belongs to a different goal")
                 return self.public(session_id, gid)
-            if limited and any(base.glob("*.json")):
-                raise GoalConflict("Start a new Scientist conversation for another study")
             command = driver.prepare_command(self, folder, spec)
             if any(
                 g["status"] in NONTERMINAL or g["worker_alive"]
@@ -793,13 +790,11 @@ class ScienceGoalService:
                 raise GoalConflict("This session already has an unfinished goal")
             profile, model = self.execution_catalog().select(spec.get("execution"))
             self.admission(profile, model.credential_toml)
-            if before_start: before_start()
             snapshot = self.prepared_profile(folder)
             snapshot.parent.mkdir(parents=True, exist_ok=True)
             atomic_json(snapshot, profile.public())
             meta = {
                 "session_id": session_id,
-                "online_owner": online_owner,
                 "spec": spec,
                 "created_at": time.time(),
                 "status": "preparing",
@@ -826,9 +821,6 @@ class ScienceGoalService:
                     GoalStore(folder).mutate(lambda s: s["progress"].update(inputs=inputs))
                 self.spawn(folder, driver, "run")
             except Exception as exc:
-                if limited:
-                    from backend.web_v2.online_access import AccessStore
-                    AccessStore().release_science("chat:" + session_id)
                 meta.update(status="prepare_failed", error_type=type(exc).__name__)
                 atomic_json(meta_path, meta)
                 raise RuntimeError("Goal could not start; preparation diagnostics retained") from exc
@@ -837,6 +829,8 @@ class ScienceGoalService:
             return self.public(session_id, gid)
 
     def control(self, session_id, goal_id, action):
+        if action == "resume":
+            online_access.require_local_scientist()
         folder, _, _ = self.metadata(session_id, goal_id)
         with file_lock(folder.parent / ".supervisor.lock"):
             folder, _, meta = self.metadata(session_id, goal_id)
@@ -869,6 +863,7 @@ class ScienceGoalService:
             return self.public(session_id, goal_id)
 
     def provide_input(self, session_id, goal_id, text, plan=None, attachments=None, interaction=None):
+        online_access.require_local_scientist()
         from agent.harness.research_updates import queue_revision, validate_revision
         from backend.web_v2.research_files import stage_inputs
         validate_revision(text or ("User response" if interaction else ""), plan, attachments)

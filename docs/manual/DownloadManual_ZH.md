@@ -31,7 +31,7 @@
 > 从 PubChem 查询咖啡因的 SMILES 和分子性质。
 
 这些数据库查询本身不需要额外的大模型或搜索服务密钥。本地和在线均可使用，
-由 Administration 控制开关。Agent 和 Scientist 可以按任务搜索调用。
+由 Administration 控制开关。Agent 可以按任务搜索调用，本地部署中的 Scientist 也可以使用。
 Researcher 通过同一个 Europe PMC 工具检索文献；UniProt 提供明确的 Ensembl 基因映射时，
 还会采集基因注释，并为人类蛋白补充相关的 Open Targets 疾病关联和药物候选。
 

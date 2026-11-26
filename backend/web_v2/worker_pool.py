@@ -16,7 +16,7 @@ import signal
 import subprocess
 import sys
 import time
-from .job_queue import JobQueue, PROJECT, TERMINAL, process_token, stop_process_tree
+from .job_queue import JobQueue, PROJECT, TERMINAL, QueueCancelled, check_execution_mode, process_token, stop_process_tree
 from .task_store import LeaseLost
 from backend.runtime_identity import loaded_source_revision
 
@@ -135,16 +135,18 @@ def submit_command(command, *, owner, kind, resource, env, cwd, stdout, pass_fds
 def execute(q, row):
     identity,lease,spec=row['id'],row['lease'],row['dispatch']
     env=dict(spec['environment'])
-    for key in spec['credential_refs']:
-        if key not in os.environ:
-            q.finish(identity,'failed','Worker credentials are not configured',lease=lease);return
-        env[key]=os.environ[key]
     env.update(VENUS_JOB_QUEUE_ROOT=str(q.root),VENUS_QUEUE_JOB_ID=identity,VENUS_QUEUE_LEASE_TOKEN=lease,VENUS_QUEUE_OWNER=row['owner'])
     env['PYTHONPATH']=str(PROJECT)+os.pathsep+str(PROJECT/'src')+os.pathsep+env.get('PYTHONPATH','')
     proc=None;child_token=None;locks=[];status='failed';message='Worker stopped';code=None
     parent=row['metadata'].get('parent_job')
     log_path=Path(spec['log']) if spec.get('log') else q.files(identity)/'worker.log'
     try:
+        check_execution_mode(row['kind'], env)
+        for key in spec['credential_refs']:
+            if key not in os.environ:
+                message='Worker credentials are not configured'
+                return
+            env[key]=os.environ[key]
         from mcp_tools.tools.capability_policy import CapabilityStore
         if row['metadata'].get('capability_tool'):
             CapabilityStore().assert_call(row['metadata']['capability_tool'],row['metadata'].get('capability_arguments',{}))
@@ -184,6 +186,8 @@ def execute(q, row):
             elif state['status'] != 'completed':status,message='failed','Research stopped: '+state['status'].replace('_',' ')
     except LeaseLost:
         return
+    except QueueCancelled as exc:
+        status,message='cancelled',str(exc)
     except Exception as exc:
         message='Task could not execute: '+type(exc).__name__
     finally:
@@ -204,6 +208,7 @@ def execute(q, row):
 def child(identity, lease):
     q=JobQueue();q.attach_child(identity,lease,os.getpid())
     row=q.get(identity);spec=json.loads(row['dispatch'])
+    check_execution_mode(row['kind'], spec['environment'])
     if row['metadata'].get('capability_tool'):
         from mcp_tools.tools.capability_policy import CapabilityStore
         CapabilityStore().assert_call(row['metadata']['capability_tool'],row['metadata'].get('capability_arguments',{}))

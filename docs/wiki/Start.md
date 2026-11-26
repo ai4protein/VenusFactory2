@@ -7,7 +7,7 @@
 | Mode | Give it | What you get |
 | --- | --- | --- |
 | Agent | A question, files or an operation | An answer, predictions or analysis files using existing tools |
-| Scientist | A research goal, data, materials and a budget | Iteratively developed code, models, evaluation evidence and a delivery package |
+| Scientist (local only) | A research goal, data, materials and a budget | Iteratively developed code, models, evaluation evidence and a delivery package |
 | Researcher | A target protein, research focus and supporting materials | A long report integrating literature, databases and predictions |
 
 Choose the mode beside the message box. **Model** selects the conversational language model; **Harness** selects its execution framework. Protein predictors are chosen through tools or Model Plaza.

@@ -36,8 +36,8 @@ const statusNames: Record<string, [string, string]> = {
   running: ["Running", "执行中"], pending: ["Pending", "待执行"], needs_revision: ["Revising", "调整中"], failed: ["Needs attention", "需处理"],
 };
 
-export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composerTarget, actionsTarget, footerTarget, sessionId, draftRevision = 0, science, busy, ensureSession, onRunning, onChanged, onGoalStatus, onHistoryActivity }: {
-  noticeTarget: HTMLElement | null; online: boolean; toolbarTarget: HTMLElement | null; composerTarget: HTMLElement | null; actionsTarget: HTMLElement | null; footerTarget: HTMLElement | null; sessionId: string; draftRevision?: number; science: boolean; busy: boolean; ensureSession: () => Promise<string>;
+export function ScienceGoalPanel({ noticeTarget, readOnly, toolbarTarget, composerTarget, actionsTarget, footerTarget, sessionId, draftRevision = 0, science, busy, ensureSession, onRunning, onChanged, onGoalStatus, onHistoryActivity }: {
+  noticeTarget: HTMLElement | null; readOnly: boolean; toolbarTarget: HTMLElement | null; composerTarget: HTMLElement | null; actionsTarget: HTMLElement | null; footerTarget: HTMLElement | null; sessionId: string; draftRevision?: number; science: boolean; busy: boolean; ensureSession: () => Promise<string>;
   onRunning: (running: boolean) => void; onChanged: (sid: string) => void | Promise<void>;
   onHistoryActivity: HistoryActivityCallback;
   onGoalStatus: (sid: string, status: string) => void;
@@ -82,14 +82,14 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
     callbacks.current.onGoalStatus(sid, (next.find(g => g.worker_alive || g.status === "active") || next[0])?.status || "");
   }
   useEffect(() => {
-    if (!science || catalog) return;
+    if (!science || readOnly || catalog) return;
     let alive = true;
     goalCatalog().then(c => {
       if (!alive) return; setCatalog(c);
 
     }).catch(e => { if (alive) setError(e.message); });
     return () => { alive = false; };
-  }, [science, catalog]);
+  }, [science, readOnly, catalog]);
   useEffect(() => {
     if (!catalog?.execution || execution.harness) return;
     const c = catalog.execution;
@@ -104,12 +104,12 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
       if (polling || !science || document.visibilityState === "hidden") return; polling = true;
       try { const result = await listGoals(sessionId); if (alive) { applyGoals(sessionId, result.goals); hasRunningGoal = result.goals.some(g => isRunActive(g.status)); } }
       catch (e) { if (alive) setError((e as Error).message); }
-      polling = false; if (alive) timer = setTimeout(poll, hasRunningGoal ? 3000 : 15000);
+      polling = false; if (alive && (!readOnly || hasRunningGoal)) timer = setTimeout(poll, hasRunningGoal ? 3000 : 15000);
     };
     const rejoin = () => { clearTimeout(timer); void poll(); };
     window.addEventListener("focus", rejoin); window.addEventListener("online", rejoin); document.addEventListener("visibilitychange", rejoin);
     void poll(); return () => { alive = false; clearTimeout(timer); window.removeEventListener("focus", rejoin); window.removeEventListener("online", rejoin); document.removeEventListener("visibilitychange", rejoin); };
-  }, [sessionId, science]);
+  }, [sessionId, science, readOnly]);
 
   useEffect(() => {
     const goal = goals.find(g => unfinished.has(g.status));
@@ -175,7 +175,7 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
           onChange={harness => setExecution({ harness, model_id: preferredModel(choices, harness, execution.model_id, catalog?.execution?.default.model_id) })}/>
         <ComposerSelect label={say("Model", "模型")} ariaLabel="Scientist model" helpText={say("API response times vary. Please allow some time for a response.", "根据API反馈速度不一可能需要耐心等待")} value={execution.model_id} disabled={pending || busy || active || !catalog}
           placeholder={say("No models available", "暂无可用模型")}
-          items={executionModelItems(catalog?.execution?.models || [], choices, execution.harness, zh, online)}
+          items={executionModelItems(catalog?.execution?.models || [], choices, execution.harness, zh, false)}
           onChange={model_id => setExecution({ ...execution, model_id })}/>
       </div>
   );
@@ -186,8 +186,9 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
   const footer = !active ? <><details ref={settingsRef} className="research-settings"><summary>{say("Run settings", "运行设置")}</summary><div className="research-settings-popover"><div className="research-settings-heading"><strong>{say("Run settings", "运行设置")}</strong><button type="button" aria-label={say("Close run settings", "关闭运行设置")} onClick={() => { if (settingsRef.current) { settingsRef.current.open = false; settingsRef.current.querySelector("summary")?.focus(); } }}>×</button></div><div className="goal-options goal-options-pair"><label>{say("Maximum iterations", "最多迭代轮数")}<input type="number" min={1} max={catalog?.maximum_budget?.max_cycles || 32} value={budget.max_cycles} onChange={e => { const n = Math.max(1, Math.min(catalog?.maximum_budget?.max_cycles || 32, Number(e.target.value) || 1)); setBudget({ ...budget, max_cycles: n, model_calls: Math.min(n * 24, catalog?.maximum_budget?.model_calls || 768), tool_calls: Math.min(n * 12, catalog?.maximum_budget?.tool_calls || 384) }); }}/></label><label>{say("Time limit (hours)", "运行时长（小时）")}<input type="number" min={0.25} step={0.25} max={(catalog?.maximum_budget?.wall_seconds || 2419200) / 3600} value={budget.wall_seconds / 3600} onChange={e => setBudget({ ...budget, wall_seconds: Math.max(900, Math.min(catalog?.maximum_budget?.wall_seconds || 2419200, (Number(e.target.value) || 0.25) * 3600)) })}/></label></div></div></details><span>{say("Enter to send · Shift + Enter for a new line", "Enter 发送 · Shift + Enter 换行")}</span></> : <span>{currentGoal ? label(currentGoal.status) : ""}</span>;
   return <><section className="science-goal-panel" aria-label={say("Scientist research goals", "科学家研究目标")}>
     {error && !isDailyQuotaMessage(error) && noticeTarget && createPortal(<ChatNotice message={error} lang={lang} onDismiss={dismissError} />, noticeTarget)}
-    {science && (!catalog || !loaded) && <p role="status">{say("Loading research…", "正在恢复研究…")}</p>}
-    {(!sessionId || (loaded && !goals.length)) && <ScientistWelcome lang={lang} disabled={pending || busy || uploading} onExample={prompt => { setObjective(prompt); composerTarget?.querySelector<HTMLTextAreaElement>("textarea")?.focus(); }}/>}
+    {science && ((!readOnly && !catalog) || !loaded) && <p role="status">{say("Loading research…", "正在恢复研究…")}</p>}
+    {readOnly && <p className="goal-note">{say("Read-only history. Run Scientist in a local deployment.", "历史研究可供查阅。请在本地部署中运行 Scientist。")}</p>}
+    {!readOnly && (!sessionId || (loaded && !goals.length)) && <ScientistWelcome lang={lang} disabled={pending || busy || uploading} onExample={prompt => { setObjective(prompt); composerTarget?.querySelector<HTMLTextAreaElement>("textarea")?.focus(); }}/>}
     {goals.map(g => <article className="science-goal-card" key={g.id}>
       <div className="goal-heading"><span className={`goal-status goal-status-${g.status}`}>{isRunActive(g.status) && <RunSpinner lang={lang}/>} {g.queue?.status === "queued" ? say("Queued", "排队中") : label(g.status)}</span><small>{say("RSI iteration", "RSI 迭代")} {g.research?.live?.phase?.episode || g.cycles?.length || 0}</small></div>
       <QueueState queue={g.queue}/><h3>{g.objective.length > 120 ? (g.research?.plan?.summary || g.objective).slice(0,120) + "…" : g.objective}</h3>
@@ -204,20 +205,20 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
       {!g.research?.execution_blocker && !g.research?.last_review && !!g.cycles?.length && g.cycles[g.cycles.length - 1].status === "failed" && <p className="goal-note">{g.cycles[g.cycles.length - 1].summary}</p>}
       {g.research?.last_review && <details className="research-review-summary"><summary>{say("Latest review", "最近一次审阅")}</summary><p>{g.research.last_review.summary}</p></details>}
       {!!g.research?.capabilities?.length && <div className="goal-capabilities"><h4>{say("Reusable capabilities", "可复用能力")}</h4>{g.research.capabilities.map(c => <p key={c.id}>{c.name}</p>)}</div>}
-      {g.driver === "autonomous_research.v1" && unfinished.has(g.status) && <>{!g.research?.pending_interaction && !!g.research?.questions?.length && <ul className="research-questions">{g.research.questions.map((q, i) => <li key={i}>{q}</li>)}</ul>}{g.research?.pending_interaction ? <InteractionCard key={g.research.pending_interaction.id} interaction={g.research.pending_interaction} sessionId={sessionId} disabled={pending || g.worker_alive} onSubmit={response => answerInteraction(g.id, response)}/> : <ResearchRevision goal={g} sessionId={sessionId} onSaved={() => update(sessionId)}/>}</>}
+      {!readOnly && g.driver === "autonomous_research.v1" && unfinished.has(g.status) && <>{!g.research?.pending_interaction && !!g.research?.questions?.length && <ul className="research-questions">{g.research.questions.map((q, i) => <li key={i}>{q}</li>)}</ul>}{g.research?.pending_interaction ? <InteractionCard key={g.research.pending_interaction.id} interaction={g.research.pending_interaction} sessionId={sessionId} disabled={pending || g.worker_alive} onSubmit={response => answerInteraction(g.id, response)}/> : <ResearchRevision goal={g} sessionId={sessionId} onSaved={() => update(sessionId)}/>}</>}
       <div className="goal-actions">
-        {g.status === "active" && <button type="button" disabled={pending} onClick={() => void control(g.id, "pause")}>{say("Pause", "暂停")}</button>}
-        {["paused", "interrupted"].includes(g.status) && <button type="button" disabled={pending || g.worker_alive} onClick={() => void control(g.id, "resume")}>{say("Resume", "继续")}</button>}
-        {unfinished.has(g.status) && <button type="button" disabled={pending} onClick={() => void control(g.id, "cancel")}>{say("End research", "结束研究")}</button>}
+        {!readOnly && g.status === "active" && <button type="button" disabled={pending} onClick={() => void control(g.id, "pause")}>{say("Pause", "暂停")}</button>}
+        {!readOnly && ["paused", "interrupted"].includes(g.status) && <button type="button" disabled={pending || g.worker_alive} onClick={() => void control(g.id, "resume")}>{say("Resume", "继续")}</button>}
+        {!readOnly && unfinished.has(g.status) && <button type="button" disabled={pending} onClick={() => void control(g.id, "cancel")}>{say("End research", "结束研究")}</button>}
         {g.status === "completed" && (!!g.research?.capabilities?.length || g.code_step?.registered) && <a href={publicationEmail(g.objective || "Scientist model", g.id)}>{say("Request publication by email", "邮件申请上架")}</a>}
       </div>
     </article>)}
 
   </section>
-    {toolbarTarget && createPortal(executionControls, toolbarTarget)}
-    {composerTarget && createPortal(composerForm || <div className="composer-textarea-wrap"><textarea rows={4} disabled aria-label={say("Research goal", "研究目标")} value={goals.find(g => unfinished.has(g.status) || g.worker_alive)?.objective || ""} placeholder={say("Loading research…", "正在加载研究…")}/></div>, composerTarget)}
-    {footerTarget && createPortal(footer, footerTarget)}
-    {actionsTarget && catalog && createPortal(
+    {!readOnly && toolbarTarget && createPortal(executionControls, toolbarTarget)}
+    {!readOnly && composerTarget && createPortal(composerForm || <div className="composer-textarea-wrap"><textarea rows={4} disabled aria-label={say("Research goal", "研究目标")} value={goals.find(g => unfinished.has(g.status) || g.worker_alive)?.objective || ""} placeholder={say("Loading research…", "正在加载研究…")}/></div>, composerTarget)}
+    {!readOnly && footerTarget && createPortal(footer, footerTarget)}
+    {!readOnly && actionsTarget && catalog && createPortal(
       <button type="submit" form={formId} className="composer-icon-btn composer-send-btn" disabled={active ? pending || uploading || awaitingInteraction || (!reply.trim() && !attachments.length) : !canStart}
         title={pending ? say("Starting…", "启动中…") : active ? say("Update research", "更新研究") : say("Start research", "开始研究")}
         aria-label={pending ? say("Starting…", "启动中…") : active ? say("Update research", "更新研究") : say("Start research", "开始研究")}>

@@ -77,7 +77,8 @@ body:has(.landing) { background:#fff; }
 .landing-mode-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
 .landing .landing-mode { padding:28px; display:flex; flex-direction:column; border:1px solid var(--lp-line); border-radius:7px; background:#fff; transition:background .15s,border-color .15s; }
 .landing .landing-mode.is-scientist { border-top:3px solid var(--lp-green); padding-top:26px; }
-.landing .landing-mode:hover { background:#f6faf8; border-color:#9cb7a8; }
+.landing .landing-mode[aria-disabled="true"] { filter:grayscale(1); }
+.landing a.landing-mode:hover { background:#f6faf8; border-color:#9cb7a8; }
 .landing-mode-top { display:flex; align-items:center; gap:10px; color:var(--lp-green); font-size:17px; font-weight:500; margin-bottom:30px; }
 .landing-mode-number { margin-left:auto; font:12px ui-monospace,monospace; color:#73877b; }
 .is-scientist .landing-mode-number { color:var(--lp-green); border:1px solid #d3e3db; border-radius:4px; padding:3px 5px; }

@@ -147,7 +147,7 @@ training uses enabled tools: `generate_training_config` prepares the
 session data and settings, `train_protein_model` produces a fitted checkpoint,
 and `protein_model_predict` checks the resulting model. These calls use the
 shared CPU/GPU job queue and preserve their parent research job and session
-ownership. Online training retains the ESM2-8M policy.
+ownership.
 
 On a PBS cluster, request GPU, CPU, memory and wall-time resources before
 starting the research process and its tool workers on the allocated node. Honor
@@ -222,8 +222,7 @@ remain outside the execution sandbox. Source files are not modified. Failed
 preparation retains its files and `cli-input-preparation.json` diagnostics and
 leaves the goal interrupted. Correct the inputs and create a new goal.
 `--input` is not accepted by `run`, `resume` or PBS commands; later attachments
-use research revision. These local paths are unavailable in online mode, where
-inputs must use the existing session upload flow.
+use research revision. Scientist goals and their input preparation run on local deployments.
 
 Submission freezes the source revision and records the goal, profile, resource
 request and scheduler identity. Status and cancellation use that recorded job.
@@ -411,8 +410,7 @@ role remains free to build other representations and algorithms.
 6. Independent admission replays interfaces and final test predictions, recomputes
    metrics, reruns training without the test split, and checks scientific scope.
 7. Approved models receive a private delivery under `workspace/deliveries/` and
-   enter the configured registry. Online models retain the existing private
-   registration policy; this change does not grant public access to user models.
+   enter the configured local registry.
 
 The host snapshots runtime source and fitted artifacts outside the writable
 session workspace, scores predictions itself and persists immutable receipts. Training-input
@@ -490,8 +488,7 @@ metadata without including held-out observations in model context.
 
 New model topics keep uploaded measurement tables in host-owned storage outside
 the Agent workspace. Original uploads are copied and hashed in bounded chunks;
-local uploads retain their existing size policy, while online uploads retain the
-10 MiB limit. Dataset preparation accepts a documented CSV/TSV cohort up to
+local uploads have no application-level file-size limit. Dataset preparation accepts a documented CSV/TSV cohort up to
 20 MiB and 21,024 rows. Larger originals remain stored privately.
 Planning receives column names and inferred types. Preparing
 a CSV/TSV table fixes the group split and exposes only its training rows; the
