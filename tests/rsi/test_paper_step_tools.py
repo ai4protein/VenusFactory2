@@ -221,11 +221,10 @@ async def test_four_role_contract_runs_real_paper_tools_with_simulated_llm(lifec
     async def role(context, name, evidence, folder):
         roles.append(name)
         context.relay.calls += 1
-        return (
-            json.dumps({"decision": "ready_for_host_validation", "summary": "fixture", "issues": []})
-            if name == "SC"
-            else "Use the declared paper computation tools"
-        )
+        if name == "SC":
+            return json.dumps({"decision": "ready_for_host_validation", "summary": "fixture", "issues": []})
+        field = {"PI": "direction", "CB": "steps"}[name]
+        return json.dumps({field: ["Use the declared paper computation tools"], "constraints": [], "unknowns": []})
 
     class Native:
         async def run(self, context):
