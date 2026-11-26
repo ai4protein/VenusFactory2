@@ -5,13 +5,13 @@ import os
 from pathlib import Path
 import sys
 
+from mcp_tools.common.results import tool_output_indicates_failure
 from mcp_tools.scheduler.jobs import ToolJobs, save_json
 
 
 def mcp_result(value):
-    from agent.chat_agent_utils import _tool_output_indicates_failure
     failed = value.is_error or any(
-        _tool_output_indicates_failure(block.text)[0]
+        tool_output_indicates_failure(block.text)[0]
         for block in value.content if getattr(block, 'type', None) == 'text'
     )
     return {'content':[c.model_dump(mode='json') for c in value.content],
@@ -49,8 +49,7 @@ async def execute(spec):
         capture = (AnalysisCapture(capture_spec, workspace, classify(spec['name'], getattr(tool, 'metadata', None))['category'])
                    if spec.get('workspace') else None)
         value=await tool.ainvoke(spec['arguments'],config={'configurable':{'session_id':spec.get('session_id')}})
-        from agent.chat_agent_utils import _tool_output_indicates_failure
-        failed,_=_tool_output_indicates_failure(value)
+        failed,_=tool_output_indicates_failure(value)
         result = {'value':value,'is_error':failed}
         if capture is not None:
             evidence = capture.finish(result)

@@ -61,7 +61,7 @@ async def run(request, *, tools=None, model=None):
 
     @wrap_tool_call
     async def observed_tool(call, handler):
-        from agent.chat_agent_utils import _tool_output_indicates_failure
+        from mcp_tools.common.results import tool_output_indicates_failure
 
         nonlocal calls
         tool_call = call.tool_call
@@ -84,7 +84,7 @@ async def run(request, *, tools=None, model=None):
             result = await handler(call.override(tool_call={**tool_call, "args": args}))
             content = public_value(result.content, request["workspace"])
             result = result.model_copy(update={"content":content})
-            failed, _ = _tool_output_indicates_failure(content)
+            failed, _ = tool_output_indicates_failure(content)
             observation.finish(failed=failed or getattr(result, 'status', '') == 'error')
             emit(
                 {

@@ -348,7 +348,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                         send({"kind": "research_tool_status", "status": "completed", "tool": name, "call_id": call_id})
                     return web.json_response({"jsonrpc": "2.0", "id": body["id"], "result": {
                         "content": [{"type": "text", "text": json.dumps(value)}], "isError": False}})
-                from agent.chat_agent_utils import _tool_output_indicates_failure
+                from mcp_tools.common.results import tool_output_indicates_failure
                 # A trusted model tool must never read paths while another MCP
                 # call is mutating them in a coding sandbox. Keep this lock until
                 # queued tools finish as well. API downloads use anchored FDs.
@@ -421,7 +421,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                     if canonical_name == "read_session_file" and reference in reference_hashes:
                         if not isinstance(value, dict) or value.get("file_sha256") != reference_hashes[reference]:
                             raise ValueError("Research context reference changed while reading; its content is unavailable")
-                    if canonical_name == 'submit_research_checkpoint' and not _tool_output_indicates_failure(value)[0]:
+                    if canonical_name == 'submit_research_checkpoint' and not tool_output_indicates_failure(value)[0]:
                         confirmation = None
                         if checkpoint_handoff is not None and checkpoint_calls < checkpoint_limit:
                             from .research_handoff import checkpoint_confirmation
@@ -433,7 +433,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                             if checkpoint_handoff is not None:
                                 checkpoint_handoff.save(arguments, public_value(value, workspace))
                             checkpoint_saved = True
-                    if canonical_name == "predict_with_evolved_model" and not _tool_output_indicates_failure(value)[0]:
+                    if canonical_name == "predict_with_evolved_model" and not tool_output_indicates_failure(value)[0]:
                         from mcp_tools.models.evolved.result_delivery import deliver_prediction
                         card = deliver_prediction(workspace, value, args, session_id=request.get("session_id"))
                         value = json.loads(value) if isinstance(value, str) else dict(value)
@@ -443,7 +443,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                             value["file_export_error"] = "Prediction completed, but result files could not be saved."
                         send({"kind": "model_result", "result": public_value(card, workspace)})
                 value = public_value(value, workspace)
-                failed, _ = _tool_output_indicates_failure(value)
+                failed, _ = tool_output_indicates_failure(value)
                 if scientific_attempt is not None:
                     scientific_attempt["status"] = "failed" if failed or scientific_attempt["status"] == "failed" else "completed"
                 if observation:
