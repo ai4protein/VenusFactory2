@@ -74,8 +74,23 @@ def dataset_config_errors(root):
     return errors
 
 
+def misplaced_tests(root):
+    """Keep first-party Python tests in component directories under tests/."""
+    misplaced = [path for path in (root / 'tests').glob('*.py')
+                 if path.name.startswith('test_') or path.name.endswith('_test.py')]
+    for name in ('backend', 'mcp_tools', 'src'):
+        for path in (root / name).rglob('*.py'):
+            parts = path.relative_to(root).parts
+            if 'vendor' in parts or any(part.startswith('_legacy') for part in parts):
+                continue
+            if path.name.startswith('test_') or path.name.endswith('_test.py'):
+                misplaced.append(path)
+    return [f'{p.relative_to(root)}: place this test in tests/<component>/'
+            for p in sorted(misplaced)]
+
+
 def check(root=ROOT):
-    errors = dataset_config_errors(root)
+    errors = dataset_config_errors(root) + misplaced_tests(root)
     for name in ('config', 'script', 'Scripts', 'epitope_miner', 'insulin_variants', 'src/tools', 'src/tool_runtime', 'src/web_v2', 'src/web', 'src/webui.py', 'src/frpc_hub.py', 'Scripts_notebook.ipynb', 'install_config.json', 'mcp_tools/runtimes', 'mcp_tools/tool_runtime', 'mcp_tools/tools/train', 'mcp_tools/tools/mutation', 'mcp_tools/tools/denovo', 'mcp_tools/tools/external', 'mcp_tools/tools/evolved', 'third_party', 'requirements-sandbox-cube.txt', 'requirements-sandbox-e2b.txt'):
         path = root / name
         if path.exists() or path.is_symlink():

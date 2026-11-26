@@ -80,3 +80,14 @@ def test_dataset_registry_accepts_nested_shipped_config(tmp_path):
 
 def test_shipped_dataset_registry_has_no_broken_references():
     assert checks.dataset_config_errors(ROOT) == []
+
+
+def test_component_tests_stay_out_of_runtime_packages_and_the_test_root(tmp_path):
+    for name in ('backend/test_api.py', 'mcp_tools/protocol_test.py', 'tests/test_mixed.py',
+                 'tests/web/test_api.py', 'tests/conftest.py', 'src/agent/vendor/sample/test_api.py'):
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    assert [Path(message.split(":", 1)[0]).as_posix() for message in checks.misplaced_tests(tmp_path)] == [
+        'backend/test_api.py', 'mcp_tools/protocol_test.py', 'tests/test_mixed.py',
+    ]
