@@ -15,6 +15,8 @@ export default defineConfig({
       output: {
         onlyExplicitManualChunks: true,
         manualChunks(id) {
+          // React uses the CommonJS interop helper during startup. Keep its chunk independent of the app entry.
+          if (id === "\0commonjsHelpers.js") return "react-vendor";
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "react-vendor";
           if (id.includes("node_modules/molstar")) return "molstar";
         },
