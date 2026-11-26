@@ -43,9 +43,7 @@ import {
   cancelChatSession,
   createChatSession,
   exportChatSessionBundle,
-  deleteCustomModelCache,
   deleteChatSession,
-  downloadExperimentReport,
   getChatQuota,
   getChatSession,
   getChatSessionAuthHeaders,
@@ -69,8 +67,6 @@ import { AttachedFiles, ComposerFilePicker, type AttachmentPanel } from "./chat/
 import { type WorkspaceFile } from "../lib/workspaceApi";
 import {
   useModelRegistry,
-  setProviderKey,
-  setActiveGateway,
   persistChatMode,
   pickExpertModelId,
   isKimiEngineModel,
@@ -87,7 +83,6 @@ import { useDocumentMeta } from "../lib/useDocumentMeta";
 // loaded yet AND we cannot read any model id from the active session. The real
 // model list comes from GET /api/models via useModelRegistry().
 const FALLBACK_MODEL_ID = SCIENCE_AGENT_MODEL_ID;
-const OTHER_MODEL_OPTION = "__other_model__";
 type RunStatus = "running" | "stopping" | "stopped";
 
 type OpenAIStyleModel = {
@@ -139,7 +134,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [noticeTarget, setNoticeTarget] = useState<HTMLDivElement | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const pendingSessionModel = useRef<string | null>(null);
-  const [workspaceParams, setWorkspaceParams] = useSearchParams();
+  const [workspaceParams] = useSearchParams();
   const researcherMode = workspaceParams.get('mode') === 'researcher';
   const visibleModeRef = useRef(workspaceParams.get('mode'));
   visibleModeRef.current = workspaceParams.get('mode');
@@ -158,20 +153,12 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const scrollPositions = useRef<Record<string, number>>({});
   const [agentExecution, setAgentExecution] = useState<AgentExecutionSelection | null>(null);
   const registry = useModelRegistry();
-  const [keyPanelProvider, setKeyPanelProvider] = useState<string>("");
-  const [keyPanelValue, setKeyPanelValue] = useState<string>("");
-  const [keyPanelSaving, setKeyPanelSaving] = useState(false);
   const [customModels, setCustomModels] = useState<OpenAIStyleModel[]>(() => {
     try {
       const parsed = JSON.parse(localStorage.getItem(CUSTOM_MODELS_STORAGE_KEY) || "[]");
       return Array.isArray(parsed) ? parsed.filter(item => item && item.id && item.modelName && item.baseUrl) : [];
     } catch { return []; }
   });
-  const [showCustomModelModal, setShowCustomModelModal] = useState(false);
-  const [customModelLabel, setCustomModelLabel] = useState("");
-  const [customModelName, setCustomModelName] = useState("");
-  const [customModelApiKey, setCustomModelApiKey] = useState("");
-  const [customModelBaseUrl, setCustomModelBaseUrl] = useState("https://api.openai.com/v1");
   const [modelSwitchNotice, setModelSwitchNotice] = useState("");
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
   const [startingTurn, setStartingTurn] = useState(false);
@@ -208,8 +195,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }, []);
   const [filePicker, setFilePicker] = useState<AttachmentPanel>(null);
   const LEGACY_SESSION_STORAGE_KEY = "vf2_active_session_id";
-  const COPY_HINT_MS = 1200;
-  const [copiedSessionId, setCopiedSessionId] = useState("");
   const modeChoiceRevision = useRef(0);
   const [agentCatalogReady, setAgentCatalogReady] = useState(false);
   const { closeOnNarrow } = useSidebar();
@@ -1050,26 +1035,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     return submitSessionAction(getSubReportDecideUrl(sessionId), { action, comment: comment || "" }, t.errSubReport);
   }
 
-  async function copySessionId(value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedSessionId(value);
-      window.setTimeout(() => setCopiedSessionId(""), COPY_HINT_MS);
-    } catch {
-      setError(t.errCopySession);
-    }
-  }
-
-  async function handleDownloadReport() {
-    if (!sessionId) return;
-    setError("");
-    try {
-      await downloadExperimentReport(sessionId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errDownloadReport);
-    }
-  }
-
   function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter") return;
     // Keep Shift+Enter for newline; ignore IME composition Enter.
@@ -1088,7 +1053,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     onFiles: addComposerFiles, onError: setError,
   }, !researcherMode && chatMode === "science_agent");
   const composerWaitingText = checkpointPlaceholder(checkpoint, Boolean(snapshot?.pending_interaction), t);
-  const hasReportData = Boolean(snapshot && (snapshot.tool_executions.length > 0 || snapshot.plan.length > 0));
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
     ? quotaExhausted
@@ -1098,56 +1062,35 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const isLocalMode = chatQuota?.mode === "local";
   const registryModels: ModelSpec[] = registry.data?.models || [];
   const keyStatus: Record<string, boolean> = registry.data?.key_status || {};
-  const defaultModelId = registry.data?.default_model || FALLBACK_MODEL_ID;
-  type ModelOption = {
-    value: string;
-    label: string;
-    disabled?: boolean;
-    title?: string;
-    provider?: string;
-    requiresAdapter?: boolean;
-    hasKey?: boolean;
-  };
-  // Local picker: graph models (+ custom in Expert). Agent still uses these ids
-  // as the underlying kimi LLM (engine stays kimi-code).
   const expertRegistryModels = useMemo(
     () => registryModels.filter((m) => isGraphEngineModel(m)),
     [registryModels]
   );
-  const modelOptions: ModelOption[] = [
-    ...expertRegistryModels.map((m) => {
-      const hasKey = keyStatus[m.provider] === true;
-      const requiresAdapter = m.requires_adapter === true;
-      const adapterReady = requiresAdapter ? Boolean(registry.data?.active_gateway) : true;
-      const disabled = !hasKey || !isFreeResearchModel(m) || (requiresAdapter && !adapterReady) || m.disabled === true;
-      const title = m.disabled
-        ? (m.disabled_reason || t.titleGatewayRequired)
-        : requiresAdapter && !adapterReady
-        ? t.titleGatewayRequired
-        : !hasKey
-        ? t.titleMissingKey(m.provider)
-        : t.titleModelInfo(m.label, m.provider);
-      return {
-        value: m.id,
-        label: hasKey ? m.label : `${m.label}${t.noKeySuffix}`,
-        disabled,
-        title,
-        provider: m.provider,
-        requiresAdapter,
-        hasKey,
-      };
-    }),
-    // Custom OpenAI-style endpoints are Expert-only (not registered in kimi).
-    ...(isLocalMode && chatMode === "science_expert"
-      ? customModels.map((m) => ({ value: m.id, label: `${m.label}${t.customSuffix}` }))
-      : []),
-  ];
+  const modelOptions = expertRegistryModels.map((m) => {
+    const hasKey = keyStatus[m.provider] === true;
+    const requiresAdapter = m.requires_adapter === true;
+    const adapterReady = requiresAdapter ? Boolean(registry.data?.active_gateway) : true;
+    const disabled = !hasKey || !isFreeResearchModel(m) || (requiresAdapter && !adapterReady) || m.disabled === true;
+    const title = m.disabled
+      ? (m.disabled_reason || t.titleGatewayRequired)
+      : requiresAdapter && !adapterReady
+      ? t.titleGatewayRequired
+      : !hasKey
+      ? t.titleMissingKey(m.provider)
+      : t.titleModelInfo(m.label, m.provider);
+    return {
+      value: m.id,
+      label: hasKey ? m.label : `${m.label}${t.noKeySuffix}`,
+      disabled,
+      title,
+    };
+  });
 
   const selectedModelSpec = registryModels.find((m) => m.id === selectedModel);
   const selectedProvider = selectedModelSpec?.provider || "";
   const selectedProviderHasKey = selectedProvider ? keyStatus[selectedProvider] === true : true;
-  // Local: model picker for both Agent (→ kimi) and Expert (→ graph).
-  const showLocalModelControls = isLocalMode && ["science_agent"].includes(chatMode) && !agentExecution;
+  // Keep the local fallback picker available before a harness selection exists.
+  const showLocalModelControls = isLocalMode && chatMode === "science_agent" && !agentExecution;
 
   // Keep selected model aligned with chat mode once registry is available.
   useEffect(() => {
@@ -1199,11 +1142,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }, [isLocalMode, selectedModel, customModels, chatMode]);
 
-  function openKeyPanelForProvider(provider: string) {
-    setKeyPanelProvider(provider);
-    setKeyPanelValue("");
-  }
-
   function handleChatModeChange(next: ChatMode, targetId?: string, updateUrl = true) {
     if (startingTurn || (next === activeModeRef.current && !researcherMode)) return;
     detachStream();
@@ -1213,7 +1151,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     persistChatMode(next);
     setFilePicker(null);
     setModelSwitchNotice("");
-    setKeyPanelProvider("");
     setError("");
     stopStream();
     setRunStatus("stopped");
@@ -1230,64 +1167,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }
 
   function handleModelChange(next: string) {
-    // Online: model is server-fixed (no client picker).
     if (!isLocalMode) return;
-    if (next === OTHER_MODEL_OPTION) {
-      // Custom endpoints are Expert-only.
-      if (chatMode !== "science_expert") {
-        handleChatModeChange("science_expert");
-        const nextParams = new URLSearchParams(workspaceParams);
-        nextParams.set("mode", "scientist");
-        setWorkspaceParams(nextParams, { replace: true });
-      }
-      setShowCustomModelModal(true);
-      return;
-    }
-    const prev = selectedModel;
+    if (selectedModel !== next && snapshot?.history?.length) setModelSwitchNotice(t.noticeModelSwitched);
     setSelectedModel(next);
-    // Stay in the current mode: Agent → kimi with this model; Expert → graph.
-    if (prev !== next && (snapshot?.history?.length || 0) > 0) {
-      setModelSwitchNotice(t.noticeModelSwitched);
-    }
-    // Expert/graph keys live in VF; Agent uses kimi's catalog — no VF key panel.
-    if (chatMode === "science_expert") {
-      const spec = registryModels.find((m) => m.id === next);
-      if (spec && keyStatus[spec.provider] !== true) {
-        openKeyPanelForProvider(spec.provider);
-      } else {
-        setKeyPanelProvider("");
-      }
-    } else {
-      setKeyPanelProvider("");
-    }
-  }
-
-  async function submitProviderKey() {
-    if (!keyPanelProvider) return;
-    const value = keyPanelValue.trim();
-    setKeyPanelSaving(true);
-    setError("");
-    try {
-      await setProviderKey(keyPanelProvider, value);
-      setKeyPanelProvider("");
-      setKeyPanelValue("");
-      registry.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errSaveKey);
-    } finally {
-      setKeyPanelSaving(false);
-    }
-  }
-
-  async function handleGatewayChange(next: string) {
-    const gatewayId = next === "" ? null : next;
-    setError("");
-    try {
-      await setActiveGateway(gatewayId);
-      registry.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errSwitchGateway);
-    }
   }
 
   async function exportCurrentSession() {
@@ -1300,72 +1182,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setError(err instanceof Error ? err.message : t.errExportSession);
     } finally {
       setRunning(false);
-    }
-  }
-
-  function saveCustomModel() {
-    const label = customModelLabel.trim() || customModelName.trim();
-    const modelName = customModelName.trim();
-    const apiKey = customModelApiKey.trim();
-    const baseUrl = customModelBaseUrl.trim();
-    if (!label || !modelName || !apiKey || !baseUrl) {
-      setError(t.errRequiredCustomModel);
-      return;
-    }
-    const normalizedLabel = label.toLowerCase();
-    const normalizedKey = `${baseUrl.toLowerCase()}::${modelName.toLowerCase()}`;
-    const builtInNameConflict = registryModels.some(
-      (m) => m.label.trim().toLowerCase() === normalizedLabel || m.id.trim().toLowerCase() === normalizedLabel
-    );
-    if (builtInNameConflict) {
-      setError(t.errLabelConflictBuiltIn);
-      return;
-    }
-    const labelConflict = customModels.some((m) => m.label.trim().toLowerCase() === normalizedLabel);
-    if (labelConflict) {
-      setError(t.errLabelConflict);
-      return;
-    }
-    const endpointConflict = customModels.some(
-      (m) => `${m.baseUrl.trim().toLowerCase()}::${m.modelName.trim().toLowerCase()}` === normalizedKey
-    );
-    if (endpointConflict) {
-      setError(t.errEndpointConflict);
-      return;
-    }
-    const item: OpenAIStyleModel = {
-      id: `custom-${Date.now()}`,
-      label,
-      modelName,
-      apiKey,
-      baseUrl,
-    };
-    setCustomModels((prev) => [...prev, item]);
-    setSelectedModel(item.id);
-    setShowCustomModelModal(false);
-    setCustomModelLabel("");
-    setCustomModelName("");
-    setCustomModelApiKey("");
-    setCustomModelBaseUrl("https://api.openai.com/v1");
-  }
-
-  async function removeCustomModel(modelId: string) {
-    setError("");
-    try {
-      await deleteCustomModelCache(modelId);
-      setCustomModels((prev) => prev.filter((m) => m.id !== modelId));
-      if (selectedModel === modelId) {
-        setSelectedModel(
-          chatMode === "science_agent"
-            ? SCIENCE_AGENT_MODEL_ID
-            : pickExpertModelId(registryModels, defaultModelId, {
-                expertModel: getExpertModelId(registry.data),
-              })
-        );
-        setModelSwitchNotice(t.noticeCustomRemoved);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errRemoveCustomModel);
     }
   }
 
@@ -1388,6 +1204,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     ? (lang === "zh" ? "请选择免费模型。" : "Select a free model.")
     : !agentExecution && !selectedProviderHasKey
     ? (lang === "zh" ? "请配置 API Key。" : "Add an API key for this model.") : "";
+
+  const quotaPill = chatQuota?.enforced && (
+    <span
+      className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
+      role="button" tabIndex={0} onClick={() => openQuota()} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openQuota(); } }}
+      title={t.quotaPillTitle(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+    >
+      {quotaExhausted
+        ? t.quotaPillExhausted(chatQuota.used ?? 0, chatQuota.limit ?? 3)
+        : t.quotaPillLabel(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+    </span>
+  );
 
   return (
     <div className="chat-page" ref={chatLayoutRef} data-new-chat={isNewChat} data-research-mode={researcherMode ? "researcher" : chatMode}>
@@ -1498,9 +1326,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                               {m.disabled ? t.gatewayRequiredSuffix : ""}
                             </option>
                           ))}
-                          {!researcherMode && chatMode === "science_expert" && (
-                            <option value={OTHER_MODEL_OPTION}>{t.otherModel}</option>
-                          )}
                         </select>
                         <span className="composer-select-chevron" aria-hidden="true">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -1509,52 +1334,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                         </span>
                       </span>
                     </label>
-                    {/* VF provider keys apply to Expert/graph only; Agent uses kimi's own catalog. */}
-                    {!researcherMode && chatMode === "science_expert" &&
-                      selectedModelSpec &&
-                      !isKimiEngineModel(selectedModelSpec) && (
-                      <button
-                        type="button"
-                        className={`model-key-chip${selectedProviderHasKey ? " is-ok" : " is-missing"}`}
-                        title={
-                          selectedProviderHasKey
-                            ? t.titleKeyConfigured(selectedProvider)
-                            : t.titleMissingKey(selectedProvider)
-                        }
-                        onClick={() => openKeyPanelForProvider(selectedProvider)}
-                      >
-                        <span className="model-key-dot" aria-hidden="true" />
-                        {selectedProviderHasKey ? t.keyOk : t.setKey}
-                      </button>
-                    )}
-                    {!researcherMode && chatMode === "science_expert" && (registry.data?.gateways?.length ?? 0) > 0 && (
-                      <label className="composer-select-shell composer-select-shell--compact">
-                        <span className="composer-select-meta">
-                          <span className="composer-select-label">{t.gatewayLabel}</span>
-                        </span>
-                        <span className="composer-select-field">
-                          <select
-                            className="composer-gateway-select"
-                            value={registry.data?.active_gateway || ""}
-                            onChange={(e) => void handleGatewayChange(e.target.value)}
-                            aria-label={t.gatewayAria}
-                            title={t.activeGateway}
-                          >
-                            <option value="">{t.noGateway}</option>
-                            {(registry.data?.gateways || []).map((g) => (
-                              <option key={g.id} value={g.id}>
-                                {g.label}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="composer-select-chevron" aria-hidden="true">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="6 9 12 15 18 9" />
-                            </svg>
-                          </span>
-                        </span>
-                      </label>
-                    )}
                   </>
                 )}
         </div>
@@ -1600,80 +1379,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
               <div className="scientist-composer-footer" ref={setScienceFooter}/>
             </div>
-            {keyPanelProvider && (
-              <div
-                className="model-key-panel"
-                role="dialog"
-                aria-label={t.keyPanelAria(keyPanelProvider)}
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  alignItems: "center",
-                  padding: "8px 10px",
-                  marginTop: "6px",
-                  border: "1px solid #e0c080",
-                  background: "#fff8e6",
-                  borderRadius: "6px",
-                }}
-              >
-                <div style={{ display: "grid", gap: 4, flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: "13px" }}>
-                    {t.keyPanelLabelPre}<strong>{keyPanelProvider}</strong>{t.keyPanelLabelPost}
-                  </span>
-                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>{t.keyPanelHint}</span>
-                </div>
-                <input
-                  type="password"
-                  value={keyPanelValue}
-                  onChange={(e) => setKeyPanelValue(e.target.value)}
-                  placeholder="sk-..."
-                  disabled={keyPanelSaving}
-                  style={{ flex: 1, minWidth: 0 }}
-                  autoFocus
-                />
-                <button
-                  className="btn-primary"
-                  onClick={() => void submitProviderKey()}
-                  disabled={keyPanelSaving || !keyPanelValue.trim()}
-                >
-                  {keyPanelSaving ? t.keyPanelSaving : t.save}
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => {
-                    setKeyPanelValue("");
-                    void (async () => {
-                      if (!keyPanelProvider) return;
-                      setKeyPanelSaving(true);
-                      setError("");
-                      try {
-                        await setProviderKey(keyPanelProvider, "");
-                        setKeyPanelProvider("");
-                        setKeyPanelValue("");
-                        registry.refresh();
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : t.errSaveKey);
-                      } finally {
-                        setKeyPanelSaving(false);
-                      }
-                    })();
-                  }}
-                  disabled={keyPanelSaving}
-                >
-                  {t.clearKey}
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => {
-                    setKeyPanelProvider("");
-                    setKeyPanelValue("");
-                  }}
-                  disabled={keyPanelSaving}
-                >
-                  {t.cancel}
-                </button>
-              </div>
-            )}
             {!researcherMode && chatMode === "science_agent" && (files.length > 0 || workspaceFiles.length > 0) && (
               <AttachedFiles files={files} workspaceFiles={workspaceFiles} running={running} lang={lang}
                 workspaceSuffix={t.workspaceSuffix} onRemoveFile={index => setFiles(previous => previous.filter((_, i) => i !== index))}
@@ -1682,17 +1387,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           </div>
         </section>
 
-        {researcherMode && <div className="chat-file-actions">{chatQuota?.enforced && (
-                  <span
-                    className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
-                    role="button" tabIndex={0} onClick={() => openQuota()} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openQuota(); } }}
-                    title={t.quotaPillTitle(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
-                  >
-                    {quotaExhausted
-                      ? t.quotaPillExhausted(chatQuota.used ?? 0, chatQuota.limit ?? 3)
-                      : t.quotaPillLabel(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
-                  </span>
-                )}</div>}
+        {researcherMode && <div className="chat-file-actions">{quotaPill}</div>}
         {!researcherMode && <SessionFilesPanel sessionId={sessionId} authHeaders={sessionId ? getChatSessionAuthHeaders(sessionId) : undefined} liveRefresh={running || goalRunning} pollMs={5000} actions={<button
                   type="button"
                   className="session-files-toggle chat-export-button"
@@ -1706,63 +1401,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                </button>} quota={<>{chatQuota?.enforced && (
-                  <span
-                    className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
-                    role="button" tabIndex={0} onClick={() => openQuota()} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openQuota(); } }}
-                    title={t.quotaPillTitle(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
-                  >
-                    {quotaExhausted
-                      ? t.quotaPillExhausted(chatQuota.used ?? 0, chatQuota.limit ?? 3)
-                      : t.quotaPillLabel(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
-                  </span>
-                )}</>}/>}
+                </button>} quota={quotaPill}/>}
       </section>
-      {showCustomModelModal && isLocalMode && (
-        <div className="modal-backdrop">
-          <div className="custom-model-modal">
-            <h3>{t.addCustomModel}</h3>
-            <label>
-              {t.displayName}
-              <input value={customModelLabel} onChange={(e) => setCustomModelLabel(e.target.value)} placeholder={t.displayNamePlaceholder} />
-            </label>
-            <label>
-              {t.modelName}
-              <input value={customModelName} onChange={(e) => setCustomModelName(e.target.value)} placeholder={t.modelNamePlaceholder} />
-            </label>
-            <label>
-              {t.apiKey}
-              <input type="password" value={customModelApiKey} onChange={(e) => setCustomModelApiKey(e.target.value)} placeholder="sk-..." />
-            </label>
-            <label>
-              {t.baseUrl}
-              <input value={customModelBaseUrl} onChange={(e) => setCustomModelBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
-            </label>
-            <div className="custom-model-modal-actions">
-              <button className="btn-secondary" onClick={() => setShowCustomModelModal(false)}>{t.cancel}</button>
-              <button className="btn-primary" onClick={saveCustomModel}>{t.confirm}</button>
-            </div>
-            <div className="custom-model-list">
-              <h4>{t.addedModels}</h4>
-              {customModels.length === 0 ? (
-                <div className="custom-model-empty">{t.noCustomModels}</div>
-              ) : (
-                customModels.map((m) => (
-                  <div key={m.id} className="custom-model-item">
-                    <div className="custom-model-item-main">
-                      <strong>{m.label}</strong>
-                      <small>{m.modelName} | {m.baseUrl}</small>
-                    </div>
-                    <button className="btn-secondary custom-model-delete-btn" onClick={() => void removeCustomModel(m.id)}>
-                      {t.deleteBtn}
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

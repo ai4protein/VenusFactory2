@@ -4,6 +4,7 @@ One source checkout runs local and online services with separate state roots.
 
 ```text
 frontend/                       React UI, styles, assets and frontend tests
+  src/pages/chat/               Chat-specific checkpoints, history projection, attachments and UI copy
 backend/                        HTTP API, auth, quotas, sessions, persistent jobs
   web_v2/                       Shared queue, worker pool, events and API modules
 mcp_tools/                      Shared scientific capability service
@@ -59,6 +60,11 @@ inputs and enqueues work. Independent workers claim leased jobs and persist even
 Scientific capabilities are served through MCP; model packages own implementation
 and runtime adapters. Agent code plans work and calls tools; it does not contain
 another copy of model inference code.
+
+The chat route owns the active session, draft and stream lifecycle. Its modules in
+`frontend/src/pages/chat/` project snapshots into checkpoints and history rows
+and render chat-specific attachment controls. Shared session, SSE and API code
+lives in `frontend/src/lib/`. Researcher and Scientist keep their own panels.
 
 Harness runtime discovery belongs to `agent.harness.installation`. Agent and
 Scientist services and standalone goal runners call this module directly. The
