@@ -124,7 +124,7 @@ async def test_native_development_and_reuse_roundtrip(tmp_path):
     assert audited["packet"]["model"]["plugin_id"] == api.PLUGIN_ID
 
 
-def test_agent_describes_full_assay_inputs_and_uses_plugin(tmp_path):
+def test_archive_documents_assay_inputs_and_blocks_public_inference(tmp_path):
     from mcp_tools.models.evolved import service
 
     task, parts = make_task(tmp_path / "data")
@@ -140,7 +140,7 @@ def test_agent_describes_full_assay_inputs_and_uses_plugin(tmp_path):
             }
 
         def predict(self, entry_id, inputs, scope, session_id):
-            return {"predictions": plugin.predict(model, inputs, scope), "entry_id": entry_id}
+            pytest.fail("Public inference attempted to execute an archived model")
 
     library = Library()
     entry_id = "e" * 64
@@ -150,8 +150,9 @@ def test_agent_describes_full_assay_inputs_and_uses_plugin(tmp_path):
     assert card["input_contract"]["representation"] == task["scope"]["representation"]
     assert card["input_contract"]["target_required"] is False
     inputs = api.inference_inputs(parts["future"])
-    result = service.predict_model(library, entry_id, inputs, task["scope"])
-    assert len(result["predictions"]) == len(inputs)
+    assert len(plugin.predict(model, inputs, task["scope"])) == len(inputs)
+    with pytest.raises(RuntimeError, match="RSI Plaza"):
+        service.predict_model(library, entry_id, inputs, task["scope"])
 
 
 def assay_pair(root):
