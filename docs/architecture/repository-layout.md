@@ -178,16 +178,12 @@ SHA-256 digest for the session directory. MCP submission validates that mapping
 before binding the child worker to the goal's workspace. The original session
 identity remains unchanged for ownership checks and event recovery.
 
-Private Scientist capability discovery derives ownership from the live worker
-lease and its parent task in `backend/web_v2/research_capability_access.py`.
-The current session database determines which goal libraries are accessible;
-model arguments cannot choose a user or storage path. `generated_scope.py` in
-the MCP discovery package combines those reviewed deliveries with operator-published
-capabilities. Search returns compact metadata, description loads one contract,
-and execution rechecks ownership, enablement, SC and technical review evidence.
-`scoped.py` exposes that same view to native harnesses alongside the older model
-registry. Invocation resolves to the existing queued tool rather than a separate
-prediction backend. Public publication remains an operator action.
+Scientist keeps each topic's source, report and evidence in its own workspace.
+The case archive and its HTTP endpoints belong to `backend/web_v2/rsi_plaza.py`
+and `backend/web_v2/rsi_plaza_api.py`. Owners can browse their private cases.
+The operator selects cases for public preview and ZIP download. Agent and
+Researcher discover callable platform tools through MCP. The gateway enforces
+the archive boundary in `mcp_tools/models/evolved/policy.py`.
 
 Tool discovery separates session navigation from model metadata. Harness adapters
 use the shared discovery broker to track which tool was inspected during a turn.
@@ -210,20 +206,12 @@ server-assigned workspace policy. Feedback never copies submitted values,
 undeclared field names or validator traces; no compute job is created for invalid
 arguments.
 
-Model origin is separate from scientific function. For example, ProteinMPNN and
-LigandMPNN are both pretrained methods; DeepSol · ESM2-650M is a factory-trained
-task model; a reviewed Scientist solubility predictor is an RSI artifact. All use
-the same discovery, queue and access-control path. An unreviewed research result
-must not become public merely because its code executed successfully.
-Evolved-model calls can carry a compact `scope_ref` from their selected
-model description. `mcp_tools/models/evolved/scope.py` binds it to the immutable
-entry and complete scope before numerical execution; the library still owns
-evidence verification and prediction receipts.
-`mcp_tools/models/evolved/result_delivery.py` checks those receipts before creating
-session-owned exports. It derives the short applicability summary supplied to
-native harnesses from the same checked scope, preserving named bounds and units.
-The complete scope, prediction values and receipt remain in the tool result and
-downloadable JSON; the host does not rewrite the assistant's final answer.
+Model code has three owners. Upstream methods such as ProteinMPNN and LigandMPNN
+use `mcp_tools/models/pretrained/`. Factory-trained predictors such as DeepSol ·
+ESM2-650M use `mcp_tools/models/factory/`. Both can serve enabled tools through
+the scheduler. Internal code for inspecting and replaying recorded RSI model
+artifacts lives in `mcp_tools/models/evolved/`. User-facing Scientist results
+are presented in [RSI Plaza](../manual/en/rsi-plaza.md).
 
 Skills are instructions, not executable plugins. Keep upstream licenses and the
 submodule revision. Native IDs take precedence; collisions use `sas_<name>`.
@@ -239,12 +227,9 @@ Dated work logs and machine-specific profiles are archived locally under ignored
 `archive/research-notes/`. Experiment evidence is preserved under `research_runs/`.
 Only reusable protocols and credential-free templates belong in source control.
 
-RSI experiment history is distinct from a deployable capability. A topic keeps
-trial code and metrics in its workspace; the host packages the selected,
-independently approved result. Later versions of the same topic and scope replace
-the default discovery entry while retaining immutable earlier versions. See
-[Scientist delivery](../scientist-model-development.md) and
-[RSI source ownership](../../src/agent/rsi/README.md).
+A Scientist topic retains its program, metrics and review evidence with the
+original run. See [Scientist delivery](../scientist-model-development.md) and
+[RSI source ownership](../../src/agent/rsi/README.md) for the artifact lifecycle.
 
 Do not merge local and online state. Do not move a Python venv after installation:
 its entry-point shebangs can contain absolute paths. Installations can be shared
