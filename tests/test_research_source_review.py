@@ -459,3 +459,33 @@ async def test_long_chapter_sends_only_flagged_text_and_records_author_timeout()
     assert requests[0]["sources"] and requests[0]["issues"]
     assert chapter["draft"] == draft and chapter["status"] == "partial"
     assert chapter["revision_error"] == {"stage": "author", "type": "TimeoutError"}
+
+
+def test_negative_whole_unit_feedback_preserves_review_failure():
+    request = sr.packet(sr.units(DOCUMENT, [SOURCE]), [SOURCE])
+    row = json.loads(assessment(request, verdict="uncertain"))["assessments"][0]
+    row["issues"][0]["claim"] = row["unit_id"]
+    result = validation.validate_assessments(json.dumps([row]), request, [SOURCE])[0]
+    assert result["passed"] is False
+    assert result["issues"][0]["claim"] == request["units"][0]["text"]
+    row["verdict"] = "supported"
+    with pytest.raises(ValueError):
+        validation.validate_assessments(json.dumps([row]), request, [SOURCE])
+
+
+def test_author_can_remove_flagged_unit_without_editing_protected_neighbors():
+    from backend.web_v2.research_chapter_edits import apply_unit_edits
+    draft = "Keep this first.\n\nRemove this assertion.\n\nKeep this last."
+    target = {"id": "chapter:2", "text": "Remove this assertion."}
+    edits = json.dumps([{"unit_id": target["id"], "text": ""}])
+    assert apply_unit_edits(draft, [target], "```JSON\n" + edits + "\n```") == draft.replace(target["text"], "")
+
+
+def test_scoped_revision_keeps_neighbor_review_signatures():
+    from backend.web_v2.research_chapter_edits import apply_unit_edits, scoped_replacement
+    doc = {**DOCUMENT, "text": "First fact. [S1]\n\nNeighboring fact. [S1]"}
+    first, neighbor = sr.units(doc, [SOURCE])
+    answer = "### Finding\n\nFirst revision. [S1]\n\nSecond sentence. [S1]"
+    edit = {"unit_id": first["id"], "text": scoped_replacement(first, answer)}
+    doc["text"] = apply_unit_edits(doc["text"], [first], json.dumps([edit]))
+    assert sr.units(doc, [SOURCE])[1:] == [neighbor]

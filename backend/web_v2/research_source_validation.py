@@ -125,6 +125,10 @@ def _validate_assessment_rows(rows, request, sources):
             raise ValueError("Invalid assessment classification or verdict")
         if not isinstance(row["issues"], list) or len(row["issues"]) > 8:
             raise ValueError("Invalid issue list")
+        if row["verdict"] in {"unsupported", "uncertain"}:
+            row = {**row, "issues": [
+                {**issue, "claim": unit["text"]} if isinstance(issue, dict) and issue.get("claim") == unit["id"]
+                else issue for issue in row["issues"]]}
         for issue in row["issues"]:
             if (not isinstance(issue, dict) or set(issue) != {"claim", "reason"}
                     or not isinstance(issue["claim"], str) or not issue["claim"].strip()

@@ -38,7 +38,7 @@ Return JSON only: {"assessments":[{"unit_id":"...","classification":"factual" or
 "evidence":[{"passage_id":"S1.1"}]}]}.
 Cover each unit exactly once. For a supported factual unit, select passages that jointly support ALL its factual assertions.
 A passage ID is a locator, not proof by itself. Read its content and reject unsupported assertions.
-Passage IDs may be returned as strings or as objects with passage_id. Use the whole unit verbatim for claim if narrowing the quoted issue is difficult.
+Passage IDs may be returned as strings or as objects with passage_id. For an issue affecting the whole unit, set claim to its unit_id and give the specific reason. The host expands that ID to the original text only for a negative verdict.
 Use proposal only for an explicitly proposed future action containing no claimed observations.
 If any assertion lacks support, mark the unit unsupported or uncertain and identify that assertion.
 A correction field contains validator feedback on the previous attempt. Correct only the supplied
@@ -185,6 +185,7 @@ def feedback(state, document):
                                   "Quoted evidence does not contain the claimed measured value",
                                   "Factual assertions require original-source evidence",
                                   "Proposal-only units must contain only explicitly prospective actions",
+                                  "Issue must identify a claim in this unit",
                                   "Unknown source citation")):
                 source_errors[item["input_sha256"]] = reason
     bad = []

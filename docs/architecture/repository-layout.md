@@ -112,6 +112,14 @@ Reconnecting replays the saved worker log; parsing a metric never starts a task
 or grants artifact access. Model routes share JSON event encoding in
 `backend/web_v2/sse_events.py`; non-finite metrics become null values for browser parsing.
 
+Scientist keeps each iteration's submitted artifacts and review decision in its own
+episode. For analysis tasks, `research_workspace.py` saves the checkpoint and
+`research_analysis_history.py` resolves earlier evidence. A report can carry
+forward when a completed step records its hash alongside the same computation,
+the workspace bytes still match, and the new submission includes no replacement
+report. SC assesses each claimed step independently. The checkpoint lists the
+measurements under review, while the provenance history identifies upstream inputs.
+
 Researcher keeps job ownership and recovery in `backend/web_v2/research_jobs.py`.
 The long-form coordinator schedules retrieval and specialist writers; document
 acceptance and rendering belong to `research_documents.py`. API views and ZIP
@@ -132,6 +140,10 @@ changing report state; normal responses and retry results use the same validator
 Explicit measurement checks belong to `research_measurements.py`; values retain
 their dimensions and unit conversions. Changes to acceptance policy invalidate
 older receipts while preserving their original review evidence.
+`research_source_repair.py` sends the author one flagged paragraph at a time.
+`research_chapter_edits.py` maps that paragraph to its Markdown span and applies
+the replacement. Document checks and independent source review then evaluate the
+revised text. Unchanged neighboring paragraphs retain their review identities.
 Chapter evidence selection and writer context belong to `research_chapter_context.py`.
 Specialists receive topic-selected source excerpts under one serialized context
 budget, with citation identities, query scope and material extraction limits.
