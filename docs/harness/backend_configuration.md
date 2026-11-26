@@ -90,12 +90,12 @@ Web 遇到供应商 429 后终止本轮自动重试；内部网关向原生 SDK 
 兼容性回归：
 
 ```bash
-python -m pytest -q tests/harness/test_native_compatibility.py \
-  tests/harness/test_web_live_text.py tests/harness/test_messages_bridge.py \
-  tests/harness/test_responses_bridge.py \
-  tests/harness/test_codex_adapter.py tests/harness/test_claude_events.py \
-  tests/harness/test_claude_host.py tests/harness/test_responses_gateway.py \
-  tests/harness/test_configured_free_routes.py tests/harness/test_user_interactions.py
+python -m pytest -q tests/harness/providers/test_native_compatibility.py \
+  tests/harness/providers/test_web_live_text.py tests/harness/providers/test_messages_bridge.py \
+  tests/harness/providers/test_responses_bridge.py \
+  tests/harness/providers/test_codex_adapter.py tests/harness/providers/test_claude_events.py \
+  tests/harness/providers/test_claude_host.py tests/harness/providers/test_responses_gateway.py \
+  tests/harness/providers/test_configured_free_routes.py tests/harness/test_user_interactions.py
 ```
 
 `scripts/harness/check_compatibility.py` 使用与 Web 相同的隔离原生客户端和渐进式工具发现。默认只检查配置；添加 `--execute` 才会向明确选定的免费模型发送公开合成序列，每组合最多 6 次请求，顺序执行，无付费回退。报告分别记录静态准入和实际成功，不把服务商临时限流判定为永久不兼容。

@@ -800,11 +800,11 @@ scripted local provider, and require the managed runtime plus bubblewrap:
 ```bash
 PYTHONPATH=.:src PYTHON_DOTENV_DISABLED=1 VENUS_TEST_NATIVE_CODEX=1 \
   VENUS_TEST_RUNTIME_ROOT=/path/to/installation \
-  python -m pytest -q tests/harness/test_native_codex_compaction.py
+  python -m pytest -q tests/harness/providers/test_native_codex_compaction.py
 
 # Set VENUS_DSH_BIN and VENUS_DSH_SITE when using a separate installation.
 PYTHONPATH=.:src PYTHON_DOTENV_DISABLED=1 VENUS_TEST_NATIVE_DSH=1 \
-  python -m pytest -q tests/harness/test_native_dsh_recovery.py
+  python -m pytest -q tests/harness/providers/test_native_dsh_recovery.py
 ```
 
 A provider context rejection can still be terminal if the native SDK does not

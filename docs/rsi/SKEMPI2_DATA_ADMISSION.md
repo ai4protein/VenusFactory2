@@ -134,7 +134,7 @@ until executed and measured. Independent scientific review is still required.
 ## Verification
 
 ```bash
-python -m pytest -q tests/rsi/test_skempi_source.py tests/rsi/test_skempi_task.py
+python -m pytest -q tests/rsi/datasets/test_skempi_source.py tests/rsi/datasets/test_skempi_task.py
 ```
 
 Tests cover censored values, units and ddG sign, source checksums, archive paths,

@@ -36,6 +36,8 @@ tests/                          Python tests grouped by the component they exerc
   jobs/, web/                   Queues, PBS/Slurm, HTTP endpoints and online policies
   mcp/, models/, platform/      Tool gateway, model behavior, installation and configuration
   support/, integration/        Shared fixtures and live checks
+  harness/providers/            Provider adapters, protocols and native transport
+  rsi/cases/, rsi/datasets/     Paper reproduction cases and dataset-specific protocols
 frontend/tests/                 UI component and interaction tests
 docs/manual/                    Canonical bilingual platform manual
 docs/wiki/                      Generated manual pages and installation guides
