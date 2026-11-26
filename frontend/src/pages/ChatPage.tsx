@@ -1,12 +1,14 @@
+import { conversationHistory } from "./chat/conversationHistory";
+import { ConversationCheckpoints } from "./chat/ConversationCheckpoints";
+import { checkpointForSession, checkpointPlaceholder } from "./chat/conversationCheckpoint";
 import { chatMessages, friendlyErrorHint } from "./chat/chatMessages";
 import { useChatStream } from "../lib/useChatStream";
 import { sanitizeChatSnapshot } from "../lib/chatStreamState";
-import { mergeHistoryActivity, submissionHistoryRow } from "../lib/optimisticHistory";
+import { submissionHistoryRow } from "../lib/optimisticHistory";
 import { NewChatStart } from "../components/NewChatStart";
 import { ChatModeIcon } from "../components/ChatModeIcon";
 import { UnifiedChatHistory } from "../components/UnifiedChatHistory";
-import { claimNewChatDraft, newChatLocation, CHAT_MODE_LABELS, historyRowKey, type ChatHistoryRow, type ResearchHistoryRow } from "../lib/unifiedChatHistory";
-import { InteractionCard } from "../components/InteractionCard";
+import { claimNewChatDraft, newChatLocation, CHAT_MODE_LABELS, type ResearchHistoryRow } from "../lib/unifiedChatHistory";
 import type { UserResponse } from "../lib/interactions";
 import { manualQuestion } from "../lib/manualCatalog";
 import { moveResearchDraft } from "../lib/researchContinuity";
@@ -34,15 +36,8 @@ import { PageLoading } from "../components/PageLoading";
 import { isFreeResearchModel } from "../lib/researchUi";
 import { ScienceGoalPanel } from "../components/ScienceGoalPanel";
 import { ChatTimeline } from "../components/ChatTimeline";
-import { openStructure, isStructureFile } from "../lib/structurePreview";
 import { SessionFilesPanel } from "../components/SessionFilesPanel";
-import { AskUserCard } from "../components/AskUserCard";
-import { ApprovalCard, type ApprovalDecision } from "../components/ApprovalCard";
-import { ClarificationForm } from "../components/ClarificationForm";
-import { IterationDecision } from "../components/IterationDecision";
-import { PlanEditor } from "../components/PlanEditor";
-import { StepCheckpoint } from "../components/StepCheckpoint";
-import { SubReportCheckpoint } from "../components/SubReportCheckpoint";
+import type { ApprovalDecision } from "../components/ApprovalCard";
 import { isResearchNoiseTool, type ToolExecution } from "../components/ToolExecutionCard";
 import {
   cancelChatSession,
@@ -70,7 +65,7 @@ import {
 } from "../lib/api";
 import { streamSSEFromPost, streamSSEFromGet } from "../lib/sse";
 import { runChatStreamAction, runChatUpdateAction, cancelChatStreamAction } from "../lib/chatActions";
-import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
+import { AttachedFiles, ComposerFilePicker, type AttachmentPanel } from "./chat/ComposerAttachments";
 import { type WorkspaceFile } from "../lib/workspaceApi";
 import {
   useModelRegistry,
@@ -211,10 +206,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     observer.observe(timeline);
     return () => observer.disconnect();
   }, []);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const fileSourceMenuRef = useRef<HTMLDivElement | null>(null);
-  const [fileSourceMenuOpen, setFileSourceMenuOpen] = useState(false);
-  const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
+  const [filePicker, setFilePicker] = useState<AttachmentPanel>(null);
   const LEGACY_SESSION_STORAGE_KEY = "vf2_active_session_id";
   const COPY_HINT_MS = 1200;
   const [copiedSessionId, setCopiedSessionId] = useState("");
@@ -304,26 +296,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   useEffect(() => {
     runningRef.current = running;
   }, [running]);
-
-  useEffect(() => {
-    if (!fileSourceMenuOpen) return;
-    function onDocPointerDown(ev: MouseEvent) {
-      const root = fileSourceMenuRef.current;
-      if (!root) return;
-      if (ev.target instanceof Node && !root.contains(ev.target)) {
-        setFileSourceMenuOpen(false);
-      }
-    }
-    function onKeyDown(ev: KeyboardEvent) {
-      if (ev.key === "Escape") setFileSourceMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onDocPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onDocPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [fileSourceMenuOpen]);
 
   const visibleHistory = useMemo(() => chatHistoryWithPending(snapshot?.history || [], pendingTurn, sessionId), [snapshot?.history, pendingTurn, sessionId]);
   useEffect(() => {
@@ -772,7 +744,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     try {
       await validateUploads(picked);
       setFiles(previous => mergeFiles(previous, picked));
-      setFileSourceMenuOpen(false); setError("");
+      setFilePicker(previous => previous === "sources" ? null : previous); setError("");
     } catch (error) { setError((error as Error).message); }
     finally { addingFilesRef.current = false; setAddingFiles(false); }
   }
@@ -1106,65 +1078,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     void sendMessage();
   }
 
-  const waitingFor = snapshot?.waiting_for || "";
-  const snapStatus = snapshot?.status || "";
-  // Hard split: gate UI follows the *session* mode (snapshot), not the composer
-  // toggle. Expert = LangGraph checkpoints only; Agent = kimi Ask/Approve only.
-  const sessionMode: ChatMode =
-    snapshot?.chat_mode === "science_agent" ||
-    snapshot?.engine === "kimi-code" ||
-    waitingFor === "kimi_question" ||
-    waitingFor === "kimi_approval" ||
-    snapStatus === "waiting_for_kimi_question" ||
-    snapStatus === "waiting_for_kimi_approval"
-      ? "science_agent"
-      : snapshot?.chat_mode === "science_expert" ||
-          snapshot?.engine === "graph" ||
-          snapStatus === "waiting_for_clarification" ||
-          snapStatus === "waiting_for_plan_confirmation" ||
-          snapStatus === "waiting_for_sub_report_review" ||
-          snapStatus === "waiting_for_step_review" ||
-          snapStatus === "waiting_for_iteration"
-        ? "science_expert"
-        : chatMode;
-  const isAgentSession = sessionMode === "science_agent";
-  const isExpertSession = sessionMode === "science_expert";
-
-  const isKimiAskUser =
-    isAgentSession &&
-    (waitingFor === "kimi_question" ||
-      snapStatus === "waiting_for_kimi_question" ||
-      Boolean(snapshot?.kimi_pending_question));
-  const isKimiApproval =
-    isAgentSession &&
-    !isKimiAskUser &&
-    (waitingFor === "kimi_approval" ||
-      snapStatus === "waiting_for_kimi_approval" ||
-      Boolean(snapshot?.kimi_pending_approval));
-  const isExpertClarification =
-    isExpertSession &&
-    snapStatus === "waiting_for_clarification" &&
-    (waitingFor === "clarification" || waitingFor === "");
-  // If the graph paused on a sub-report, always show Continue/Rewrite.
-  // (review_sub_reports only controls whether the graph pauses — not whether
-  // the already-paused UI may render. Hiding the card left users stuck.)
-  const isSubReportGate =
-    isExpertSession && snapStatus === "waiting_for_sub_report_review";
-  const isExpertPlanGate =
-    isExpertSession && snapStatus === "waiting_for_plan_confirmation";
-  const isExpertStepGate =
-    isExpertSession && snapStatus === "waiting_for_step_review";
-  const isExpertIterationGate =
-    isExpertSession && snapStatus === "waiting_for_iteration";
-  const isWaitingForInteraction =
-    Boolean(snapshot?.pending_interaction) ||
-    isKimiAskUser ||
-    isKimiApproval ||
-    isExpertClarification ||
-    isExpertPlanGate ||
-    isExpertStepGate ||
-    isExpertIterationGate ||
-    isSubReportGate;
+  const checkpoint = checkpointForSession(snapshot, chatMode);
+  const isWaitingForInteraction = Boolean(snapshot?.pending_interaction || checkpoint);
   useFileTransfer(composerElement, {
     disabled: running || goalRunning || addingFiles || isWaitingForInteraction,
     label: lang === "zh" ? "松开以添加文件" : "Drop files to attach",
@@ -1172,29 +1087,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     unreadable: lang === "zh" ? "请选择文件，暂不支持文件夹。" : "Choose files; folders are not supported.",
     onFiles: addComposerFiles, onError: setError,
   }, !researcherMode && chatMode === "science_agent");
-  const composerWaitingText = (() => {
-    if (snapshot?.pending_interaction) return t.composerWaitingAskUser;
-    if (isKimiApproval) return t.composerWaitingApproval;
-    if (isKimiAskUser) return t.composerWaitingAskUser;
-    switch (snapStatus) {
-      case "waiting_for_clarification":
-        return t.composerWaitingClarification;
-      case "waiting_for_kimi_question":
-        return t.composerWaitingAskUser;
-      case "waiting_for_kimi_approval":
-        return t.composerWaitingApproval;
-      case "waiting_for_plan_confirmation":
-        return t.composerWaitingPlan;
-      case "waiting_for_sub_report_review":
-        return t.composerWaitingSubReport;
-      case "waiting_for_step_review":
-        return t.composerWaitingStep;
-      case "waiting_for_iteration":
-        return t.composerWaitingIteration;
-      default:
-        return t.composerWaiting;
-    }
-  })();
+  const composerWaitingText = checkpointPlaceholder(checkpoint, Boolean(snapshot?.pending_interaction), t);
   const hasReportData = Boolean(snapshot && (snapshot.tool_executions.length > 0 || snapshot.plan.length > 0));
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
@@ -1318,8 +1211,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     activeModeRef.current = next;
     setChatMode(next);
     persistChatMode(next);
-    setFileSourceMenuOpen(false);
-    setWorkspacePickerOpen(false);
+    setFilePicker(null);
     setModelSwitchNotice("");
     setKeyPanelProvider("");
     setError("");
@@ -1477,22 +1369,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
-  function historyIsRunning(row: { session_id: string; status?: string }) {
-    if (row.session_id === scientistSessionId && isRunActive(goalStatuses[row.session_id])) return true;
-    if (row.session_id === sessionId && agentWorking) return true;
-    return isRunActive(row.status);
-  }
-
   const isNewChat = !routeSessionId && (researcherMode || !sessionId) && !startingTurn && !pendingTurn;
-  const sharedHistory: ChatHistoryRow[] = mergeHistoryActivity([
-    ...sessions.map(s => ({ id: s.session_id, mode: s.chat_mode || "science_agent" as const,
-      title: (!researcherMode && s.session_id === sessionId ? activeSessionTitle : "") || s.title?.trim() || t.newChat,
-      date: s.created_at, running: historyIsRunning(s), canDelete: true })),
-    ...researchReports.map(r => ({ id: r.id, mode: "researcher" as const, title: r.title,
-      date: r.created * 1000, running: ["queued", "running"].includes(r.status), canDelete: chatQuota?.mode === "online" })),
-  ], historyActivity);
-  const visibleHistoryMode = researcherMode ? "researcher" : chatMode;
-  const historyActiveId = (researcherMode ? routeSessionId : sessionId) || Object.values(historyActivity).find(row => row.mode === visibleHistoryMode)?.id || "";
+  const history = conversationHistory({
+    sessions, reports: researchReports, activity: historyActivity,
+    activeMode: researcherMode ? "researcher" : chatMode,
+    activeId: researcherMode ? routeSessionId : sessionId, activeTitle: activeSessionTitle,
+    agentRunId: agentWorking ? sessionId : "",
+    scientistRunId: isRunActive(goalStatuses[scientistSessionId]) ? scientistSessionId : "",
+    online: chatQuota?.mode === "online", untitled: t.newChat,
+  });
   const nativeUnavailable = registryModels.find(m => isKimiEngineModel(m))?.disabled;
   const agentBlockedReason = !agentCatalogReady
     ? (lang === "zh" ? "请选择可用的执行器和模型。" : "Choose an available executor and model.")
@@ -1508,7 +1393,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     <div className="chat-page" ref={chatLayoutRef} data-new-chat={isNewChat} data-research-mode={researcherMode ? "researcher" : chatMode}>
       <section className="chat-grid">
         <SidebarContent>
-          <UnifiedChatHistory rows={sharedHistory} activeKey={historyRowKey({ id: historyActiveId, mode: visibleHistoryMode })}
+          <UnifiedChatHistory rows={history.rows} activeKey={history.activeKey}
             lang={lang} disabled={startingTurn}
             onOpen={row => { navigate(chatSessionLocation(lang, row.id, row.mode)); closeOnNarrow(); }}
             onDelete={row => row.mode === "researcher" ? researcherPanelRef.current?.deleteReport(row.id) || Promise.resolve(false) : deleteAndSelectNextSession(row.id)}/>
@@ -1546,102 +1431,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 setMessage((prev) => `${quoted}\n\n${prev}`);
               }}
             />}
-            {!researcherMode && chatMode === "science_agent" && snapshot?.pending_interaction &&
-              <InteractionCard key={snapshot.pending_interaction.id} interaction={snapshot.pending_interaction}
-                sessionId={sessionId} disabled={agentWorking} onSubmit={submitInteraction}/>}
-            {/* Science Agent (kimi-code) gates — never mix with Expert forms */}
-            {!researcherMode && isAgentSession &&
-              streamingIdx < 0 &&
-              isKimiAskUser &&
-              (snapshot?.clarification_questions?.length ?? 0) > 0 && (
-                <div className="agent-gate-wrap">
-                  <AskUserCard
-                    key={`ask-${waitingFor}-${!researcherMode && snapshot?.kimi_pending_question?.question_id || ""}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 80)}`}
-                    questions={snapshot!.clarification_questions}
-                    onSubmit={submitAskUser}
-                    disabled={running}
-                  />
-                </div>
-              )}
-            {!researcherMode && isAgentSession && streamingIdx < 0 && isKimiApproval && (
-                <div className="agent-gate-wrap">
-                  <ApprovalCard
-                    key={`appr-${waitingFor}-${!researcherMode && snapshot?.kimi_pending_approval?.approval_id || ""}`}
-                    toolName={!researcherMode && snapshot?.kimi_pending_approval?.tool_name || ""}
-                    prompt={
-                      snapshot?.kimi_pending_approval?.approval_prompt ||
-                      snapshot?.approval_prompt ||
-                      ""
-                    }
-                    planMarkdown={
-                      snapshot?.kimi_pending_approval?.plan_markdown ||
-                      snapshot?.plan_markdown ||
-                      ""
-                    }
-                    optionLabels={
-                      snapshot?.kimi_pending_approval?.option_labels ||
-                      snapshot?.clarification_questions?.[0]?.options ||
-                      []
-                    }
-                    onDecide={submitApproval}
-                    disabled={running}
-                  />
-                </div>
-              )}
-            {/* Science Expert (LangGraph PI→CB→MLS→SC) checkpoints only.
-                Waiting gates must mount even if streamingIdx briefly lags —
-                otherwise ClarificationForm stays hidden behind a Thinking pulse. */}
-            {!researcherMode && isExpertSession &&
-              isExpertClarification &&
-              (snapshot?.clarification_questions?.length ?? 0) > 0 && (
-                <div className="expert-checkpoint-card">
-                  <div className="expert-checkpoint-title">{t.checkpointClarify}</div>
-                  <ClarificationForm
-                    key={`${!researcherMode && snapshot?.waiting_for}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 120)}`}
-                    questions={snapshot!.clarification_questions}
-                    onSubmit={submitClarification}
-                    disabled={running}
-                  />
-                </div>
-              )}
-            {!researcherMode && isExpertSession &&
-              isExpertPlanGate &&
-              (snapshot?.plan?.length ?? 0) > 0 && (
-                <div className="expert-checkpoint-card">
-                  <div className="expert-checkpoint-title">{t.checkpointPlan}</div>
-                  <PlanEditor
-                    plan={snapshot!.plan}
-                    onConfirm={confirmPlan}
-                    disabled={running}
-                  />
-                </div>
-              )}
-            {!researcherMode && isExpertSession && isSubReportGate && (
-              <div className="expert-checkpoint-card">
-                <div className="expert-checkpoint-title">{t.checkpointSubReport}</div>
-                <SubReportCheckpoint
-                  onDecide={handleSubReportDecision}
-                  disabled={running}
-                />
-              </div>
-            )}
-            {!researcherMode && isExpertSession && isExpertStepGate && (
-              <div className="expert-checkpoint-card">
-                <div className="expert-checkpoint-title">{t.checkpointStep}</div>
-                <StepCheckpoint
-                  onDecide={handleStepDecision}
-                  disabled={running}
-                />
-              </div>
-            )}
-            {!researcherMode && isExpertSession && isExpertIterationGate && (
-              <div className="expert-checkpoint-card">
-                <div className="expert-checkpoint-title">{t.checkpointIteration}</div>
-                <IterationDecision
-                  onDecide={handleIterationDecision}
-                  disabled={running}
-                />
-              </div>
+            {!researcherMode && snapshot && (
+              <ConversationCheckpoints
+                checkpoint={checkpoint} snapshot={snapshot} sessionId={sessionId} agentView={chatMode === "science_agent"}
+                agentWorking={agentWorking} streaming={streamingIdx >= 0} running={running} t={t}
+                submitInteraction={submitInteraction} submitAskUser={submitAskUser} submitApproval={submitApproval}
+                submitClarification={submitClarification} confirmPlan={confirmPlan} handleSubReportDecision={handleSubReportDecision}
+                handleStepDecision={handleStepDecision} handleIterationDecision={handleIterationDecision}
+              />
             )}
             </div>
           </div>
@@ -1766,81 +1563,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 <div className="scientist-composer-actions" ref={setScienceActions} />
                 {!researcherMode && chatMode === "science_agent" && <>
                 <ContextUsageRing context={snapshot?.agent_context} nativeContext={snapshot?.kimi_context} lang={lang} />
-                <div className="file-source-inline" ref={fileSourceMenuRef}>
-                  <button
-                    type="button"
-                    className={`file-upload-icon-btn${running ? " disabled" : ""}${fileSourceMenuOpen ? " is-open" : ""}`}
-                    title={t.uploadFiles}
-                    aria-label={t.fileSourceAria}
-                    aria-haspopup="menu"
-                    aria-expanded={fileSourceMenuOpen}
-                    disabled={running}
-                    onClick={() => setFileSourceMenuOpen((v) => !v)}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                    </svg>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    onChange={(e) => {
-                      const picked = Array.from(e.target.files || []);
-                      e.target.value = "";
-                      void addComposerFiles(picked);
-                    }}
-                    disabled={running}
-                    className="file-upload-hidden" hidden tabIndex={-1}
-                  />
-                  {fileSourceMenuOpen && (
-                    <div className="file-source-menu" role="menu" aria-label={t.fileSourceAria}>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="file-source-menu-item"
-                        onClick={() => {
-                          setFileSourceMenuOpen(false);
-                          fileInputRef.current?.click();
-                        }}
-                      >
-                        <span className="file-source-menu-title">{t.fileSourceLocal}</span>
-                        <span className="file-source-menu-hint">{t.fileSourceLocalHint}</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className={`file-source-menu-item${workspaceEnabled ? "" : " is-disabled"}`}
-                        disabled={!workspaceEnabled}
-                        title={workspaceEnabled ? t.fromWorkspaceHint : t.fromWorkspaceOnlineHint}
-                        onClick={() => {
-                          if (!workspaceEnabled) return;
-                          setFileSourceMenuOpen(false);
-                          setWorkspacePickerOpen(true);
-                        }}
-                      >
-                        <span className="file-source-menu-title">{t.fromWorkspace}</span>
-                        <span className="file-source-menu-hint">
-                          {workspaceEnabled ? t.fromWorkspaceHint : t.fromWorkspaceOnlineHint}
-                        </span>
-                      </button>
-                    </div>
-                  )}
-                  <WorkspaceFilePicker
-                    workspaceEnabled={workspaceEnabled}
-                    disabled={running}
-                    allowMultiple
-                    hideTrigger
-                    open={workspacePickerOpen}
-                    onOpenChange={setWorkspacePickerOpen}
-                    buttonLabel={t.fromWorkspace}
-                    onPick={(picked) => {
-                      setWorkspaceFiles(previous => [...previous, ...picked.filter(file => !previous.some(old => old.id === file.id))]);
-                      setWorkspacePickerOpen(false);
-                    }}
-                  />
-                </div>
-
+                <ComposerFilePicker panel={filePicker} onChange={setFilePicker} running={running} t={t}
+                  workspaceEnabled={workspaceEnabled} addComposerFiles={addComposerFiles}
+                  onWorkspaceFiles={picked => setWorkspaceFiles(previous => [...previous, ...picked.filter(file => !previous.some(old => old.id === file.id))])} />
                 {agentWorking ? (
                   <button
                     type="button"
@@ -1950,14 +1675,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               </div>
             )}
             {!researcherMode && chatMode === "science_agent" && (files.length > 0 || workspaceFiles.length > 0) && (
-              <div className="file-preview" aria-label={lang === "zh" ? "待发送文件" : "Attached files"}>
-                {files.map((f, index) => (
-                  <span key={`${f.name}:${f.size}:${f.lastModified}`}><span title={f.name}>{isStructureFile(f.name) ? <button type="button" className="attachment-structure-link" onClick={() => { const url = URL.createObjectURL(f); openStructure({ path: f.name, name: f.name, url }); }}>{f.name}</button> : f.name}</span><button type="button" disabled={running} aria-label={`${lang === "zh" ? "移除 " : "Remove "}${f.name}`} onClick={() => setFiles(previous => previous.filter((_, i) => i !== index))}>×</button></span>
-                ))}
-                {workspaceFiles.map((f) => (
-                  <span key={f.id}><span title={f.display_name}>{f.display_name} {t.workspaceSuffix}</span><button type="button" disabled={running} aria-label={`${lang === "zh" ? "移除 " : "Remove "}${f.display_name}`} onClick={() => setWorkspaceFiles(previous => previous.filter(file => file.id !== f.id))}>×</button></span>
-                ))}
-              </div>
+              <AttachedFiles files={files} workspaceFiles={workspaceFiles} running={running} lang={lang}
+                workspaceSuffix={t.workspaceSuffix} onRemoveFile={index => setFiles(previous => previous.filter((_, i) => i !== index))}
+                onRemoveWorkspaceFile={id => setWorkspaceFiles(previous => previous.filter(file => file.id !== id))} />
             )}
           </div>
         </section>
