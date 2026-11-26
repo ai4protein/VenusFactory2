@@ -234,7 +234,14 @@ def feedback_state(events, workspace, previous=None, *, development=None, episod
                     key = request_key
             failures.pop(key, None)
             failures[key] = failure
-    rows = list(failures.values())
+    # A negative read-only catalogue lookup never executed a research action.
+    # Its native tool event remains in the audit; saved feedback from older
+    # sessions passes through this same filter when the next episode resumes.
+    rows = [row for row in failures.values() if not (
+        _name(row["tool"]) == "describe_tool" and
+        row["error"].removeprefix("Error: ") ==
+        "DisclosureError: Tool unavailable. Search for an enabled tool."
+    )]
     # Repeated request denials cannot evict observed execution evidence.
     pending = ([row for row in rows if row.get("failure_kind") != "request"][-5:]
                + [row for row in rows if row.get("failure_kind") == "request"][-5:])

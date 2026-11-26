@@ -14,6 +14,21 @@ def failure(name, message, identity="call"):
     ]
 
 
+def test_negative_catalogue_lookup_does_not_block_measurements_or_resume(tmp_path):
+    from agent.harness.research_execution_feedback import feedback_state
+
+    message = "Error: DisclosureError: Tool unavailable. Search for an enabled tool."
+    lookup = failure("mcp__venusfactory__describe_tool", message)
+    real_error = failure("calculate_physchem_from_sequence", message, "calculation")
+    unexpected = failure("describe_tool", "Permission error", "permission")
+    saved = {"key": "legacy-lookup", "tool": "describe_tool", "error": message}
+    previous = {"pending": [saved], "errors": [saved], "episode_index": 0}
+    result = feedback_state(lookup + real_error + unexpected, tmp_path, previous, episode_index=1)
+    assert [r["error"] for r in result["errors"]] == [message, "Permission error"]
+    assert [r["tool"] for r in result["pending"]] == ["calculate_physchem_from_sequence", "describe_tool"]
+    assert feedback_state([], tmp_path, {"errors": [saved]})["errors"] == []
+
+
 def test_failure_feedback_is_bounded_and_excludes_arguments(tmp_path):
     events=[]
     for n in range(8):
