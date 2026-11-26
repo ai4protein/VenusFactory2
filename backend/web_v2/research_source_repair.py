@@ -8,6 +8,14 @@ from .research_chapter_edits import apply_unit_edits, scoped_replacement, unit_l
 from .research_source_review import document_ready, feedback, packet, review_documents
 
 
+def revision_sources(unit, chapter_source_ids, sources):
+    """Give the author chapter evidence when the original paragraph lacks a valid citation."""
+    available = {source["id"] for source in sources}
+    cited = [key for key in unit["citations"] if key in available]
+    author_unit = {**unit, "citations": cited or chapter_source_ids}
+    return packet([author_unit], sources)["sources"]
+
+
 async def repair_chapters(state, payload, chapters, model_call, publish):
     from .research_documents import (
         audit_chapter,
@@ -42,8 +50,8 @@ async def repair_chapters(state, payload, chapters, model_call, publish):
             publish()
             edits = []
             for unit, finding in flagged:
-                evidence = packet([unit], state["sources"])
-                request = {"units": [unit], "sources": evidence["sources"], "issues": finding["issues"]}
+                request = {"units": [unit], "issues": finding["issues"],
+                           "sources": revision_sources(unit, chapter["source_ids"], state["sources"])}
                 stage = "author"
                 answer, truncated = await model_call(payload["model_id"], [
                     {"role": "system", "content":

@@ -489,3 +489,19 @@ def test_scoped_revision_keeps_neighbor_review_signatures():
     edit = {"unit_id": first["id"], "text": scoped_replacement(first, answer)}
     doc["text"] = apply_unit_edits(doc["text"], [first], json.dumps([edit]))
     assert sr.units(doc, [SOURCE])[1:] == [neighbor]
+
+@pytest.mark.parametrize("cited", [[], ["S99"], ["S2"]])
+def test_uncited_paragraph_repair_uses_chapter_evidence_only_for_author(cited):
+    from backend.web_v2.research_source_repair import revision_sources
+
+    sources = [SOURCE, {**SOURCE, "id": "S2"}, {**SOURCE, "id": "S3"}]
+    unit = sr.units(DOCUMENT, sources)[0]
+    unit["citations"] = cited.copy()
+    expected = ["S2"] if cited == ["S2"] else ["S1", "S2"]
+    evidence = revision_sources(unit, ["S1", "S2"], sources)
+    assert [row["id"] for row in evidence] == expected
+    assert all(row["passages"] for row in evidence)
+    assert unit["citations"] == cited
+    assert [row["id"] for row in sr.packet([unit], sources)["sources"]] == (
+        ["S2"] if cited == ["S2"] else []
+    )
