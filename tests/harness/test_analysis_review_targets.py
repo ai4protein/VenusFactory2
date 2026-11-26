@@ -216,3 +216,15 @@ def test_current_and_upstream_task_choices_remain_distinct():
     field = schema["input_assessments"]["items"]["properties"]
     assert field["task_id"]["enum"] == [bound]
     assert field["source_task_ids"]["items"]["enum"] == [upstream, bound]
+
+
+def test_independent_computation_cannot_offer_itself_as_an_upstream_input(make_case):
+    _, _, context, _ = make_case()
+    receipt = context["analysis_evidence"]["computations"][0]["artifact"]
+    context["execution"]["checkpoint"]["artifacts"].append(receipt)
+    selected = packet(context)
+    state = selected["analysis_review_state"]
+    assert state["checkpoint_has_no_parent"]
+    props = sc.analysis_review_schema(analysis.POLICY, state)["properties"]["input_assessments"]["items"]["properties"]
+    assert "derived_input" not in props["kind"]["enum"]
+    assert props["source_task_ids"]["maxItems"] == 0

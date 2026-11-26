@@ -125,7 +125,16 @@ def review_targets(context):
         if row.get("task_id") in task_ids and row.get("status") == "verified" and row.get("artifact")
         and (row["artifact"].get("path"), row["artifact"].get("sha256")) in current_artifacts
     ]
+    previous_outputs = set()
+    direct_parent_possible = False
+    for task in index.get("computations", []):
+        if task.get("status") != "verified":
+            continue
+        if task.get("task_id") in cited_ids and previous_outputs.intersection(task.get("input_files", {}).values()):
+            direct_parent_possible = True
+        previous_outputs.update(task.get("output_files", {}).values())
     return {
+        "checkpoint_has_no_parent": bool(cited_ids) and not direct_parent_possible,
         "checkpoint_task_ids": list(dict.fromkeys(cited_ids)),
         "completed_step_ids": completed[:24],
         "completed_step_ids_omitted": max(0, len(completed) - 24),

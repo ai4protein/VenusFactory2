@@ -109,7 +109,11 @@ def analysis_review_schema(policy, review_state=None):
             claims["items"]["properties"]["task_id"]["enum"] = list(primary_ids)
             input_fields = inputs["items"]["properties"]
             input_fields["task_id"]["enum"] = list(primary_ids)
-            input_fields["source_task_ids"]["items"]["enum"] = list(ids)
+            if review_state.get("checkpoint_has_no_parent"):
+                input_fields["kind"]["enum"].remove("derived_input")
+                input_fields["source_task_ids"]["maxItems"] = 0
+            else:
+                input_fields["source_task_ids"]["items"]["enum"] = list(ids)
         else:
             claims["maxItems"] = inputs["maxItems"] = 0
             fields["step_assessments"]["items"]["properties"]["claim_ids"]["maxItems"] = 0
@@ -374,6 +378,7 @@ def evidence_context(context, proposals, development):
             result["analysis_review_targets"] = analysis_report_review.review_targets(result)
             state["completed_step_ids"] = list(result["execution"]["checkpoint"]["completed_steps"])
             state["checkpoint_task_ids"] = result["analysis_review_targets"]["checkpoint_task_ids"]
+            state["checkpoint_has_no_parent"] = result["analysis_review_targets"]["checkpoint_has_no_parent"]
         else:
             result["scientific_acceptance"]["analysis_review_policy"] = analysis_interim_review.POLICY
     facts = {"evaluated_experiment_ids": [row["id"] for row in history],

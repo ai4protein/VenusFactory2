@@ -267,7 +267,7 @@ class AutonomousResearch:
                 'Use the supplied materials and subsequent observations to choose a feasible strategy; '
                 'the first plan is provisional until inputs have been inspected. '
                 'Group related measurements into one computation milestone, not one step per reported scalar. '
-                'For an ordinary sequence analysis, use execution for parsing/computation and artifact for the final report. '
+                'For a single measurement delivered in a brief report, use one execution milestone with acceptance criteria covering input identity, actual computation, reported value and units, and a traceable report. File inspection and writing are parts of that deliverable. Use separate milestones for independently reviewable outputs. '
                 'Use data_partition only when the milestone actually requires protected training-data partition validation.')
         if role in {'PI','CB'}:
             instruction += (' A short everyday research goal is sufficient: supply the experimental design yourself. '
