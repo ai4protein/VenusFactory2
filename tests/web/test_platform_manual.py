@@ -35,7 +35,7 @@ def test_manual_wiki_and_legacy_files_share_one_source():
     ('线上训练为什么只能 ESM2-8M？', 'training','zh'),
     ('Scientist research plan independent review', 'scientist','en'),
     ('三个模式共享每天几个对话额度', 'settings','zh'),
-    ('workflow save connect cards', 'workflows','en'),
+    ('RSI Plaza Scientist case repository ZIP download', 'rsi-plaza','en'),
 ])
 def test_search_returns_citable_relevant_tutorials(query,expected,lang):
     from mcp_tools.tools.platform_manual import query_manual

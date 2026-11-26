@@ -22,7 +22,7 @@ def discovery_instructions(tool_names):
     if not search:
         return CAPABILITY_BOUNDARY + '\n\n' + help_text
     text = (
-        "Capability discovery: search enabled platform tools and Factory-trained models before claiming availability. "
+        f"Capability discovery: use {search} to find enabled platform tools and Factory-trained models before claiming availability. "
         "Use kind='models' for the Model Plaza inventory, kind='tools' for native tools, or kind='all' for a task search. "
         "Search by protein or property and paginate. An empty page is not proof of missing capability. "
         "RSI outputs are case repositories in RSI Plaza for preview and ZIP download; they cannot be called by Agent or Researcher. "

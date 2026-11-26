@@ -14,7 +14,7 @@ from mcp_tools.models import platform_catalog
 from mcp_tools.models.factory.prediction import fintuned_operations as operations
 from mcp_tools.models.factory.prediction.output_scale import output_scale
 from mcp_tools.models.factory.runners import finetuned
-from mcp_tools.tools.capability_policy import CapabilityStore, selector
+from mcp_tools.tools.capability_policy import CapabilityDisabled, CapabilityStore, selector
 from mcp_tools.tools.predict.tools_agent import predict_protein_function_tool
 from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
 
@@ -152,8 +152,12 @@ def test_live_model_switch_uses_dataset_without_confusing_shared_backbone(
                 if card.get("dataset") == disabled and card.get("model") == "ESM2-650M")
     store = CapabilityStore()
     revision = store.set("model:" + card["id"], False, 0, selector(card), "fixture operator")
-    result = invoke(disclosure, name, arguments, runtime_double, tmp_path)
-    assert (result["status"] == "success") is allowed
+    if allowed:
+        result = invoke(disclosure, name, arguments, runtime_double, tmp_path)
+        assert result["status"] == "success"
+    else:
+        with pytest.raises(CapabilityDisabled):
+            invoke(disclosure, name, arguments, runtime_double, tmp_path)
     assert bool(runtime_double.calls) is allowed
     assert bool(runtime_double.loads) is allowed
     # A fresh search must see the switch, without another model's stale selection.
@@ -338,8 +342,9 @@ def test_private_route_keeps_disabled_model_and_tool_checks(tmp_path, monkeypatc
     store.set("model:" + card["id"], False, 0, selector(card), "fixture operator")
     private = {"task": "Solubility", "model_name": "ESM2-650M", "adapter_path": str(
         runtime_double.base / "DeepSol" / "esm2_t33_650M_UR50D")}
-    result = invoke(disclosure, name, private, runtime_double, tmp_path)
-    assert result["status"] == "error" and not runtime_double.calls
+    with pytest.raises(CapabilityDisabled):
+        invoke(disclosure, name, private, runtime_double, tmp_path)
+    assert not runtime_double.calls and not runtime_double.loads
     store.set("tool:predict_protein_function", False, 0, {}, "fixture operator")
     with pytest.raises(DisclosureError, match="unavailable"):
         invoke(disclosure, name, private, runtime_double, tmp_path)
