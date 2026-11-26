@@ -119,7 +119,13 @@ export const ResearcherPanel = forwardRef<ResearcherPanelHandle, {
     if (!active || options) return;
     let alive = true;
     void request<Options>('/options').then(o => {
-      if (!alive) return; setOptions(o);
+      if (!alive) return;
+      if (!Array.isArray(o?.models) || !o.models.every(m => typeof m?.id === "string")
+          || !Array.isArray(o.analyses) || !o.analyses.every(a => typeof a?.id === "string")
+          || (o.chapters != null && (!Array.isArray(o.chapters) || !o.chapters.every(c => typeof c?.id === "string")))) {
+        throw new Error(tr("Could not load research options.", "无法加载研究选项。"));
+      }
+      setOptions(o);
       setDraft(d => ({ ...d,
         model: o.models.some(m => m.id === d.model && m.ready && (!o.online || m.free)) ? d.model : o.models.find(m => m.id === o.default_model && m.ready && (!o.online || m.free))?.id || o.models.find(m => m.ready && (!o.online || m.free))?.id || '',
         scopes: d.configured ? d.scopes.filter(id => o.analyses.some(a => a.id === id && a.available)) : o.analyses.filter(a => a.default && a.available).map(a => a.id),
