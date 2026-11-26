@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from backend.web_v2 import research_source_review as review
-from backend.web_v2.research_source_validation import validate_assessments
+from backend.web_v2.researcher import source_review as review
+from backend.web_v2.researcher.source_validation import validate_assessments
 
 
 def proposal_request(text):

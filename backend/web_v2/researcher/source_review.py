@@ -9,9 +9,9 @@ from collections import deque
 
 import httpx
 
-from .research_evidence_passages import chunks, digest, selected_passages, source_digest
-from .research_review_binding import ReviewerBindingUnavailable
-from .research_source_validation import partial_assessments, validate_assessments
+from .evidence_passages import chunks, digest, selected_passages, source_digest
+from ..research_review_binding import ReviewerBindingUnavailable
+from .source_validation import partial_assessments, validate_assessments
 
 VERSION = "source_review.v3"
 MAX_PACKET_CHARS = 28000
@@ -214,7 +214,7 @@ async def review_documents(state, payload, documents, model_call, publish, *, re
     binding = state.get("reviewer_binding")
     reviewer_sha = None
     if binding is not None:
-        from .research_review_binding import align_review_state, binding_digest
+        from ..research_review_binding import align_review_state, binding_digest
         reviewer_sha = binding_digest(binding)
         align_review_state(state, binding)
     reviewer_id = binding["route"]["option_id"] if binding else payload["model_id"]

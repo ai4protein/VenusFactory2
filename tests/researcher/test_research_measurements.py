@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from backend.web_v2.research_measurements import measured_values_anchored
-from backend.web_v2.research_measurements import measurements
+from backend.web_v2.researcher.measurements import measured_values_anchored
+from backend.web_v2.researcher.measurements import measurements
 
 
 @pytest.mark.parametrize("claim,quote,expected", [
@@ -57,7 +57,7 @@ def test_unknown_unit_or_boolean_cannot_supply_a_measurement():
     assert not measured_values_anchored("The value is 1 mM.", [{"quote": '{"value":1,"unit":"arbitrary"}'}])
 
 def test_model_identifiers_are_not_treated_as_molar_measurements():
-    from backend.web_v2.research_measurements import measurements
+    from backend.web_v2.researcher.measurements import measurements
     assert not measurements("ESM2-650M and ESM2-8M generate predictions.")
 
 
@@ -67,7 +67,7 @@ def test_pathological_numeric_exponents_are_not_accepted():
     )
 
 def test_bare_model_capacity_cannot_supply_a_molar_measurement():
-    from backend.web_v2.research_measurements import measurements
+    from backend.web_v2.researcher.measurements import measurements
     assert not measurements("The ESM2 8M model was used.")
     assert not measured_values_anchored("The value is 8 M.", [{"quote": "The ESM2 8M model was used."}])
     assert measured_values_anchored("The value is 1 M.", [{"quote": "The value is 1000 mM."}])

@@ -96,7 +96,7 @@ async def write_editor_review(state, payload, model_call, publish):
             return
         request = list(messages)
         if state.get("evidence_review_required") and draft:
-            from .research_source_review import feedback, revision_input
+            from .researcher.source_review import feedback, revision_input
             document = {"id": "editor", "title": "Integrated assessment", "text": draft}
             if feedback(state, document):
                 evidence_feedback = revision_input(state, document)

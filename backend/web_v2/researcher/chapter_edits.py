@@ -2,7 +2,7 @@
 import json
 import re
 
-from .research_source_review import is_review_line
+from .source_review import is_review_line
 
 
 def _unique_fields(pairs):

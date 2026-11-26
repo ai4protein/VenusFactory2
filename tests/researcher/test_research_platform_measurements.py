@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from backend.web_v2 import research_source_review as sr
-from backend.web_v2.research_measurements import measured_values_anchored, measurements
-from backend.web_v2.research_source_validation import validate_assessments
+from backend.web_v2.researcher import source_review as sr
+from backend.web_v2.researcher.measurements import measured_values_anchored, measurements
+from backend.web_v2.researcher.source_validation import validate_assessments
 
 # Minimal public calculation fixture from 40267, report 863031ec4794604636731648e8700940,
 # S27 source SHA 85580a98a5400fad09837bfd062d34a906387ce426bc88d0fe3868d7fdaab78d.

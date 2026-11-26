@@ -381,7 +381,7 @@ def test_scheduler_generates_parameter_digest_without_publishing_arguments(tmp_p
 async def test_resume_rewrites_and_reaudits_only_chapter_with_new_topic_evidence(ledger, monkeypatch, two_topics):
     from backend.web_v2 import research_longform as lf
     from backend.web_v2.research_documents import chapter_document
-    from backend.web_v2.research_source_review import VERSION, document_receipt, units
+    from backend.web_v2.researcher.source_review import VERSION, document_receipt, units
     from research_source_review_fixture import with_source_review
 
     _, _, create, calls = ledger

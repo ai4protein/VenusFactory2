@@ -148,7 +148,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         # Legacy checkpoints cannot distinguish collection and writer failures.
         state.setdefault('collection_partial', bool(state.get('partial')))
     align_review_state(state, payload['reviewer_binding'])
-    from .research_source_review import VERSION, review_documents
+    from .researcher.source_review import VERSION, review_documents
     state["evidence_review_required"] = VERSION
     for chapter in state["chapters"]:
         chapter["evidence_review_required"] = VERSION
@@ -336,7 +336,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
     for chapter in candidates:
         chapter["source_review"] = receipts[chapter["id"]]
         chapter["status"] = "completed" if receipts[chapter["id"]]["status"] == "completed" else "partial"
-    from .research_source_repair import repair_chapters, review_editor
+    from .researcher.source_repair import repair_chapters, review_editor
     await repair_chapters(state, payload, candidates, model_call, publish)
     completed = sum(chapter_ready(c, state["sources"]) for c in state["chapters"])
     state['completed_chapters'] = completed

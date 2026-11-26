@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from backend.web_v2.research_evidence_passages import resolve_passage, selected_passages
+from backend.web_v2.researcher.evidence_passages import resolve_passage, selected_passages
 
 
 def source(data):

@@ -5,9 +5,9 @@ import json
 import pytest
 
 from backend.web_v2.research_chapter_context import MAX_CONTEXT_CHARS, source_context
-from backend.web_v2.research_evidence_passages import resolve_passage, selected_passages, source_digest
+from backend.web_v2.researcher.evidence_passages import resolve_passage, selected_passages, source_digest
 from backend.web_v2.research_query_scope import query_result_scope
-from backend.web_v2.research_source_review import packet, units
+from backend.web_v2.researcher.source_review import packet, units
 
 
 def source(*, identity="S1", count=8, total=1409, long=False):

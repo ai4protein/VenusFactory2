@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 
-from .research_query_scope import query_result_scope
+from ..research_query_scope import query_result_scope
 
 MAX_PASSAGE = 1600
 # Reserve a bounded share for input identity and interpretation fields in the

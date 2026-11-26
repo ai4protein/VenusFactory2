@@ -8,7 +8,7 @@ import pytest
 
 from backend.web_v2 import research_report as report
 from backend.web_v2 import research_review_binding as binding
-from backend.web_v2 import research_source_review as review
+from backend.web_v2.researcher import source_review as review
 from backend.web_v2.job_queue import JobQueue
 from backend.web_v2.research_jobs import ResearchJobs, write
 from backend.web_v2.usage_store import UsageStore

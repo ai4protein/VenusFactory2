@@ -57,7 +57,7 @@ def chapter_ready(chapter, sources=None):
     if chapter.get("status") != "completed" or not chapter.get("draft") or contains_long_sequence(chapter["draft"]):
         return False
     if chapter.get("evidence_review_required"):
-        from .research_source_review import document_ready
+        from .researcher.source_review import document_ready
         if sources is None or not chapter.get("id") or not chapter.get("title"):
             return False
         return document_ready(chapter_document(chapter), sources, chapter.get("source_review"), chapter.get("reviewer_binding_sha256"))
@@ -66,7 +66,7 @@ def chapter_ready(chapter, sources=None):
 
 def refresh_review_progress(state):
     """Project bound review receipts into chapter progress without completing a report."""
-    from .research_source_review import VERSION, document_ready, document_signature
+    from .researcher.source_review import VERSION, document_ready, document_signature
 
     review = state.get("source_review", {})
     receipts = review.get("documents", {})
@@ -170,7 +170,7 @@ def review_ready(state, lang):
     sources = state.get("sources", [])
     audit = editor_audit(state["review"], [s["id"] for s in sources], lang)
     if source_review_required(state):
-        from .research_source_review import document_ready
+        from .researcher.source_review import document_ready
         document = {"id": "editor", "title": "Integrated assessment", "text": state["review"]}
         if (not document_ready(document, sources, state.get("review_source_review"), (state.get("reviewer_binding") or {}).get("sha256"))
                 or state.get("review_chapters_sha256") != chapter_signature(state)):
@@ -205,7 +205,7 @@ def report_view(state, lang):
     """
     value = copy.deepcopy(state)
     if source_review_required(value):
-        from .research_source_review import VERSION
+        from .researcher.source_review import VERSION
         value["evidence_review_required"] = VERSION
     sources = value.get("sources", [])
     chapters = value.get("chapters")

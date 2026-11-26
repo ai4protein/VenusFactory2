@@ -1,7 +1,7 @@
 """Protocol doubles for report transport tests; these do not validate biology."""
 import functools
 import json
-from backend.web_v2.research_source_review import SYSTEM
+from backend.web_v2.researcher.source_review import SYSTEM
 
 
 def with_source_review(writer):

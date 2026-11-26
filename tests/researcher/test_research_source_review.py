@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from backend.web_v2 import research_source_review as sr
-from backend.web_v2 import research_source_validation as validation
-from backend.web_v2.research_evidence_passages import resolve_passage, selected_passages, source_digest
+from backend.web_v2.researcher import source_review as sr
+from backend.web_v2.researcher import source_validation as validation
+from backend.web_v2.researcher.evidence_passages import resolve_passage, selected_passages, source_digest
 
 SOURCE = {"id":"S1","kind":"database","title":"Reference annotation",
           "text":json.dumps({"features":[{"type":"Initiator methionine","description":"Removed",
@@ -329,7 +329,7 @@ async def test_first_review_does_not_spend_revision_budget_on_format_retries():
 
 
 def test_targeted_author_repair_can_only_replace_unique_flagged_paragraphs():
-    from backend.web_v2.research_source_repair import apply_unit_edits
+    from backend.web_v2.researcher.source_repair import apply_unit_edits
     text = "Reviewed. [S1]\n\nNeeds revision. [S2]\n\nAlso reviewed. [S3]"
     units = [{"id": "topic:2", "text": "Needs revision. [S2]"}]
     change = {"unit_id": "topic:2", "text": "Revised with evidence. [S2]"}
@@ -398,7 +398,7 @@ def test_packet_alias_must_resolve_to_a_cited_original_passage():
 
 
 def test_markdown_heading_maps_back_to_original_draft_without_rewriting_other_units():
-    from backend.web_v2.research_source_repair import apply_unit_edits
+    from backend.web_v2.researcher.source_repair import apply_unit_edits
     draft = "## Context\r\n\r\nKeep this. [S1]\r\n\r\n## Finding\r\n\r\nRevise this. [S1]\r\n\r\nKeep the ending. [S1]"
     document = {**DOCUMENT, "text": draft}
     target = sr.units(document, [SOURCE])[1]
@@ -410,7 +410,7 @@ def test_markdown_heading_maps_back_to_original_draft_without_rewriting_other_un
 
 
 def test_legacy_markdown_revision_preserves_intervening_reviewed_blocks():
-    from backend.web_v2.research_source_repair import apply_unit_edits
+    from backend.web_v2.researcher.source_repair import apply_unit_edits
 
     draft = "Introduction.\n\nRepair A.\n\nReviewed middle.\n\nRepair B.\n\nConclusion."
     units = sr.units({**DOCUMENT, "text": draft}, [])
@@ -423,7 +423,7 @@ def test_legacy_markdown_revision_preserves_intervening_reviewed_blocks():
 
 
 def test_table_divider_can_be_mapped_without_matching_other_equal_paragraphs():
-    from backend.web_v2.research_source_repair import unit_locations
+    from backend.web_v2.researcher.source_repair import unit_locations
 
     draft = "| Item | Value |\n|:---|---:|\n| A | 1 |\n\nSame.\n\nSame."
     first, second, _ = sr.units({**DOCUMENT, "text": draft}, [])
@@ -435,7 +435,7 @@ def test_table_divider_can_be_mapped_without_matching_other_equal_paragraphs():
 
 @pytest.mark.asyncio
 async def test_long_chapter_sends_only_flagged_text_and_records_author_timeout():
-    from backend.web_v2.research_source_repair import repair_chapters
+    from backend.web_v2.researcher.source_repair import repair_chapters
 
     draft = "Unsupported sentence. [S1]\n\n" + "Previously reviewed text. " * 1800
     doc = {**DOCUMENT, "text": draft}
@@ -474,7 +474,7 @@ def test_negative_whole_unit_feedback_preserves_review_failure():
 
 
 def test_author_can_remove_flagged_unit_without_editing_protected_neighbors():
-    from backend.web_v2.research_chapter_edits import apply_unit_edits
+    from backend.web_v2.researcher.chapter_edits import apply_unit_edits
     draft = "Keep this first.\n\nRemove this assertion.\n\nKeep this last."
     target = {"id": "chapter:2", "text": "Remove this assertion."}
     edits = json.dumps([{"unit_id": target["id"], "text": ""}])
@@ -482,7 +482,7 @@ def test_author_can_remove_flagged_unit_without_editing_protected_neighbors():
 
 
 def test_scoped_revision_keeps_neighbor_review_signatures():
-    from backend.web_v2.research_chapter_edits import apply_unit_edits, scoped_replacement
+    from backend.web_v2.researcher.chapter_edits import apply_unit_edits, scoped_replacement
     doc = {**DOCUMENT, "text": "First fact. [S1]\n\nNeighboring fact. [S1]"}
     first, neighbor = sr.units(doc, [SOURCE])
     answer = "### Finding\n\nFirst revision. [S1]\n\nSecond sentence. [S1]"
@@ -492,7 +492,7 @@ def test_scoped_revision_keeps_neighbor_review_signatures():
 
 @pytest.mark.parametrize("cited", [[], ["S99"], ["S2"]])
 def test_uncited_paragraph_repair_uses_chapter_evidence_only_for_author(cited):
-    from backend.web_v2.research_source_repair import revision_sources
+    from backend.web_v2.researcher.source_repair import revision_sources
 
     sources = [SOURCE, {**SOURCE, "id": "S2"}, {**SOURCE, "id": "S3"}]
     unit = sr.units(DOCUMENT, sources)[0]

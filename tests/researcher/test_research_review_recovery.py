@@ -6,8 +6,8 @@ import json
 import httpx
 import pytest
 
-from backend.web_v2 import research_source_review as sr
-from backend.web_v2 import research_source_validation as validation
+from backend.web_v2.researcher import source_review as sr
+from backend.web_v2.researcher import source_validation as validation
 
 SOURCE = {"id": "S1", "kind": "database", "title": "Annotation",
           "text": "The initiator methionine is removed.", "url": "https://example.org/entry"}

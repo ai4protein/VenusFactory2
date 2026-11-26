@@ -30,7 +30,13 @@ configs/                        Runtime, queue, install and research configurati
 requirements/optional/          Opt-in Cube/E2B dependencies
 requirements/macos.txt         macOS dependency profile
 scripts/                        Service launch, installation, migration and examples
-tests/                          Backend, MCP, runtime and agent tests
+tests/                          Python tests grouped by the component they exercise
+  agent/, harness/, scientist/  Chat orchestration, harness protocols, Scientist service
+  researcher/, rsi/             Report generation and RSI research engine
+  jobs/, web/                   Queues, PBS/Slurm, HTTP endpoints and online policies
+  mcp/, models/, platform/      Tool gateway, model behavior, installation and configuration
+  support/, integration/        Shared fixtures and live checks
+frontend/tests/                 UI component and interaction tests
 docs/manual/                    Canonical bilingual platform manual
 docs/wiki/                      Generated manual pages and installation guides
 docs/images/                    Current UI screenshots with capture provenance
@@ -120,6 +126,12 @@ the workspace bytes still match, and the new submission includes no replacement
 report. SC assesses each claimed step independently. The checkpoint lists the
 measurements under review, while the provenance history identifies upstream inputs.
 
+The Researcher evidence and paragraph-revision modules live in
+`backend/web_v2/researcher/`. Its HTTP and persistent job entry points remain in
+`backend/web_v2`. Use `python -m pytest tests/researcher` for the report suite.
+Use `python -m pytest --collect-only -q tests` to check discovery across all Python
+suites without contacting a scientific service.
+
 Researcher keeps job ownership and recovery in `backend/web_v2/research_jobs.py`.
 The long-form coordinator schedules retrieval and specialist writers; document
 acceptance and rendering belong to `research_documents.py`. API views and ZIP
@@ -132,23 +144,23 @@ layer's structural checks before source review. Rechecking a report preserves it
 saved drafts, evidence, request budget and queue lifecycle; it never rewrites the
 historical checkpoint.
 Source-review receipts, revision feedback and bounded recovery belong to
-`research_source_review.py`; author and editor modules consume those receipts
+`researcher/source_review.py`; author and editor modules consume those receipts
 without owning the reviewer. Response decoding, complete and partial assessment
-validation belong to `research_source_validation.py`. That pure module checks
+validation belong to `researcher/source_validation.py`. That pure module checks
 coverage, original-source anchors and measured values without calling models or
 changing report state; normal responses and retry results use the same validator.
-Explicit measurement checks belong to `research_measurements.py`; values retain
+Explicit measurement checks belong to `researcher/measurements.py`; values retain
 their dimensions and unit conversions. Changes to acceptance policy invalidate
 older receipts while preserving their original review evidence.
-`research_source_repair.py` sends the author one flagged paragraph at a time.
-`research_chapter_edits.py` maps that paragraph to its Markdown span and applies
+`researcher/source_repair.py` sends the author one flagged paragraph at a time.
+`researcher/chapter_edits.py` maps that paragraph to its Markdown span and applies
 the replacement. Document checks and independent source review then evaluate the
 revised text. Unchanged neighboring paragraphs retain their review identities.
 Chapter evidence selection and writer context belong to `research_chapter_context.py`.
 Specialists receive topic-selected source excerpts under one serialized context
 budget, with citation identities, query scope and material extraction limits.
 Passage selection for both writing and review belongs to
-`research_evidence_passages.py`. Its shared tokenizer retains scientific
+`researcher/evidence_passages.py`. Its shared tokenizer retains scientific
 abbreviations and splits structured field names for retrieval. JSON field paths
 also participate in retrieval when a record is split into scalar values. Writer
 excerpts retain those paths under the same total context budget; review quotes and

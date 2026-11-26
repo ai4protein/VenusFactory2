@@ -7,7 +7,8 @@ import zipfile
 from unittest.mock import patch
 import pytest
 
-from backend.web_v2 import research_longform as lf, research_source_review as sr
+from backend.web_v2 import research_longform as lf
+from backend.web_v2.researcher import source_review as sr
 from backend.web_v2.research_dossier import build_dossier
 
 PROSE = "The reference annotates removal of the initiator methionine at the beginning of the sequence. " * 30 + "[S1]"

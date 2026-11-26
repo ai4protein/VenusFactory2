@@ -169,7 +169,7 @@ def test_existing_one_argument_context_builder_remains_callable():
     ("rate/volume~normalized", 8.2, "rate volume normalized"),
 ])
 def test_large_database_records_retain_field_identity_for_writers(field, value, query):
-    from backend.web_v2.research_evidence_passages import selected_passages, resolve_passage
+    from backend.web_v2.researcher.evidence_passages import selected_passages, resolve_passage
     record = {"metadata": {str(i): {"annotation": "Unrelated record metadata. " * 30}
                            for i in range(16)}, "measurement": {field: value,
                            "background": "Unrelated assay description. " * 100}}

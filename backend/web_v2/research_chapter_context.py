@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 
 from .research_evidence import evidence_excerpt
-from .research_evidence_passages import selected_passages
+from .researcher.evidence_passages import selected_passages
 from .research_query_scope import query_result_scope
 
 MAX_CONTEXT_CHARS = 24000

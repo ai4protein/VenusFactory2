@@ -4,8 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 
-from .research_chapter_edits import apply_unit_edits, scoped_replacement, unit_locations
-from .research_source_review import document_ready, feedback, packet, review_documents
+from .chapter_edits import apply_unit_edits, scoped_replacement, unit_locations
+from .source_review import document_ready, feedback, packet, review_documents
 
 
 def revision_sources(unit, chapter_source_ids, sources):
@@ -17,7 +17,7 @@ def revision_sources(unit, chapter_source_ids, sources):
 
 
 async def repair_chapters(state, payload, chapters, model_call, publish):
-    from .research_documents import (
+    from ..research_documents import (
         audit_chapter,
         chapter_document,
         incomplete_chapter,
@@ -93,8 +93,8 @@ async def repair_chapters(state, payload, chapters, model_call, publish):
 
 
 async def review_editor(state, payload, model_call, publish):
-    from .research_documents import editor_audit, incomplete_review, review_ready
-    from .research_editor import editorial_input, write_editor_review
+    from ..research_documents import editor_audit, incomplete_review, review_ready
+    from ..research_editor import editorial_input, write_editor_review
     lang = payload.get("lang", "en")
     signature = hashlib.sha256(json.dumps(editorial_input(state, payload), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if review_ready(state, lang) and state.get("review_input_sha256") == signature:

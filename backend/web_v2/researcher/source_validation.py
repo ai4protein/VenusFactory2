@@ -4,8 +4,8 @@ from __future__ import annotations
 import json
 import re
 
-from .research_evidence_passages import resolve_passage, source_digest
-from .research_measurements import measured_values_anchored
+from .evidence_passages import resolve_passage, source_digest
+from .measurements import measured_values_anchored
 
 
 def _unique_object(pairs):

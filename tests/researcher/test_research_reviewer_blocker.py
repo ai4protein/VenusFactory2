@@ -8,7 +8,7 @@ import pytest
 from backend.web_v2 import research_longform as longform
 from backend.web_v2 import research_report as report
 from backend.web_v2 import research_review_binding as binding
-from backend.web_v2 import research_source_review as review
+from backend.web_v2.researcher import source_review as review
 from backend.web_v2.usage_store import UsageStore
 from mcp_tools.tools.capability_policy import CapabilityStore
 from support.research_reviewer import install_catalog
