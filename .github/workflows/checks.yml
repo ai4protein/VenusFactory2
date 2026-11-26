@@ -26,13 +26,13 @@ jobs:
           HF_HUB_OFFLINE: '1'
           TRANSFORMERS_OFFLINE: '1'
         run: >-
-          python -m pytest -q tests/test_http_security.py tests/test_worker_lifecycle.py
-          tests/test_repository_state_exclusions.py tests/test_layout_checks.py tests/test_incremental_install.py
-          tests/test_initialize.py tests/test_skill_validation.py tests/test_hub_progress.py
-          tests/test_dependency_audit.py tests/test_legacy_install.py tests/test_torch_detect.py
-          tests/test_esm3_runtime.py tests/test_scientific_contracts.py
-          tests/test_deployment_services.py tests/test_mcp_service_lifecycle.py
-          tests/test_runtime_identity.py tests/harness/test_runtime_discovery.py
+          python -m pytest -q tests/web/test_http_security.py tests/jobs/test_worker_lifecycle.py
+          tests/platform/test_repository_state_exclusions.py tests/platform/test_layout_checks.py tests/platform/test_incremental_install.py
+          tests/platform/test_initialize.py tests/platform/test_skill_validation.py tests/platform/test_hub_progress.py
+          tests/platform/test_dependency_audit.py tests/platform/test_legacy_install.py tests/platform/test_torch_detect.py
+          tests/models/test_esm3_runtime.py tests/models/test_scientific_contracts.py
+          tests/platform/test_deployment_services.py tests/mcp/test_mcp_service_lifecycle.py
+          tests/platform/test_runtime_identity.py tests/harness/test_runtime_discovery.py
       - name: Verify isolated virtualenv mount layout
         env:
           PYTHONPATH: src
@@ -65,7 +65,7 @@ jobs:
           tests/harness/test_codex_adapter.py tests/harness/test_web_live_text.py
           tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
           tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py
-          tests/test_research_review_recovery.py tests/test_research_measurements.py
+          tests/researcher/test_research_review_recovery.py tests/researcher/test_research_measurements.py
           tests/harness/test_research_algorithm_checks.py tests/harness/test_focused_repair.py tests/harness/test_outbound_strings.py
           tests/harness/test_role_context.py tests/harness/test_web_research_role_context.py
           tests/harness/test_native_expert_team.py tests/harness/test_native_expert_audit.py
@@ -121,10 +121,9 @@ jobs:
         # Globs automatically admit new cluster/PBS regression modules.
         run: >-
           python -B -m pytest -q -p no:cacheprovider --junitxml=cluster-results.xml
-          tests/test_compute_pbs.py tests/test_compute_slurm.py
-          tests/test_cluster_*.py tests/test_pbs_*.py
-          tests/harness/test_cluster_*.py tests/harness/test_pbs_*.py
-          tests/test_job_queue.py tests/test_durable_tasks.py
+          tests/jobs/test_compute_pbs.py tests/jobs/test_compute_slurm.py
+          tests/jobs/test_cluster_*.py tests/jobs/test_pbs_*.py
+          tests/jobs/test_job_queue.py tests/jobs/test_durable_tasks.py
       - name: Require executed sandbox coverage without skipped tests
         id: cluster-results
         run: |
@@ -196,25 +195,25 @@ jobs:
           tests/rsi/test_prediction_result_delivery.py tests/rsi/test_scoped_model_discovery.py
           tests/rsi/test_model_tasks.py tests/rsi/test_science_goal.py tests/rsi/test_shared_science_goal.py
           tests/rsi/test_numerical_evidence.py tests/rsi/test_shared_model_publication.py
-          tests/test_research_source_review_flow.py tests/test_evolved_tool_scheduling.py tests/test_scientist_tool_scheduling.py
-          tests/test_research_source_review.py tests/test_research_evidence.py
-          tests/test_research_evidence_context.py tests/test_research_query_scope.py
+          tests/researcher/test_research_source_review_flow.py tests/models/test_evolved_tool_scheduling.py tests/scientist/test_scientist_tool_scheduling.py
+          tests/researcher/test_research_source_review.py tests/researcher/test_research_evidence.py
+          tests/researcher/test_research_evidence_context.py tests/researcher/test_research_query_scope.py
           tests/rsi/test_package_layout.py tests/rsi/test_sabio_assay_tasks.py
           tests/rsi/test_property_coverage.py tests/rsi/test_deeploc_source.py tests/rsi/test_deeploc_protocol.py tests/rsi/test_shared_acquisition_plan.py tests/rsi/test_research_project_catalog.py
           tests/rsi/test_model_retention.py tests/rsi/test_model_curation.py
-          tests/rsi/test_capability_discovery.py tests/test_platform_model_discovery.py
-          tests/test_mutation_tool_contracts.py tests/harness/test_tool_disclosure.py
+          tests/rsi/test_capability_discovery.py tests/mcp/test_platform_model_discovery.py
+          tests/models/test_mutation_tool_contracts.py tests/harness/test_tool_disclosure.py
           tests/harness/test_capability_boundary.py tests/harness/test_selected_tool_contract.py
           tests/harness/test_web_native_catalog.py tests/harness/test_context_relay.py
           tests/harness/test_research_handoff.py tests/harness/test_research_checkpoint_budget.py
-          tests/test_design_docking_contracts.py tests/test_external_mcp_dispatch.py tests/test_external_models.py
-          tests/test_model_plaza_performance.py tests/rsi/test_feedback_verification_scope.py
-          tests/test_plaza_tools.py tests/test_workflow_removed.py tests/test_rsi_plaza.py
-          tests/test_api_startup.py tests/test_http_workflow_responsiveness.py tests/test_blocking_workflow.py tests/test_mcp_service_health.py
-          tests/test_research_reference_context.py tests/test_research_pdb_kegg.py
-          tests/test_research_uniprot_cache.py tests/test_research_report.py tests/test_research_longform.py tests/test_research_input_snapshot.py
-          tests/test_research_target_evidence.py tests/test_research_chapter_context.py
-          tests/test_research_dossier.py tests/test_public_knowledge_queries.py
+          tests/models/test_design_docking_contracts.py tests/mcp/test_external_mcp_dispatch.py tests/models/test_external_models.py
+          tests/web/test_model_plaza_performance.py tests/rsi/test_feedback_verification_scope.py
+          tests/web/test_plaza_tools.py tests/web/test_workflow_removed.py tests/web/test_rsi_plaza.py
+          tests/web/test_api_startup.py tests/web/test_http_workflow_responsiveness.py tests/web/test_blocking_workflow.py tests/mcp/test_mcp_service_health.py
+          tests/researcher/test_research_reference_context.py tests/researcher/test_research_pdb_kegg.py
+          tests/researcher/test_research_uniprot_cache.py tests/researcher/test_research_report.py tests/researcher/test_research_longform.py tests/researcher/test_research_input_snapshot.py
+          tests/researcher/test_research_target_evidence.py tests/researcher/test_research_chapter_context.py
+          tests/researcher/test_research_dossier.py tests/mcp/test_public_knowledge_queries.py
           tests/harness/test_generated_capability_discovery.py
           tests/harness/test_workspace_json.py tests/harness/test_workspace_preview.py
           tests/harness/test_capability_admission.py tests/harness/test_curated_publication.py

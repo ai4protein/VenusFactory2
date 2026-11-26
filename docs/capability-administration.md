@@ -25,4 +25,4 @@ Admin cookies are mode-specific, so local and online previews on the same host d
 
 ## Validation
 
-`tests/test_capability_policy.py` covers mode isolation, revision conflicts, stale references, per-model matching, visibility, direct calls, real FastMCP listing/call refusal, queue replay, legacy HTTP APIs, administrator authentication, cross-origin rejection and masked environment updates. The related queue, access, training-policy and model-platform regressions remain part of verification.
+`tests/mcp/test_capability_policy.py` covers mode isolation, revision conflicts, stale references, per-model matching, visibility, direct calls, real FastMCP listing/call refusal, queue replay, legacy HTTP APIs, administrator authentication, cross-origin rejection and masked environment updates. The related queue, access, training-policy and model-platform regressions remain part of verification.

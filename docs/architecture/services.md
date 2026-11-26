@@ -218,8 +218,8 @@ local transport/configuration problem; inspect that before blaming data sources.
 python scripts/check_layout.py
 python scripts/check_repository.py
 python scripts/sync_platform_docs.py --check
-PYTHONPATH=src python -m pytest -q tests/test_http_security.py tests/test_worker_lifecycle.py tests/test_repository_state_exclusions.py
-PYTHONPATH=src python -m pytest -q tests/test_research_project_delivery.py tests/test_external_mcp_dispatch.py tests/test_tool_runtime.py tests/test_durable_tasks.py
+PYTHONPATH=src python -m pytest -q tests/web/test_http_security.py tests/jobs/test_worker_lifecycle.py tests/platform/test_repository_state_exclusions.py
+PYTHONPATH=src python -m pytest -q tests/scientist/test_research_project_delivery.py tests/mcp/test_external_mcp_dispatch.py tests/agent/test_tool_runtime.py tests/jobs/test_durable_tasks.py
 cd frontend
 npm run build
 ```

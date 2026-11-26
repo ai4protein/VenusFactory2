@@ -45,4 +45,4 @@ The online executor exposes a small allowlist of public literature/web search to
 
 ## Verification
 
-`tests/test_online_access.py` exercises atomic concurrent admission, shared modes and aliases, retry idempotency, calendar reset, IP/browser identity, email key sharing, expiration/rotation/revocation, administrator authentication/CSRF/throttling and server-side Scientist budget enforcement. It does not call external models. Existing report, Scientist supervisor and Agent transport regressions must also pass before publishing a preview.
+`tests/web/test_online_access.py` exercises atomic concurrent admission, shared modes and aliases, retry idempotency, calendar reset, IP/browser identity, email key sharing, expiration/rotation/revocation, administrator authentication/CSRF/throttling and server-side Scientist budget enforcement. It does not call external models. Existing report, Scientist supervisor and Agent transport regressions must also pass before publishing a preview.

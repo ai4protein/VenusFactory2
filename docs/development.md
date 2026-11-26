@@ -31,7 +31,7 @@ python scripts/check_repository.py
 python scripts/check_layout.py
 python scripts/validate_skills.py
 python scripts/sync_platform_docs.py --check
-PYTHONPATH=src python -m pytest -q tests/test_model_family_boundaries.py tests/test_model_identity.py tests/test_managed_model_runtimes.py tests/test_tool_runtime.py
+PYTHONPATH=src python -m pytest -q tests/models/test_model_family_boundaries.py tests/models/test_model_identity.py tests/models/test_managed_model_runtimes.py tests/agent/test_tool_runtime.py
 ```
 
 These are targeted layout, documentation and model-integration checks; they do
