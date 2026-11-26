@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .contracts import digest
 from .events import audit_trace
+from .research_analysis_evidence import is_report_path
 
 
 def checkpoint_confirmation(metadata, arguments, result):
@@ -22,7 +23,7 @@ def checkpoint_confirmation(metadata, arguments, result):
     paths = [row["path"] for row in result.get("artifacts", [])]
     if not claimed or not pending or not any(p.startswith("analysis/") for p in paths):
         return None
-    if not any(p.lower().endswith((".md", ".txt")) and not p.startswith("inputs/") for p in paths):
+    if not any(is_report_path(p) for p in paths):
         return None
     return {
         "pending_steps": [{"id": key, "title": title} for key, title in pending],

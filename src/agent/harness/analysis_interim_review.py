@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import PurePosixPath
 
 from jsonschema import Draft202012Validator, ValidationError
 
 from utils.scoped_files import parts
 
-from .research_analysis_evidence import JOB, SHA
+from .research_analysis_evidence import JOB, SHA, is_report_path
 
 POLICY = "analysis-interim-review.v1"
 PROMPT = """You are the independent Scientific Critic of unfinished analysis.
@@ -64,7 +63,7 @@ def eligibility(context):
         try:
             path, digest = item["path"], item["sha256"]
             parts(path)
-            if (PurePosixPath(path).suffix.lower() not in {".md", ".txt"}
+            if (not is_report_path(path)
                     or path in original_paths or digest in original_hashes
                     or not isinstance(digest, str) or not SHA.fullmatch(digest)):
                 continue

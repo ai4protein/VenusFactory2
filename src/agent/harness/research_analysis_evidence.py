@@ -9,7 +9,7 @@ import copy
 import hashlib
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from mcp_tools.scheduler.receipt_binding import value_digest
 from utils.scoped_files import open_file, write_bytes
@@ -21,6 +21,12 @@ FIELDS = {"version", "tool", "category", "workspace_sha256", "arguments_sha256",
 MAX_BYTES = 100 * 1024**2
 MAX_VERIFICATION_BYTES = 32 * 1024**2
 MAX_VERIFICATION_FILES = 128
+
+
+def is_report_path(path):
+    """Text staged under inputs belongs to the analysis input, even when generated mid-run."""
+    name = PurePosixPath(path)
+    return bool(name.parts and name.parts[0] != "inputs" and name.suffix.lower() in {".md", ".txt"})
 
 
 class VerificationBudget:

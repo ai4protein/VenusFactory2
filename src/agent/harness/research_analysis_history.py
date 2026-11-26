@@ -12,7 +12,7 @@ from pathlib import Path
 
 from utils.scoped_files import read_bytes
 
-from .research_analysis_evidence import JOB, VerificationBudget
+from .research_analysis_evidence import JOB, VerificationBudget, is_report_path
 from .research_analysis_provenance import _verified_document
 
 SCHEMA = "research-analysis-history.v1"
@@ -161,11 +161,9 @@ def previous_report(workspace, plan, submitted, registered_inputs):
     """Recover one unchanged report for the same explicitly resubmitted computation."""
     if plan.get("deliverable") != "analysis":
         return None
-    def is_report(path):
-        return Path(path).suffix.lower() in {".md", ".txt"}
     inputs = {row.get("path") for row in registered_inputs}
     hashes = {row.get("sha256") for row in registered_inputs}
-    if any(is_report(row["path"]) and row["path"] not in inputs for row in submitted):
+    if any(is_report_path(row["path"]) and row["path"] not in inputs for row in submitted):
         return None
     cited = {(r["path"], r["sha256"]) for r in submitted if r["path"].startswith("analysis/")}
     if not cited:
@@ -176,7 +174,7 @@ def previous_report(workspace, plan, submitted, registered_inputs):
         if step.get("status") != "completed" or not any((r.get("path"), r.get("sha256")) in cited for r in evidence):
             continue
         candidates.update((r["path"], r["sha256"]) for r in evidence
-                          if is_report(r["path"]) and r["path"] not in inputs and r["sha256"] not in hashes)
+                          if is_report_path(r["path"]) and r["path"] not in inputs and r["sha256"] not in hashes)
     if len(candidates) != 1:
         return None
     path, expected = candidates.pop()

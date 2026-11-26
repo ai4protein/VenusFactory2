@@ -72,6 +72,16 @@ def test_exact_plain_text_and_crlf_reports_are_eligible(make_case, report):
     assert interim.eligibility(context)["stage"] == "final"
 
 
+def test_intermediate_text_in_inputs_is_not_a_report(make_case):
+    _, _, context, _ = make_case(report="ACDEFGHIKC")
+    for rows in [context["execution"]["checkpoint"]["artifacts"], context["artifact_previews"],
+                 context["analysis_evidence"]["checkpoint_artifacts"]["records"]]:
+        rows[0]["path"] = "inputs/sequence.txt"
+    decision = interim.eligibility(context)
+    assert decision["report_paths"] == []
+    assert "verified_report_missing" in decision["reasons"]
+
+
 def test_empty_report_is_not_final(make_case):
     _, _, context, _ = make_case(report="\n")
     assert interim.eligibility(context)["stage"] == "interim"
